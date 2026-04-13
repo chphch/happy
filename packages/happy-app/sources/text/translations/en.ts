@@ -217,6 +217,8 @@ export const en: TranslationStructure = {
         markdownCopyV2Subtitle: 'Long press opens copy modal',
         hideInactiveSessions: 'Hide inactive sessions',
         hideInactiveSessionsSubtitle: 'Show only active chats in your list',
+        imageUpload: 'Image Upload',
+        imageUploadSubtitle: 'Attach images to messages for Claude to analyze',
     },
 
     errors: {

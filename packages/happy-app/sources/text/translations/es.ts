@@ -203,6 +203,8 @@ export const es: TranslationStructure = {
         markdownCopyV2Subtitle: 'Pulsación larga abre modal de copiado',
         hideInactiveSessions: 'Ocultar sesiones inactivas',
         hideInactiveSessionsSubtitle: 'Muestra solo los chats activos en tu lista',
+        imageUpload: 'Subida de imágenes',
+        imageUploadSubtitle: 'Adjunta imágenes a los mensajes para que Claude las analice',
     },
 
     errors: {

@@ -204,6 +204,8 @@ export const ja: TranslationStructure = {
         markdownCopyV2Subtitle: '長押しでコピーモーダルを開く',
         hideInactiveSessions: '非アクティブセッションを非表示',
         hideInactiveSessionsSubtitle: 'アクティブなチャットのみをリストに表示',
+        imageUpload: '画像アップロード',
+        imageUploadSubtitle: 'メッセージに画像を添付してClaudeに分析させる',
     },
 
     errors: {

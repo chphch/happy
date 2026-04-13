@@ -14,6 +14,7 @@ export default function FeaturesSettingsScreen() {
     const [markdownCopyV2, setMarkdownCopyV2] = useLocalSettingMutable('markdownCopyV2');
     const [hideInactiveSessions, setHideInactiveSessions] = useSettingMutable('hideInactiveSessions');
     const [expResumeSession, setExpResumeSession] = useSettingMutable('expResumeSession');
+    const [expImageUpload, setExpImageUpload] = useSettingMutable('expImageUpload');
 
     return (
         <ItemList style={{ paddingTop: 0 }}>
@@ -66,6 +67,18 @@ export default function FeaturesSettingsScreen() {
                         <Switch
                             value={expResumeSession}
                             onValueChange={setExpResumeSession}
+                        />
+                    }
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.imageUpload')}
+                    subtitle={t('settingsFeatures.imageUploadSubtitle')}
+                    icon={<Ionicons name="image-outline" size={29} color="#FF2D55" />}
+                    rightElement={
+                        <Switch
+                            value={expImageUpload}
+                            onValueChange={setExpImageUpload}
                         />
                     }
                     showChevron={false}

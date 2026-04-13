@@ -203,6 +203,8 @@ export const zhHant: TranslationStructure = {
         markdownCopyV2Subtitle: '長按開啟複製強制回應視窗',
         hideInactiveSessions: '隱藏非活躍工作階段',
         hideInactiveSessionsSubtitle: '僅在清單中顯示活躍的聊天',
+        imageUpload: '圖片上傳',
+        imageUploadSubtitle: '將圖片附加到訊息中讓 Claude 分析',
     },
 
     errors: {

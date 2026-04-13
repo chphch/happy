@@ -204,6 +204,8 @@ export const zhHans: TranslationStructure = {
         markdownCopyV2Subtitle: '长按打开复制模态框',
         hideInactiveSessions: '隐藏非活跃会话',
         hideInactiveSessionsSubtitle: '仅在列表中显示活跃的聊天',
+        imageUpload: '图片上传',
+        imageUploadSubtitle: '将图片附加到消息中让 Claude 分析',
     },
 
     errors: {

@@ -184,6 +184,8 @@ export const ru: TranslationStructure = {
         markdownCopyV2Subtitle: 'Долгое нажатие открывает модальное окно копирования',
         hideInactiveSessions: 'Скрывать неактивные сессии',
         hideInactiveSessionsSubtitle: 'Показывать в списке только активные чаты',
+        imageUpload: 'Загрузка изображений',
+        imageUploadSubtitle: 'Прикрепляйте изображения к сообщениям для анализа Claude',
     },
 
     errors: {
