@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { SessionListViewItem, useSessionListViewData, useSetting } from '@/sync/storage';
+import { SessionListViewItem, SessionRowData, useSessionListViewData, useSetting } from '@/sync/storage';
 
 export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
     const data = useSessionListViewData();
@@ -11,19 +11,29 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
         }
 
         const result: SessionListViewItem[] = [];
-        let hasInactive = false;
+        const inactiveSessions: SessionRowData[] = [];
+        const starredActiveItems: SessionListViewItem[] = [];
 
-        // First pass: add active sessions group and check if inactive sessions exist
+        // First pass: keep the active-sessions block, collect inactive rows,
+        // also surface starred-but-active sessions as standalone rows
+        // (see buildSessionListViewData → Starred section).
         for (const item of data) {
             if (item.type === 'active-sessions') {
                 result.push(item);
-            } else if (item.type === 'session' && !item.session.active) {
-                hasInactive = true;
+            } else if (item.type === 'session') {
+                if (!item.session.active) {
+                    inactiveSessions.push(item.session);
+                } else if (item.session.starred) {
+                    starredActiveItems.push(item);
+                }
             }
         }
 
-        // Insert archive toggle if there are inactive sessions
-        if (hasInactive) {
+        // Render starred-active sessions as standalone rows immediately after
+        // the active-sessions block, before the archive toggle.
+        result.push(...starredActiveItems);
+
+        if (inactiveSessions.length > 0) {
             result.push({ type: 'archive-toggle', hidden: hideInactiveSessions });
         }
 
