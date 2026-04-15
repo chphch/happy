@@ -167,6 +167,7 @@ export function SessionActionsPopover({
                     <Pressable
                         key={action.id}
                         accessibilityRole="button"
+                        testID={`session-action-${action.id}`}
                         onPress={() => handleActionPress(action)}
                         style={({ pressed }) => [
                             styles.menuItem,

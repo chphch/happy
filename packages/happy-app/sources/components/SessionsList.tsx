@@ -397,7 +397,9 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
             isSingle ? styles.sessionItemContainerSingle :
                 isFirst ? styles.sessionItemContainerFirst :
                     isLast ? styles.sessionItemContainerLast : {}
-        ]}>
+        ]}
+            testID={`session-item-${session.id}`}
+        >
         <Pressable
             style={[
                 styles.sessionItem,
@@ -421,7 +423,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                     </View>
                 )}
                 {session.starred && !session.hasDraft && (
-                    <View style={styles.draftIconContainer}>
+                    <View style={styles.draftIconContainer} testID={`session-star-badge-${session.id}`}>
                         <Ionicons
                             name="star"
                             size={11}
