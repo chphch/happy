@@ -314,6 +314,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
                 selected && styles.sessionRowSelected
             ]}
             onPress={handlePress}
+            testID={`session-item-${session.id}`}
             {...menuProps}
         >
             <View style={styles.sessionContent}>
