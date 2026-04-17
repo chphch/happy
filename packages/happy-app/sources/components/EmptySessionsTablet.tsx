@@ -69,9 +69,9 @@ export function EmptySessionsTablet() {
     };
     
     return (
-        <View style={styles.container}>
-            <Ionicons 
-                name="terminal-outline" 
+        <View style={styles.container} testID="empty-main-screen">
+            <Ionicons
+                name="terminal-outline"
                 size={64} 
                 color={theme.colors.textSecondary}
                 style={styles.iconContainer}

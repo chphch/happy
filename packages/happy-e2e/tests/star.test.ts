@@ -47,9 +47,12 @@ async function createSession(token: string): Promise<string> {
         },
         body: JSON.stringify({
             tag: `e2e-star-test-${Date.now()}`,
-            // Plain text metadata — will fail to decrypt in the app (shows as "unknown"),
-            // but the session still appears in the inactive session list.
-            metadata: 'e2e-placeholder',
+            // Must be valid base64 — the web `atob` in decodeBase64 throws
+            // InvalidCharacterError on non-base64 chars, which rejects
+            // fetchSessions and leaves the list stuck on the loading spinner.
+            // AEAD decryption will still fail (returning null metadata),
+            // but the session is kept in the list via applySessions.
+            metadata: Buffer.from('e2e-placeholder').toString('base64'),
         }),
     });
 
