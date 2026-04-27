@@ -126,6 +126,11 @@ export async function startApi(opts: StartApiOptions = {}) {
             decorateReply: false,
             // SPA fallback — if file not found, serve index.html
             wildcard: false,
+            // Content-hashed expo assets (/_expo/*) are safe to cache hard;
+            // index.html is overridden to no-cache below so config injection stays fresh.
+            cacheControl: true,
+            maxAge: '30d',
+            immutable: true,
         });
         if (injectScript) {
             app.addHook('onSend', async (request, reply, payload) => {
@@ -151,6 +156,7 @@ export async function startApi(opts: StartApiOptions = {}) {
                 }
                 const injected = html.replace(/<head[^>]*>/i, (m) => `${m}\n${injectScript}`);
                 reply.header('content-length', Buffer.byteLength(injected));
+                reply.header('cache-control', 'no-cache');
                 return injected;
             });
         }
@@ -159,8 +165,9 @@ export async function startApi(opts: StartApiOptions = {}) {
             const url = request.raw.url || '';
             // Don't fall through for API/socket/files paths
             if (request.method !== 'GET') return reply.code(404).send({ error: 'Not found' });
-            if (url.startsWith('/v1') || url.startsWith('/v3') || url.startsWith('/socket') ||
-                url.startsWith('/files/') || url.startsWith('/metrics') || url.startsWith('/health')) {
+            if (url.startsWith('/v1') || url.startsWith('/v2') || url.startsWith('/v3') ||
+                url.startsWith('/socket') || url.startsWith('/files/') || url.startsWith('/metrics') ||
+                url.startsWith('/health') || url.startsWith('/logs-combined-')) {
                 return reply.code(404).send({ error: 'Not found' });
             }
             const indexPath = path.join(opts.staticDir!, 'index.html');
@@ -169,8 +176,13 @@ export async function startApi(opts: StartApiOptions = {}) {
             }
             const html = fs.readFileSync(indexPath, 'utf8');
             const injected = injectScript ? html.replace(/<head[^>]*>/i, (m) => `${m}\n${injectScript}`) : html;
-            reply.type('text/html').send(injected);
+            reply.header('cache-control', 'no-cache').type('text/html').send(injected);
         });
+
+        // Compress served assets (expo JS/CSS bundles, ~3-5x smaller). Registered
+        // AFTER the injection onSend hook so order is inject-then-compress; scoped
+        // to static mode (Docker API-only mode leaves compression to nginx).
+        app.register(import('@fastify/compress'), { global: true, threshold: 1024 });
     }
 
     // Start HTTP
