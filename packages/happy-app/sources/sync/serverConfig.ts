@@ -1,4 +1,5 @@
 import { MMKV } from 'react-native-mmkv';
+import Constants from 'expo-constants';
 
 // Separate MMKV instance for server config that persists across logouts
 const serverConfigStorage = new MMKV({ id: 'server-config' });
@@ -10,6 +11,10 @@ const DEFAULT_SERVER_URL = 'https://api.cluster-fluster.com';
 export function getServerUrl(): string {
     return serverConfigStorage.getString(SERVER_KEY) ||
            (globalThis as any).__HAPPY_CONFIG__?.serverUrl ||
+           // Baked into every bundle via app.config.js extra.serverUrl (selfhost
+           // only) — survives `eas update`, unlike the build-time env var below
+           // which the OTA publisher must remember to export. (DD, 2026-06-10)
+           (Constants.expoConfig?.extra as any)?.serverUrl ||
            process.env.EXPO_PUBLIC_HAPPY_SERVER_URL ||
            DEFAULT_SERVER_URL;
 }
