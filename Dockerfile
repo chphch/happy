@@ -13,6 +13,12 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY scripts ./scripts
 COPY patches ./patches
 
+# happy-server doesn't run Electron — happy-app pulls it as a workspace dep
+# for desktop builds. Skipping the postinstall binary download avoids a
+# server-image-build dependency on github.com/electron/electron releases,
+# which has periodically returned 504s during our weekly rebuild cron.
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
+
 RUN mkdir -p packages/happy-app packages/happy-server packages/happy-cli packages/happy-agent packages/happy-wire
 
 COPY packages/happy-app/package.json packages/happy-app/
