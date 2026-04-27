@@ -1,15 +1,18 @@
 const { execFileSync } = require('node:child_process');
 
 const variant = process.env.APP_ENV || 'development';
+const isSelfhost = variant === 'selfhost';
 const name = {
     development: "Happy (dev)",
     preview: "Happy (preview)",
-    production: "Happy"
+    production: "Happy",
+    selfhost: "Happy (chphch)"
 }[variant];
 const bundleId = {
     development: "com.slopus.happy.dev",
     preview: "com.slopus.happy.preview",
-    production: "com.ex3ndr.happy"
+    production: "com.ex3ndr.happy",
+    selfhost: "com.chphch.happy.selfhost"
 }[variant];
 // const stagingElevenLabsAgentId = 'agent_7801k2c0r5hjfraa1kdbytpvs6yt';
 const productionElevenLabsAgentId = 'agent_6701k211syvvegba4kt7m68nxjmw';
@@ -17,11 +20,13 @@ const elevenLabsAgentId = {
     development: productionElevenLabsAgentId,
     preview: productionElevenLabsAgentId,
     production: productionElevenLabsAgentId,
+    selfhost: productionElevenLabsAgentId,
 }[variant];
 const consoleLoggingDefault = {
     development: true,
     preview: true,
     production: false,
+    selfhost: false,
 }[variant];
 
 function git(args) {
@@ -59,7 +64,7 @@ export default {
     expo: {
         name,
         slug: "happy",
-        version: "1.7.0",
+        version: process.env.ANDROID_VERSION_NAME || "1.7.0",
         runtimeVersion: "21",
         orientation: "default",
         icon: "./sources/assets/images/icon.png",
@@ -110,7 +115,8 @@ export default {
                 "android.permission.READ_MEDIA_VIDEO",
             ],
             package: bundleId,
-            googleServicesFile: "./google-services.json",
+            ...(process.env.ANDROID_VERSION_CODE ? { versionCode: parseInt(process.env.ANDROID_VERSION_CODE, 10) } : {}),
+            ...(isSelfhost ? {} : { googleServicesFile: "./google-services.json" }),
             intentFilters: variant === 'production' ? [
                 {
                     "action": "VIEW",
@@ -206,9 +212,11 @@ export default {
             ]
         ],
         updates: {
-            url: "https://u.expo.dev/4558dd3d-cd5a-47cd-bad9-e591a241cc06",
+            url: isSelfhost
+                ? "https://u.expo.dev/11313486-e54f-4962-a6b2-3b8bef7a8386"
+                : "https://u.expo.dev/4558dd3d-cd5a-47cd-bad9-e591a241cc06",
             requestHeaders: {
-                "expo-channel-name": "production"
+                "expo-channel-name": isSelfhost ? "selfhost" : "production"
             }
         },
         experiments: {
@@ -219,8 +227,16 @@ export default {
                 root: "./sources/app"
             },
             eas: {
-                projectId: "4558dd3d-cd5a-47cd-bad9-e591a241cc06"
+                projectId: isSelfhost
+                    ? "11313486-e54f-4962-a6b2-3b8bef7a8386"
+                    : "4558dd3d-cd5a-47cd-bad9-e591a241cc06"
             },
+            // Self-host server URL baked into every bundle (incl. OTA) so
+            // `eas update` no longer depends on the publisher exporting
+            // EXPO_PUBLIC_HAPPY_SERVER_URL. Read by getServerUrl() in
+            // sources/sync/serverConfig.ts. Lives beside the updates.url /
+            // eas.projectId selfhost ternaries above. (DD, 2026-06-10)
+            serverUrl: isSelfhost ? "https://happy.bingsucouple.com" : undefined,
             app: {
                 postHogKey: process.env.EXPO_PUBLIC_POSTHOG_API_KEY,
                 revenueCatAppleKey: process.env.EXPO_PUBLIC_REVENUE_CAT_APPLE,
@@ -232,6 +248,6 @@ export default {
                 buildCommitTimestamp: buildMetadata.commitTimestamp,
             }
         },
-        owner: "bulkacorp"
+        ...(isSelfhost ? {} : { owner: "bulkacorp" })
     }
 };
