@@ -12,3 +12,16 @@ node_modules
 **/ios/Pods
 **/src-tauri/target
 **/target
+
+# Mobile build outputs — keep them out of every Docker build context.
+# The android tree alone is ~1.5 GB after a cancun gradle build is pulled
+# back to macmini for apksigner re-sign; tarring it into the context blew
+# past Docker's VM disk quota (ENOSPC) during server + webapp builds on
+# 2026-06-09. None of the server/webapp/cli images need any of this.
+**/android/app/build
+**/android/build
+**/android/.gradle
+**/android/app/release
+**/android/local.properties
+**/ios/build
+**/ios/DerivedData
