@@ -9,7 +9,7 @@ import { type SessionState, formatPathRelativeToHome, vibingMessages, formatLast
 import { Avatar } from './Avatar';
 import { Typography } from '@/constants/Typography';
 import { StatusDot } from './StatusDot';
-import { useAllMachines, useSessionGitStatus } from '@/sync/storage';
+import { useAllMachines, useSessionGitStatus, useIsProjectStarred, useStarredProjects, storage, projectKey } from '@/sync/storage';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
@@ -86,6 +86,12 @@ const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRo
         router.navigate('/new');
     }, [session.machineId, session.homeDir, repoPath, isWorktree, sessionPath, draft, router]);
 
+    const isStarred = useIsProjectStarred(session.machineId, repoPath);
+    const handleToggleStar = React.useCallback(() => {
+        if (!session.machineId) return;
+        storage.getState().toggleProjectStarred(session.machineId, repoPath);
+    }, [session.machineId, repoPath]);
+
     const [isHovered, setIsHovered] = React.useState(false);
 
     return (
@@ -129,6 +135,19 @@ const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRo
                 )}
             </View>
 
+            {/* Star toggle — always visible (filled when starred, outline otherwise) */}
+            <Pressable
+                onPress={handleToggleStar}
+                hitSlop={{ top: 15, bottom: 15, left: 8, right: 8 }}
+                style={styles.starButton}
+            >
+                <Ionicons
+                    name={isStarred ? 'star' : 'star-outline'}
+                    size={14}
+                    color={isStarred ? '#f5a623' : theme.colors.textSecondary}
+                />
+            </Pressable>
+
             {/* + button — vertically centered, large hit area; desktop: hover-only */}
             <Pressable
                 onPress={handleAdd}
@@ -166,6 +185,7 @@ const MachineSeparator = React.memo(({ machineName, machineId }: { machineName: 
 export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: ActiveSessionsGroupProps) {
     const styles = stylesheet;
     const machines = useAllMachines();
+    const starredProjects = useStarredProjects();
 
     const machinesMap = React.useMemo(() => {
         const map: Record<string, Machine> = {};
@@ -229,7 +249,14 @@ export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: Acti
         <View style={styles.container}>
             {machineGroups.map(machineGroup => {
                 const sortedProjects = Array.from(machineGroup.projects.entries()).sort(
-                    ([, a], [, b]) => a.displayPath.localeCompare(b.displayPath)
+                    ([pathA, a], [pathB, b]) => {
+                        const repoA = isWorktreePath(pathA) ? getRepoPath(pathA) : pathA;
+                        const repoB = isWorktreePath(pathB) ? getRepoPath(pathB) : pathB;
+                        const starredA = starredProjects.has(projectKey(machineGroup.machineId, repoA));
+                        const starredB = starredProjects.has(projectKey(machineGroup.machineId, repoB));
+                        if (starredA !== starredB) return starredA ? -1 : 1;
+                        return a.displayPath.localeCompare(b.displayPath);
+                    }
                 );
 
                 return (
@@ -474,6 +501,10 @@ const stylesheet = StyleSheet.create((theme) => ({
         marginLeft: 3,
     },
     addButton: {
+        marginLeft: 4,
+        padding: 8,
+    },
+    starButton: {
         marginLeft: 4,
         padding: 8,
     },
