@@ -22,8 +22,11 @@ import { LocalSettings, applyLocalSettings } from "./localSettings";
 import { Purchases, customerInfoToPurchases } from "./purchases";
 import { Profile } from "./profile";
 import { UserProfile, RelationshipUpdatedEvent } from "./friendTypes";
-import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts } from "./persistence";
+import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts, loadStarredProjects, saveStarredProjects } from "./persistence";
 import { isAgentModePushPending } from "./agentModesPending";
+
+export const projectKey = (machineId: string, path: string): string => `${machineId}:${path}`;
+import type { PermissionModeKey } from '@/components/PermissionModeSelector';
 import type { CustomerInfo } from './revenueCat/types';
 import React from "react";
 import { sync } from "./sync";
@@ -173,6 +176,9 @@ interface StorageState {
     socketLastDisconnectedAt: number | null;
     isDataReady: boolean;
     nativeUpdateStatus: { available: boolean; updateUrl?: string } | null;
+    starredProjects: Set<string>;  // Set of `${machineId}:${path}` keys (custom-only feature, MMKV-persisted, not server-synced)
+    toggleProjectStarred: (machineId: string, path: string) => void;
+    isProjectStarred: (machineId: string, path: string) => boolean;
     applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[]) => void;
     applyMachines: (machines: Machine[], replace?: boolean) => void;
     deleteMachine: (machineId: string) => void;
@@ -368,6 +374,7 @@ export const storage = create<StorageState>()((set, get) => {
         nativeUpdateStatus: null,
         unreadSessionIds: new Set<string>(),
         currentViewingSessionId: null,
+        starredProjects: loadStarredProjects(),
         isMutableToolCall: (sessionId: string, callId: string) => {
             const sessionMessages = get().sessionMessages[sessionId];
             if (!sessionMessages) {
@@ -961,6 +968,20 @@ export const storage = create<StorageState>()((set, get) => {
                 ...updates
             };
         }),
+        toggleProjectStarred: (machineId: string, path: string) => set((state) => {
+            const key = projectKey(machineId, path);
+            const next = new Set(state.starredProjects);
+            if (next.has(key)) {
+                next.delete(key);
+            } else {
+                next.add(key);
+            }
+            saveStarredProjects(next);
+            return { ...state, starredProjects: next };
+        }),
+        isProjectStarred: (machineId: string, path: string) => {
+            return get().starredProjects.has(projectKey(machineId, path));
+        },
         updateSessionDraft: (sessionId: string, draft: string | null) => set((state) => {
             const session = state.sessions[sessionId];
             if (!session) return state;
@@ -1393,6 +1414,17 @@ export function useLocalSetting<K extends keyof LocalSettings>(name: K): LocalSe
 
 export function useIsSessionUnread(sessionId: string): boolean {
     return storage((state) => state.unreadSessionIds.has(sessionId));
+}
+
+export function useStarredProjects(): Set<string> {
+    return storage((state) => state.starredProjects);
+}
+
+export function useIsProjectStarred(machineId: string | undefined | null, path: string | undefined | null): boolean {
+    return storage((state) => {
+        if (!machineId || !path) return false;
+        return state.starredProjects.has(projectKey(machineId, path));
+    });
 }
 
 // Artifact hooks
