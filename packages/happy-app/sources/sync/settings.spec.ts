@@ -192,6 +192,7 @@ describe('settings', () => {
                 sessionStatusBarDisplay: 'hidden',
                 hideInactiveSessions: false,
                 sortSessionsByActivity: false,
+                archivedSessionsSortBy: 'createdAt',
                 expResumeSession: false,
                 fileDiffsSidebar: false,
                 groupToolCalls: false,
