@@ -209,6 +209,32 @@ const stylesheet = StyleSheet.create((theme) => ({
         paddingHorizontal: 12,
         ...Typography.default('semiBold'),
     },
+    archiveSort: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 6,
+        paddingHorizontal: 24,
+        paddingTop: 0,
+        paddingBottom: 8,
+    },
+    archiveSortOption: {
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+    },
+    archiveSortText: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        ...Typography.default('regular'),
+    },
+    archiveSortTextActive: {
+        color: theme.colors.text,
+        ...Typography.default('semiBold'),
+    },
+    archiveSortSeparator: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+    },
 }));
 
 export function SessionsList({
@@ -228,9 +254,12 @@ export function SessionsList({
     const pathname = usePathname();
     const isTablet = useIsTablet();
     const [hideInactiveSessions, setHideInactiveSessions] = useSettingMutable('hideInactiveSessions');
+    const setArchivedSortBy = useSettingMutable('archivedSessionsSortBy')[1];
     const toggleArchived = React.useCallback(() => {
         setHideInactiveSessions(!hideInactiveSessions);
     }, [hideInactiveSessions, setHideInactiveSessions]);
+    const sortByCreatedAt = React.useCallback(() => setArchivedSortBy('createdAt'), [setArchivedSortBy]);
+    const sortByLastSeen = React.useCallback(() => setArchivedSortBy('lastSeenAt'), [setArchivedSortBy]);
     // Selection is derived once from pathname so the data array stays stable
     // across navigations. This keeps FlatList virtualization intact: only
     // the previously- and newly-selected rows re-render, instead of the
@@ -307,6 +336,7 @@ export function SessionsList({
             case 'header': return `header-${item.title}-${index}`;
             case 'active-sessions': return 'active-sessions';
             case 'archive-toggle': return 'archive-toggle';
+            case 'archive-sort': return 'archive-sort';
             case 'project-group': return `project-group-${item.machine.id}-${item.displayPath}-${index}`;
             case 'session': return `session-${item.session.id}`;
         }
@@ -332,6 +362,24 @@ export function SessionsList({
                         </Text>
                         <View style={styles.archiveToggleLine} />
                     </Pressable>
+                );
+
+            case 'archive-sort':
+                return (
+                    <View style={styles.archiveSort}>
+                        <Ionicons name="swap-vertical-outline" size={14} color="#8E8E93" />
+                        <Pressable style={styles.archiveSortOption} onPress={sortByCreatedAt}>
+                            <Text style={[styles.archiveSortText, item.current === 'createdAt' && styles.archiveSortTextActive]}>
+                                {t('settingsFeatures.archivedSortByValueStarted')}
+                            </Text>
+                        </Pressable>
+                        <Text style={styles.archiveSortSeparator}>·</Text>
+                        <Pressable style={styles.archiveSortOption} onPress={sortByLastSeen}>
+                            <Text style={[styles.archiveSortText, item.current === 'lastSeenAt' && styles.archiveSortTextActive]}>
+                                {t('settingsFeatures.archivedSortByValueLastSeen')}
+                            </Text>
+                        </Pressable>
+                    </View>
                 );
 
             case 'active-sessions':
@@ -374,7 +422,7 @@ export function SessionsList({
                     />
                 );
         }
-    }, [selectedSessionId, data, toggleArchived]);
+    }, [selectedSessionId, data, toggleArchived, sortByCreatedAt, sortByLastSeen]);
 
 
     // Remove this section as we'll use FlatList for all items now
