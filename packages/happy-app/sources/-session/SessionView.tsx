@@ -488,10 +488,6 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const isDisconnected = !sessionStatus.isConnected;
     const resumeCommandBlock = getResumeCommandBlock(session);
 
-    // Image attachment state (expImageUpload feature flag)
-    const expImageUpload = useSetting('expImageUpload');
-    const { selectedImages, pickImages, removeImage, clearImages, addImages } = useImagePicker();
-
     // ChatComposer owns the message state + useDraft subscription. We only
     // hold an imperative handle so handleSend can read the live text and
     // clear it without subscribing to it (which would re-render the whole
@@ -537,13 +533,11 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     // need to re-create on every keystroke.
     const handleSend = React.useCallback(() => {
         const liveMessage = composerHandleRef.current?.getMessage() ?? '';
-        if (liveMessage.trim() || (expImageUpload && selectedImages.length > 0)) {
-            const attachments = expImageUpload ? selectedImages : undefined;
+        if (liveMessage.trim()) {
             composerHandleRef.current?.clearMessage();
-            if (expImageUpload) clearImages();
-            sync.sendMessage(sessionId, liveMessage, { source: 'chat', attachments });
+            sync.sendMessage(sessionId, liveMessage, { source: 'chat' });
         }
-    }, [sessionId, expImageUpload, selectedImages, clearImages]);
+    }, [sessionId]);
 
     const handleAbort = React.useCallback(() => {
         storage.getState().resetSessionAgentOverrides(sessionId);
@@ -690,10 +684,6 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             onAbort={isDisconnected ? undefined : handleAbort}
             showAbortButton={sessionStatus.state === 'thinking' || sessionStatus.state === 'waiting'}
             onFileViewerPress={experiments && !isTablet ? handleFileViewerPress : undefined}
-            selectedImages={expImageUpload ? selectedImages : undefined}
-            onPickImages={expImageUpload ? pickImages : undefined}
-            onRemoveImage={expImageUpload ? removeImage : undefined}
-            onAddImages={expImageUpload ? addImages : undefined}
             autocompletePrefixes={AGENT_INPUT_AUTOCOMPLETE_PREFIXES}
             autocompleteSuggestions={handleAutocompleteSuggestions}
             usageData={usageData}
