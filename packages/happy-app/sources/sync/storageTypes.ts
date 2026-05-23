@@ -426,6 +426,8 @@ export const MachineMetadataSchema = z.object({
         claude: z.boolean(),
         codex: z.boolean(),
         gemini: z.boolean(),
+        // Optional for backward compatibility with CLIs predating Hermes support.
+        hermes: z.boolean().optional(),
         openclaw: z.boolean(),
         agy: z.boolean().optional(), // optional: older CLIs don't report agy
         rig: z.boolean().optional(), // Rig runs its own Happy-connected daemon
