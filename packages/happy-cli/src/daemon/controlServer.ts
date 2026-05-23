@@ -16,12 +16,16 @@ export function startDaemonControlServer({
   getChildren,
   stopSession,
   spawnSession,
+  resumeSession,
+  reviveOrphans,
   requestShutdown,
   onHappySessionWebhook
 }: {
   getChildren: () => TrackedSession[];
   stopSession: (sessionId: string) => boolean;
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
+  resumeSession: (happySessionId: string, options?: { model?: string; permissionMode?: string }) => Promise<SpawnSessionResult>;
+  reviveOrphans: (options?: { maxAgeMs?: number }) => Promise<{ attempted: { happySessionId: string; path: string; result: SpawnSessionResult }[] }>;
   requestShutdown: () => void;
   onHappySessionWebhook: (sessionId: string, metadata: Metadata, encryption?: SessionEncryptionData) => void;
 }): Promise<{ port: number; stop: () => Promise<void> }> {
@@ -188,6 +192,72 @@ export function startDaemonControlServer({
             error: result.errorMessage
           };
       }
+    });
+
+    // Resume a previously-active session by happySessionId.
+    // Replicates the mobile app's resume-happy-session RPC, but locally.
+    typed.post('/resume-session', {
+      schema: {
+        body: z.object({
+          happySessionId: z.string(),
+          model: z.string().optional(),
+          permissionMode: z.string().optional(),
+        }),
+        response: {
+          200: z.object({
+            success: z.boolean(),
+            sessionId: z.string().optional(),
+            error: z.string().optional(),
+          }),
+          500: z.object({
+            success: z.boolean(),
+            error: z.string().optional(),
+          })
+        }
+      }
+    }, async (request, reply) => {
+      const { happySessionId, model, permissionMode } = request.body;
+      logger.debug(`[CONTROL SERVER] Resume session request: ${happySessionId}`);
+      const result = await resumeSession(happySessionId, { model, permissionMode });
+      if (result.type === 'success') {
+        return { success: true, sessionId: result.sessionId };
+      }
+      reply.code(500);
+      return { success: false, error: result.type === 'error' ? result.errorMessage : `unexpected: ${result.type}` };
+    });
+
+    // Bulk-revive: scan persisted sessions, attempt resume for each unarchived
+    // daemon-spawned session whose hostPid is dead AND no alive session for the same cwd.
+    typed.post('/resume-orphans', {
+      schema: {
+        body: z.object({
+          maxAgeMs: z.number().optional(),
+        }).optional(),
+        response: {
+          200: z.object({
+            attempted: z.array(z.object({
+              happySessionId: z.string(),
+              path: z.string(),
+              ok: z.boolean(),
+              sessionId: z.string().optional(),
+              error: z.string().optional(),
+            }))
+          })
+        }
+      }
+    }, async (request) => {
+      const maxAgeMs = request.body?.maxAgeMs;
+      logger.debug(`[CONTROL SERVER] Resume orphans request (maxAgeMs=${maxAgeMs ?? 'default'})`);
+      const { attempted } = await reviveOrphans({ maxAgeMs });
+      return {
+        attempted: attempted.map(a => ({
+          happySessionId: a.happySessionId,
+          path: a.path,
+          ok: a.result.type === 'success',
+          sessionId: a.result.type === 'success' ? a.result.sessionId : undefined,
+          error: a.result.type === 'error' ? a.result.errorMessage : undefined,
+        }))
+      };
     });
 
     // Stop daemon
