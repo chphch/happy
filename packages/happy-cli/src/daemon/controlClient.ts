@@ -109,6 +109,18 @@ export async function stopDaemonHttp(): Promise<void> {
   await daemonPost('/stop');
 }
 
+export async function resumeDaemonSession(happySessionId: string, options?: { model?: string; permissionMode?: string }): Promise<{ success: boolean; sessionId?: string; error?: string }> {
+  const result = await daemonPost('/resume-session', { happySessionId, ...options });
+  if (result?.error) return { success: false, error: result.error };
+  return result;
+}
+
+export async function reviveDaemonOrphans(options?: { maxAgeMs?: number }): Promise<{ attempted: { happySessionId: string; path: string; ok: boolean; sessionId?: string; error?: string }[] } | { error: string }> {
+  const result = await daemonPost('/resume-orphans', options ?? {});
+  if (result?.error) return { error: result.error };
+  return result;
+}
+
 /**
  * The version check is still quite naive.
  * For instance we are not handling the case where we upgraded happy,
