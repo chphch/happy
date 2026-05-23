@@ -34,6 +34,7 @@ import { extractNoSandboxFlag } from './utils/sandboxFlags'
 import { handleResumeCommand } from '@/resume/handleResumeCommand'
 import { ensureDaemonRunning } from './daemon/ensureDaemonRunning'
 import { handleCodexCommand } from './commands/codexCommand'
+import { handleSendCommand } from './commands/sendCommand'
 
 
 (async () => {
@@ -497,6 +498,17 @@ Conversation history is preserved on the server, but in-flight tool calls are in
       process.exit(1)
     }
     return;
+  } else if (subcommand === 'send') {
+    try {
+      await handleSendCommand(args.slice(1));
+    } catch (error) {
+      console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error')
+      if (process.env.DEBUG) {
+        console.error(error)
+      }
+      process.exit(1)
+    }
+    return;
   } else if (subcommand === 'daemon') {
     // Show daemon management help
     const daemonSubcommand = args[1]
@@ -721,6 +733,7 @@ ${chalk.bold('Usage:')}
   happy connect           Connect AI vendor API keys
   happy sandbox           Configure and manage OS-level sandboxing
   happy notify            Send push notification
+  happy send              Send a user message to another Happy session
   happy daemon            Manage background service that allows
                             to spawn new sessions away from your computer
   happy doctor            System diagnostics & troubleshooting
@@ -743,6 +756,9 @@ ${chalk.bold('Examples:')}
                            Print raw ACP backend/envelope events
   happy auth login --force Authenticate
   happy doctor             Run diagnostics
+  happy send --list        List cached sessions you can send messages to
+  happy send cmphrci0 "ping"
+                           Send a user message into the session matching that prefix
 
 ${chalk.bold('Happy supports ALL Claude options!')}
   Use any claude flag with happy as you would with claude. Our favorite:
