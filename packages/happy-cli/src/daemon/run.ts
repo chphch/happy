@@ -178,12 +178,39 @@ export async function startDaemon(): Promise<void> {
     // Setup state - key by PID
     const pidToTrackedSession = new Map<number, TrackedSession>();
 
+    // Liveness probe. `process.kill(pid, 0)` doesn't signal the target — it just
+    // checks whether the PID currently exists for us.
+    const isPidAlive = (pid: number | undefined): boolean => {
+      if (!pid) return false;
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // A process recorded before the machine's current boot is definitely gone:
+    // a reboot resets the PID space, so a raw `isPidAlive(hostPid)` can give a
+    // false positive once an unrelated process reuses that PID. Gate the probe on
+    // "this record was saved during the current boot". `savedAt` is stamped when
+    // the session reports itself (its process was alive then), so
+    // `savedAt < bootTime` ⇒ the process can only have died since ⇒ treat as dead.
+    const bootTimeMs = Date.now() - os.uptime() * 1000;
+    const isPersistedHostAlive = (s: PersistedSession): boolean =>
+      s.savedAt >= bootTimeMs && isPidAlive(s.metadata?.hostPid);
+
     // Retain session data after process exits so resume can still find it.
-    // Pre-populate from disk so sessions survive daemon restarts.
+    // Pre-populate from disk so sessions survive daemon restarts. Sessions whose
+    // host process is still alive (daemon-only restart / upgrade — children are
+    // detached and survive the old daemon's exit) are ALSO re-tracked as live in
+    // `pidToTrackedSession`, so `daemon list`, stop, and revive-dedup stay
+    // accurate across a restart without the session having to re-register.
     const sessionIdToFinishedSession = new Map<string, TrackedSession>();
     const persisted = readPersistedSessions();
+    let rehydratedAlive = 0;
     for (const [id, s] of Object.entries(persisted)) {
-      sessionIdToFinishedSession.set(id, {
+      const tracked: TrackedSession = {
         startedBy: 'persisted',
         happySessionId: id,
         happySessionMetadataFromLocalWebhook: s.metadata,
@@ -195,10 +222,21 @@ export async function startDaemon(): Promise<void> {
           agentStateVersion: s.agentStateVersion,
         },
         pid: 0,
-      });
+      };
+      sessionIdToFinishedSession.set(id, tracked);
+
+      const hostPid = s.metadata?.hostPid;
+      if (hostPid && isPersistedHostAlive(s)) {
+        // Re-track the still-running session under its real PID. There is no
+        // childProcess handle (we didn't spawn it this boot), so stopSession
+        // falls back to process.kill(pid) and the heartbeat prunes it once the
+        // PID dies — at which point it remains resumable via the finished map.
+        pidToTrackedSession.set(hostPid, { ...tracked, pid: hostPid });
+        rehydratedAlive++;
+      }
     }
     if (Object.keys(persisted).length > 0) {
-      logger.debug(`[DAEMON RUN] Loaded ${Object.keys(persisted).length} persisted sessions from disk`);
+      logger.debug(`[DAEMON RUN] Loaded ${Object.keys(persisted).length} persisted sessions from disk (${rehydratedAlive} still alive, re-tracked)`);
     }
 
     // Session spawning awaiter system
@@ -805,11 +843,129 @@ export async function startDaemon(): Promise<void> {
       pidToTrackedSession.delete(pid);
     };
 
+    // Bulk-revive: scan persisted sessions, attempt resume for each
+    // daemon-spawned session whose hostPid is dead AND no currently-tracked
+    // session shares the same cwd. Idempotent: a second call only resumes
+    // sessions still missing. (isPidAlive / isPersistedHostAlive are defined
+    // near the top of startDaemon, alongside the startup rehydration.)
+    const reviveOrphans = async (options?: { maxAgeMs?: number }): Promise<{ attempted: { happySessionId: string; path: string; result: SpawnSessionResult }[] }> => {
+      // `maxAgeMs` is an optional ceiling on `lifecycleStateSince` for callers who
+      // want to constrain the scan; by default we revive every unarchived
+      // daemon-spawned session whose host process is dead, regardless of age.
+      const cutoffMs = options?.maxAgeMs !== undefined ? Date.now() - options.maxAgeMs : undefined;
+      const persisted = readPersistedSessions();
+
+      // Skip sessions that are ALREADY alive — keyed by happySessionId, not by
+      // cwd. The old per-cwd gate capped revival at one session per project;
+      // we now revive every unarchived dead session, so the liveness check must
+      // be per-session, or we'd refuse to revive a dead session just because a
+      // sibling in the same cwd happens to be up.
+      const aliveSessionIds = new Set<string>();
+      for (const t of pidToTrackedSession.values()) {
+        if (t.happySessionId) aliveSessionIds.add(t.happySessionId);
+      }
+
+      // The CLI treats both 'archived' and 'archiveRequested' as terminal — see
+      // apiSession.ts where the runtime exits on either. Reviving an
+      // archive-requested session would race the same exit signal, so skip both.
+      // Everything NOT archived is fair game — the intent is "revive all of a
+      // project's sessions except the ones explicitly archived".
+      const isUnarchived = (s: string | undefined): boolean =>
+        s !== 'archived' && s !== 'archiveRequested';
+
+      // CRITICAL: local sessions.json holds each session's INITIAL webhook
+      // metadata only — later archive/unarchive happens server-side and is never
+      // written back, so local `lifecycleState` is stale (~always 'running').
+      // Fetch the server's authoritative metadata once and decrypt each with the
+      // locally-cached per-session key, so "exclude archived" is actually correct.
+      // Sessions the server no longer lists aren't resumable anyway (resumeSession's
+      // own fetch would miss them), so they're skipped when the fetch succeeded.
+      // FAIL CLOSED: if the server can't be reached we CANNOT tell which
+      // sessions are archived (local lifecycleState is uselessly stale, per
+      // above). Reviving on stale state resurrects archived sessions — the
+      // 2026-06-11 over-revive: a daemon reboot mid-deploy raced the swapping
+      // server, the fetch aborted on its 10s timeout, the (then) stale-local
+      // fallback yielded 250 candidates incl. archived ones. So RETRY the fetch
+      // (a just-restarted server is briefly unready), and if it still fails,
+      // skip the whole revive rather than reviving everything. `serverFetchOk`
+      // tracks the GET succeeding — NOT `serverMd.size`, so a legitimately empty
+      // session list doesn't read as a failure.
+      const serverMd = new Map<string, Metadata>();
+      let serverFetchOk = false;
+      for (let attempt = 1; attempt <= 3 && !serverFetchOk; attempt++) {
+        try {
+          const resp = await axios.get(`${configuration.serverUrl}/v1/sessions`, {
+            headers: { Authorization: `Bearer ${credentials.token}` }, timeout: 2_500,
+          });
+          serverFetchOk = true;
+          for (const sv of ((resp.data as { sessions?: { id: string; metadata: string }[] }).sessions ?? [])) {
+            const local = persisted[sv.id];
+            if (!local?.encryptionKey) continue;
+            try {
+              serverMd.set(sv.id, decrypt(decodeBase64(local.encryptionKey), local.encryptionVariant, decodeBase64(sv.metadata)) as Metadata);
+            } catch { /* undecryptable — skip */ }
+          }
+        } catch (e) {
+          logger.debug(`[DAEMON RUN] reviveOrphans: server session fetch attempt ${attempt}/3 failed: ${e instanceof Error ? e.message : e}`);
+          // Keep total retry budget < the 10s daemonPost client timeout so a
+          // manual /resume-orphans call doesn't abort client-side mid-retry:
+          // worst case 3×2.5s + 0.5s + 1s = 9s.
+          if (attempt < 3) await new Promise<void>((resolve) => setTimeout(resolve, 500 * attempt));
+        }
+      }
+      if (!serverFetchOk) {
+        logger.debug('[DAEMON RUN] reviveOrphans: server unreachable after 3 attempts — skipping revive (cannot verify archive state; failing closed to avoid resurrecting archived sessions)');
+        return { attempted: [] };
+      }
+
+      type Candidate = { happySessionId: string; path: string; lifecycleStateSince: number; hostPid?: number };
+      const candidates: Candidate[] = [];
+      for (const [id, s] of Object.entries(persisted)) {
+        const md = s.metadata as Metadata | undefined;
+        if (!md || !md.path) continue;
+        if (!md.startedFromDaemon) continue;
+        // Server is the source of truth for archived state. The fetch is
+        // guaranteed to have succeeded here (fail-closed return above), so skip
+        // sessions the server no longer lists, and trust ONLY server
+        // lifecycleState — never the stale local copy that can't see archives.
+        const sm = serverMd.get(id);
+        if (!sm) continue;
+        if (!isUnarchived(sm.lifecycleState)) continue;
+        const since = (sm.lifecycleStateSince ?? 0) as number;
+        if (cutoffMs !== undefined && since < cutoffMs) continue;
+        if (aliveSessionIds.has(id)) continue;   // this exact session is already up
+        if (isPersistedHostAlive(s)) continue;    // its host process is still running
+        candidates.push({ happySessionId: id, path: md.path, lifecycleStateSince: since, hostPid: md.hostPid });
+      }
+
+      const cwdCount = new Set(candidates.map((c) => c.path)).size;
+      logger.debug(`[DAEMON RUN] reviveOrphans: ${candidates.length} candidates across ${cwdCount} cwds (cutoff=${cutoffMs !== undefined ? new Date(cutoffMs).toISOString() : 'none'})`);
+
+      // Revive every candidate, but with bounded concurrency: a project can hold
+      // many dead sessions and firing all `happy claude --resume` spawns at once
+      // would thunder-herd the box (each spawn = a node process + websocket +
+      // agent subprocess). Batches of REVIVE_CONCURRENCY run in parallel; the
+      // next batch waits for the previous, capping peak load.
+      const attempted: { happySessionId: string; path: string; result: SpawnSessionResult }[] = [];
+      const REVIVE_CONCURRENCY = 5;
+      for (let i = 0; i < candidates.length; i += REVIVE_CONCURRENCY) {
+        const batch = candidates.slice(i, i + REVIVE_CONCURRENCY);
+        const results = await Promise.all(batch.map(async (c) => {
+          const result = await resumeSession(c.happySessionId);
+          return { happySessionId: c.happySessionId, path: c.path, result };
+        }));
+        attempted.push(...results);
+      }
+      return { attempted };
+    };
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
       getChildren: getCurrentChildren,
       stopSession,
       spawnSession,
+      resumeSession,
+      reviveOrphans,
       requestShutdown: () => requestShutdown('happy-cli'),
       onHappySessionWebhook
     });
@@ -873,6 +1029,38 @@ export async function startDaemon(): Promise<void> {
 
     // Connect to server
     apiMachine.connect();
+
+    // Auto-revive orphans on startup (default ON; opt out with
+    // HAPPY_DAEMON_AUTO_REVIVE_ORPHANS=0). After a machine reboot or crash the
+    // daemon comes back (systemd/launchd) but its daemon-spawned sessions are
+    // gone — this resurrects every unarchived one whose host process is dead.
+    // Sessions that survived a daemon-only restart were re-tracked above, so
+    // their cwd is already "alive" and they are skipped here (no double-spawn).
+    // By default there is NO time window — set HAPPY_DAEMON_AUTO_REVIVE_WINDOW_HOURS
+    // to put a ceiling on `lifecycleStateSince`. Runs once after a short delay so
+    // the WebSocket is connected and ready to receive the spawned sessions'
+    // webhooks.
+    if (process.env.HAPPY_DAEMON_AUTO_REVIVE_ORPHANS !== '0') {
+      const hoursEnv = process.env.HAPPY_DAEMON_AUTO_REVIVE_WINDOW_HOURS;
+      const hoursParsed = hoursEnv ? parseInt(hoursEnv) : NaN;
+      const maxAgeMs = Number.isFinite(hoursParsed) && hoursParsed > 0 ? hoursParsed * 60 * 60 * 1000 : undefined;
+      setTimeout(async () => {
+        try {
+          logger.debug(`[DAEMON RUN] Auto-revive orphans starting${maxAgeMs !== undefined ? ` (window=${hoursParsed}h)` : ' (no time window — all unarchived)'}`);
+          const { attempted } = await reviveOrphans(maxAgeMs !== undefined ? { maxAgeMs } : undefined);
+          const ok = attempted.filter(a => a.result.type === 'success').length;
+          const failed = attempted.length - ok;
+          logger.debug(`[DAEMON RUN] Auto-revive complete: ${ok} resumed, ${failed} failed (of ${attempted.length})`);
+          for (const a of attempted) {
+            if (a.result.type === 'error') {
+              logger.debug(`[DAEMON RUN] Auto-revive failed for ${a.happySessionId} (${a.path}): ${a.result.errorMessage}`);
+            }
+          }
+        } catch (err) {
+          logger.debug(`[DAEMON RUN] Auto-revive crashed:`, err);
+        }
+      }, 3_000);
+    }
 
     // Every 60 seconds:
     // 1. Prune stale sessions
