@@ -764,11 +764,67 @@ export async function startDaemon(): Promise<void> {
       pidToTrackedSession.delete(pid);
     };
 
+    // Bulk-revive: scan persisted sessions, attempt resume for each
+    // daemon-spawned session whose hostPid is dead AND no currently-tracked
+    // session shares the same cwd. Idempotent: a second call only resumes
+    // sessions still missing.
+    const isPidAlive = (pid: number | undefined): boolean => {
+      if (!pid) return false;
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const reviveOrphans = async (options?: { maxAgeMs?: number }): Promise<{ attempted: { happySessionId: string; path: string; result: SpawnSessionResult }[] }> => {
+      const cutoffMs = Date.now() - (options?.maxAgeMs ?? 72 * 60 * 60 * 1000);
+      const persisted = readPersistedSessions();
+
+      // Build a set of cwds that already have an alive tracked session.
+      const aliveCwds = new Set<string>();
+      for (const t of pidToTrackedSession.values()) {
+        const p = t.happySessionMetadataFromLocalWebhook?.path;
+        if (p) aliveCwds.add(p);
+      }
+
+      type Candidate = { happySessionId: string; path: string; lifecycleStateSince: number; hostPid?: number };
+      const byCwd = new Map<string, Candidate>();
+      for (const [id, s] of Object.entries(persisted)) {
+        const md = s.metadata as Metadata | undefined;
+        if (!md || !md.path) continue;
+        if (!md.startedFromDaemon) continue;
+        const since = (md.lifecycleStateSince ?? 0) as number;
+        if (since < cutoffMs) continue;
+        if (aliveCwds.has(md.path)) continue;
+        if (isPidAlive(md.hostPid)) continue;
+        const existing = byCwd.get(md.path);
+        if (!existing || existing.lifecycleStateSince < since) {
+          byCwd.set(md.path, { happySessionId: id, path: md.path, lifecycleStateSince: since, hostPid: md.hostPid });
+        }
+      }
+
+      logger.debug(`[DAEMON RUN] reviveOrphans: ${byCwd.size} candidates (cutoff=${new Date(cutoffMs).toISOString()})`);
+
+      const attempted: { happySessionId: string; path: string; result: SpawnSessionResult }[] = [];
+      // Fire in parallel — each spawn is independent; the per-spawn webhook
+      // awaiter has its own 15s timeout, so worst case the slowest one bounds it.
+      const results = await Promise.all(Array.from(byCwd.values()).map(async (c) => {
+        const result = await resumeSession(c.happySessionId);
+        return { happySessionId: c.happySessionId, path: c.path, result };
+      }));
+      attempted.push(...results);
+      return { attempted };
+    };
+
     // Start control server
     const { port: controlPort, stop: stopControlServer } = await startDaemonControlServer({
       getChildren: getCurrentChildren,
       stopSession,
       spawnSession,
+      resumeSession,
+      reviveOrphans,
       requestShutdown: () => requestShutdown('happy-cli'),
       onHappySessionWebhook
     });
@@ -832,6 +888,32 @@ export async function startDaemon(): Promise<void> {
 
     // Connect to server
     apiMachine.connect();
+
+    // Optional auto-revive on startup: if HAPPY_DAEMON_AUTO_REVIVE_ORPHANS=1,
+    // bulk-resume daemon-spawned sessions whose hostPid is dead. Window defaults
+    // to 24h since lifecycleStateSince — adjustable via
+    // HAPPY_DAEMON_AUTO_REVIVE_WINDOW_HOURS. Runs once after a short delay so the
+    // WebSocket is connected and ready to receive the spawned sessions' webhooks.
+    if (process.env.HAPPY_DAEMON_AUTO_REVIVE_ORPHANS === '1') {
+      const hours = parseInt(process.env.HAPPY_DAEMON_AUTO_REVIVE_WINDOW_HOURS || '24');
+      const maxAgeMs = hours * 60 * 60 * 1000;
+      setTimeout(async () => {
+        try {
+          logger.debug(`[DAEMON RUN] Auto-revive orphans (window=${hours}h) starting`);
+          const { attempted } = await reviveOrphans({ maxAgeMs });
+          const ok = attempted.filter(a => a.result.type === 'success').length;
+          const failed = attempted.length - ok;
+          logger.debug(`[DAEMON RUN] Auto-revive complete: ${ok} resumed, ${failed} failed (of ${attempted.length})`);
+          for (const a of attempted) {
+            if (a.result.type === 'error') {
+              logger.debug(`[DAEMON RUN] Auto-revive failed for ${a.happySessionId} (${a.path}): ${a.result.errorMessage}`);
+            }
+          }
+        } catch (err) {
+          logger.debug(`[DAEMON RUN] Auto-revive crashed:`, err);
+        }
+      }, 3_000);
+    }
 
     // Every 60 seconds:
     // 1. Prune stale sessions

@@ -22,7 +22,7 @@ import { install } from './daemon/install'
 import { uninstall } from './daemon/uninstall'
 import { ApiClient } from './api/api'
 import { runDoctorCommand, runDoctorDaemon } from './ui/doctor'
-import { listDaemonSessions, stopDaemonSession } from './daemon/controlClient'
+import { listDaemonSessions, stopDaemonSession, resumeDaemonSession, reviveDaemonOrphans } from './daemon/controlClient'
 import { handleAuthCommand } from './commands/auth'
 import { handleConnectCommand } from './commands/connect'
 import { handleSandboxCommand } from './commands/sandbox'
@@ -510,6 +510,57 @@ Conversation history is preserved on the server, but in-flight tool calls are in
       }
       return
 
+    } else if (daemonSubcommand === 'resume-session') {
+      const happySessionId = args[2]
+      if (!happySessionId) {
+        console.error('happySessionId required (e.g. happy daemon resume-session cmphr71km2ndlp81g1ghocso0)')
+        process.exit(1)
+      }
+      try {
+        const result = await resumeDaemonSession(happySessionId)
+        if (result.success) {
+          console.log(`Resumed: ${result.sessionId}`)
+        } else {
+          console.error(`Failed: ${result.error}`)
+          process.exit(1)
+        }
+      } catch (error) {
+        console.log('No daemon running')
+        process.exit(1)
+      }
+      return
+
+    } else if (daemonSubcommand === 'revive-orphans') {
+      // Optional --hours N to override the default 72h window.
+      let maxAgeMs: number | undefined
+      const hoursIdx = args.indexOf('--hours')
+      if (hoursIdx !== -1 && args[hoursIdx + 1]) {
+        const h = parseInt(args[hoursIdx + 1])
+        if (Number.isFinite(h) && h > 0) maxAgeMs = h * 60 * 60 * 1000
+      }
+      try {
+        const result = await reviveDaemonOrphans(maxAgeMs ? { maxAgeMs } : undefined)
+        if ('error' in result) {
+          console.error(`Failed: ${result.error}`)
+          process.exit(1)
+        }
+        if (result.attempted.length === 0) {
+          console.log('No orphans found')
+        } else {
+          const ok = result.attempted.filter(a => a.ok).length
+          console.log(`Attempted ${result.attempted.length} resume(s) — ${ok} succeeded, ${result.attempted.length - ok} failed`)
+          for (const a of result.attempted) {
+            const tag = a.ok ? chalk.green('OK ') : chalk.red('ERR')
+            const detail = a.ok ? `→ ${a.sessionId ?? '(no id)'}` : `→ ${a.error ?? '(no error)'}`
+            console.log(`  ${tag}  ${a.path}  (${a.happySessionId})  ${detail}`)
+          }
+        }
+      } catch (error) {
+        console.log('No daemon running')
+        process.exit(1)
+      }
+      return
+
     } else if (daemonSubcommand === 'start') {
       // Spawn detached daemon process
       const child = spawnHappyCLI(['daemon', 'start-sync'], {
@@ -577,6 +628,9 @@ ${chalk.bold('Usage:')}
   happy daemon stop               Stop the daemon (sessions stay alive)
   happy daemon status             Show daemon status
   happy daemon list               List active sessions
+  happy daemon resume-session ID  Resume a single happy session by id (locally)
+  happy daemon revive-orphans     Bulk-resume daemon-spawned sessions whose host process died
+                                  (one per cwd within last 72h; --hours N to override)
 
   If you want to kill all happy related processes run 
   ${chalk.cyan('happy doctor clean')}
