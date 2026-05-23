@@ -19,6 +19,20 @@ import { useSessionQuickActions } from '@/hooks/useSessionQuickActions';
 
 const SCROLL_THRESHOLD = 300;
 
+// Per-session scroll offset cache (module scope, in-memory only).
+// The SessionView mounts <ChatList key={sessionId} ...> via expo-router's
+// Stack, so navigating away from a session unmounts this component entirely
+// and the FlatList's scroll state is destroyed. Without this cache, coming
+// back to a session always renders at offset 0 (visual bottom for an
+// inverted list), losing whatever position the user had while reading
+// older messages.
+//
+// Lives at module scope so it survives the unmount/remount cycle of the
+// component. Not persisted across app restarts — that would be a separate
+// requirement and adds storage coupling we don't need for the
+// switch-between-sessions case.
+const sessionScrollOffsets: Map<string, number> = new Map();
+
 export const ChatList = React.memo((props: { session: Session }) => {
     const { messages, hasMoreOlder, isLoadingOlder } = useSessionMessages(props.session.id);
     return (
@@ -167,7 +181,7 @@ const ChatListInternal = React.memo((props: {
             showScrollButtonRef.current = next;
             setShowScrollButton(next);
         }
-    }, []);
+    }, [props.sessionId]);
 
     const scrollToBottom = useCallback(() => {
         flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
