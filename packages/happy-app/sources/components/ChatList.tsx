@@ -176,10 +176,78 @@ const ChatListInternal = React.memo((props: {
     // the user's viewport when reading older messages mid-stream).
     const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
         const offsetY = e.nativeEvent.contentOffset.y;
+<<<<<<< HEAD
         const next = offsetY > SCROLL_THRESHOLD;
         if (next !== showScrollButtonRef.current) {
             showScrollButtonRef.current = next;
             setShowScrollButton(next);
+=======
+        setShowScrollButton(offsetY > SCROLL_THRESHOLD);
+        // Track near-bottom state for auto-scroll on new content
+        isNearBottom.current = offsetY < 100;
+        // Remember the user's position per session so we can restore it the
+        // next time this component mounts for the same session (see
+        // onContentSizeChange below).
+        //
+        // CRITICAL: only write while restore is NOT in progress. During the
+        // restore loop, our own programmatic scrollToOffset(cached) fires
+        // this handler with the CLAMPED offset (FlatList caps to current
+        // content height, which is still growing). Writing that clamped
+        // value back to the cache poisons the saved position — on the next
+        // retry tick we read the smaller value, the clamp gets worse each
+        // iteration, and eventually the offset lands within 100px of bottom
+        // → isNearBottom flips true → the maintainVisible auto-scroll snaps
+        // the viewport to offset 0. That is the "맨 아래로" symptom the
+        // user reported even after PR #1323.
+        if (hasRestoredRef.current) {
+            sessionScrollOffsets.set(props.sessionId, offsetY);
+        }
+    }, [props.sessionId]);
+
+    // Restore the user's prior scroll position after this component has
+    // actual content to lay out. The FlatList renders at offset 0 (visual
+    // bottom of an inverted list) by default, which is wrong when the user
+    // was reading older messages and came back to this session from
+    // elsewhere.
+    //
+    // Why this is NOT a fire-once-on-first-change: inverted FlatList renders
+    // a windowed slice of items on mount, so the first `onContentSizeChange`
+    // can report a content height much smaller than the cached offset. If we
+    // marked ourselves "restored" on that first fire, `scrollToOffset` would
+    // get clamped to the current (small) content height and subsequent
+    // content growth (virtualizer expanding the window, lazy older pages)
+    // would never re-trigger the restore. So we keep retrying — and keep
+    // clamping intentionally so FlatList renders more items — until content
+    // height has caught up to the cached offset. Then we mark restored and
+    // stop. Subsequent size changes (incoming live messages) are left to
+    // FlatList's native maintainVisibleContentPosition.
+    //
+    // The custom branch retains the JS-side auto-scroll-on-new-content path
+    // (the upstream `maintainVisibleContentPosition` alone hasn't fully
+    // replaced it here), so we also keep `isNearBottom` synced to the
+    // restored offset to prevent the post-restore content-size delta from
+    // snapping the viewport back to bottom.
+    //
+    // (hasRestoredRef is declared near the top so handleScroll above can
+    // read it — see the comment on handleScroll for why that matters.)
+    const onContentSizeChange = useCallback((_w: number, h: number) => {
+        if (!hasRestoredRef.current) {
+            if (props.messages.length === 0) return;
+            const cached = sessionScrollOffsets.get(props.sessionId);
+            if (cached === undefined || cached <= 0) {
+                hasRestoredRef.current = true;
+            } else {
+                flatListRef.current?.scrollToOffset({ offset: cached, animated: false });
+                isNearBottom.current = cached < 100;
+                if (h >= cached) {
+                    hasRestoredRef.current = true;
+                }
+                return;
+            }
+        }
+        if (isNearBottom.current) {
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+>>>>>>> 3b564f18 (fix(happy-app): don't poison scroll cache during restore loop)
         }
     }, [props.sessionId, props.messages.length]);
 
