@@ -8,6 +8,17 @@ import { Metadata, Session } from '@/sync/storageTypes';
 import { ChatFooter } from './ChatFooter';
 import { Message } from '@/sync/typesMessage';
 
+// Per-session scroll offset cache (module scope, in-memory only).
+// Mirrors the native ChatList.tsx cache. SessionView mounts
+// <ChatList key={sessionId} ...> via expo-router's Stack, so navigating
+// away unmounts this component and the <div>'s scrollTop is destroyed.
+// Without this cache, returning to a session always renders at the visual
+// bottom (scrollTop 0 in column-reverse), losing the user's prior position.
+//
+// Values are the column-reverse scrollTop — i.e. 0 at the visual bottom and
+// progressively negative as the user scrolls up to read older messages.
+const sessionScrollOffsets: Map<string, number> = new Map();
+
 export const ChatList = React.memo((props: { session: Session }) => {
     const { messages } = useSessionMessages(props.session.id);
     return (
@@ -27,12 +38,68 @@ const ChatListInternal = React.memo((props: {
     const headerHeight = useHeaderHeight();
     const safeArea = useSafeAreaInsets();
     const session = useSession(props.sessionId)!;
+    const scrollRef = React.useRef<HTMLDivElement | null>(null);
+    const hasRestoredRef = React.useRef(false);
+
+    // Save scroll position on every scroll event. Skip writes while the
+    // restore loop below is still in progress: during restore we set
+    // scrollTop programmatically, which fires onScroll with the clamped
+    // value (browser caps to current scrollHeight, which is still growing
+    // as messages render). Writing those clamped values back would poison
+    // the cache before we finish restoring.
+    const handleScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        if (!hasRestoredRef.current) return;
+        sessionScrollOffsets.set(props.sessionId, e.currentTarget.scrollTop);
+    }, [props.sessionId]);
+
+    // Restore on mount, then retry as content height grows. column-reverse
+    // <div> starts with scrollTop=0 at the visual bottom; scrolling up takes
+    // scrollTop negative. Cached values are negative for non-bottom positions.
+    //
+    // Why a retry loop: messages render asynchronously (virtualized
+    // MessageView children may settle their height after layout). The first
+    // attempt to set scrollTop=cached may be clamped by the browser if
+    // scrollHeight isn't large enough yet. We keep retrying on each new
+    // messages.length / content resize until the actual scrollTop matches
+    // (or content has stabilised), then mark restored.
+    React.useLayoutEffect(() => {
+        if (hasRestoredRef.current) return;
+        const node = scrollRef.current;
+        if (!node) return;
+        if (props.messages.length === 0) return;
+        const cached = sessionScrollOffsets.get(props.sessionId);
+        if (cached === undefined || cached >= 0) {
+            // No cached scroll (or cached at bottom) — nothing to restore.
+            hasRestoredRef.current = true;
+            return;
+        }
+        node.scrollTop = cached;
+        // Mark restored only once the browser accepted the value. Negative
+        // scrollTop values get clamped toward 0 if content isn't tall enough.
+        if (Math.abs(node.scrollTop - cached) < 1) {
+            hasRestoredRef.current = true;
+        }
+    }, [props.sessionId, props.messages.length]);
+
+    // Capture the final position right before unmount so re-mounting this
+    // session can restore. onScroll already keeps the cache fresh during
+    // normal use, but if the unmount fires between a scroll event and the
+    // next paint we want the very last value.
+    React.useEffect(() => {
+        return () => {
+            const node = scrollRef.current;
+            if (!node) return;
+            sessionScrollOffsets.set(props.sessionId, node.scrollTop);
+        };
+    }, [props.sessionId]);
 
     // flex-direction: column-reverse gives us native browser reversed scroll
     // without scaleY(-1), so middle-click auto-scroll and wheel work correctly.
     // Messages are already newest-first from the store, which matches column-reverse order.
     return (
         <div
+            ref={scrollRef}
+            onScroll={handleScroll}
             style={{
                 display: 'flex',
                 flexDirection: 'column-reverse',
