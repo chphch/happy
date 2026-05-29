@@ -1,12 +1,16 @@
 import * as React from 'react';
 import { useSession, useSessionMessages } from '@/sync/storage';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useHeaderHeight } from '@/utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageView } from './MessageView';
 import { Metadata, Session } from '@/sync/storageTypes';
 import { ChatFooter } from './ChatFooter';
 import { Message } from '@/sync/typesMessage';
+import { Octicons } from '@expo/vector-icons';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+
+const SCROLL_THRESHOLD = 300;
 
 // Per-session scroll offset cache (module scope, in-memory only).
 // Mirrors the native ChatList.tsx cache. SessionView mounts
@@ -35,11 +39,17 @@ const ChatListInternal = React.memo((props: {
     sessionId: string;
     messages: Message[];
 }) => {
+    const { theme } = useUnistyles();
     const headerHeight = useHeaderHeight();
     const safeArea = useSafeAreaInsets();
     const session = useSession(props.sessionId)!;
     const scrollRef = React.useRef<HTMLDivElement | null>(null);
     const hasRestoredRef = React.useRef(false);
+    const [showScrollButton, setShowScrollButton] = React.useState(false);
+    // Tracks current showScrollButton value so we only call setState when the
+    // threshold is actually crossed, not on every scroll frame. Mirrors the
+    // guard in ChatList.tsx.
+    const showScrollButtonRef = React.useRef(false);
 
     // Save scroll position on every scroll event. Skip writes while the
     // restore loop below is still in progress: during restore we set
@@ -47,10 +57,26 @@ const ChatListInternal = React.memo((props: {
     // value (browser caps to current scrollHeight, which is still growing
     // as messages render). Writing those clamped values back would poison
     // the cache before we finish restoring.
+    //
+    // column-reverse: scrollTop=0 at visual bottom, |scrollTop| grows as the
+    // user scrolls up toward older messages. Sign varies by browser (Chromium
+    // returns negative values, others positive), so abs() to be safe.
     const handleScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
         if (!hasRestoredRef.current) return;
-        sessionScrollOffsets.set(props.sessionId, e.currentTarget.scrollTop);
+        const scrollTop = e.currentTarget.scrollTop;
+        sessionScrollOffsets.set(props.sessionId, scrollTop);
+        const next = Math.abs(scrollTop) > SCROLL_THRESHOLD;
+        if (next !== showScrollButtonRef.current) {
+            showScrollButtonRef.current = next;
+            setShowScrollButton(next);
+        }
     }, [props.sessionId]);
+
+    const scrollToBottom = React.useCallback(() => {
+        const node = scrollRef.current;
+        if (!node) return;
+        node.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
 
     // Restore on mount, then retry as content height grows. column-reverse
     // <div> starts with scrollTop=0 at the visual bottom; scrolling up takes
@@ -97,31 +123,80 @@ const ChatListInternal = React.memo((props: {
     // without scaleY(-1), so middle-click auto-scroll and wheel work correctly.
     // Messages are already newest-first from the store, which matches column-reverse order.
     return (
-        <div
-            ref={scrollRef}
-            onScroll={handleScroll}
-            style={{
-                display: 'flex',
-                flexDirection: 'column-reverse',
-                overflowY: 'auto',
-                overflowX: 'hidden',
-                height: '100%',
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'thin',
-            }}
-        >
-            {/* In column-reverse, first DOM element = visual bottom */}
-            <ChatFooter controlledByUser={session.agentState?.controlledByUser || false} />
-            {props.messages.map((message) => (
-                <MessageView
-                    key={message.id}
-                    message={message}
-                    metadata={props.metadata}
-                    sessionId={props.sessionId}
-                />
-            ))}
-            {/* Top spacer for header — last in DOM = visual top */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', height: headerHeight + safeArea.top + 32 }} />
-        </div>
+        <View style={{ flex: 1 }}>
+            <div
+                ref={scrollRef}
+                onScroll={handleScroll}
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column-reverse',
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    height: '100%',
+                    WebkitOverflowScrolling: 'touch',
+                    scrollbarWidth: 'thin',
+                }}
+            >
+                {/* In column-reverse, first DOM element = visual bottom */}
+                <ChatFooter controlledByUser={session.agentState?.controlledByUser || false} />
+                {props.messages.map((message) => (
+                    <MessageView
+                        key={message.id}
+                        message={message}
+                        metadata={props.metadata}
+                        sessionId={props.sessionId}
+                    />
+                ))}
+                {/* Top spacer for header — last in DOM = visual top */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', height: headerHeight + safeArea.top + 32 }} />
+            </div>
+            {showScrollButton && (
+                <View style={styles.scrollButtonContainer}>
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.scrollButton,
+                            pressed ? styles.scrollButtonPressed : styles.scrollButtonDefault
+                        ]}
+                        onPress={scrollToBottom}
+                    >
+                        <Octicons name="arrow-down" size={14} color={theme.colors.text} />
+                    </Pressable>
+                </View>
+            )}
+        </View>
     );
 });
+
+const styles = StyleSheet.create((theme) => ({
+    scrollButtonContainer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: 'box-none',
+    },
+    scrollButton: {
+        borderRadius: 16,
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: theme.colors.divider,
+        shadowColor: theme.colors.shadow.color,
+        shadowOffset: { width: 0, height: 1 },
+        shadowRadius: 2,
+        shadowOpacity: theme.colors.shadow.opacity * 0.5,
+        elevation: 2,
+    },
+    scrollButtonDefault: {
+        backgroundColor: theme.colors.surface,
+        opacity: 0.9,
+    },
+    scrollButtonPressed: {
+        backgroundColor: theme.colors.surface,
+        opacity: 0.7,
+    },
+}));
