@@ -340,6 +340,11 @@ export function getClaudeEffortLevels(): EffortLevel[] {
         { key: 'high', name: 'high' },
         { key: 'xhigh', name: 'xhigh' },
         { key: 'max', name: 'max' },
+        // 'ultracode' is not a raw SDK thinking level — it maps to xhigh thinking
+        // plus Claude Code's ultracode mode (multi-agent orchestration). The CLI
+        // resolves it to xhigh + the `ultracode` settings flag. See happy-cli
+        // claudeRemote.ts / generateHookSettings.ts.
+        { key: 'ultracode', name: 'ultracode' },
     ];
 }
 
