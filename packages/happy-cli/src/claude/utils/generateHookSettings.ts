@@ -30,6 +30,7 @@ export function generateHookSettingsFile(port: number): string {
     const hookCommand = `node "${forwarderScript}" ${port}`;
 
     const settings = {
+        ultracode: true,
         hooks: {
             SessionStart: [
                 {
