@@ -13,7 +13,30 @@ import type { SandboxConfig } from "@/persistence"
 export type { PermissionMode } from "@/api/types"
 import type { PermissionMode } from "@/api/types"
 
-export type ClaudeEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+/**
+ * Effort levels the Claude Agent SDK accepts directly for its `effort` option.
+ */
+export type SdkEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+/**
+ * Happy's effort levels. Superset of {@link SdkEffort}: 'ultracode' is a
+ * Happy-only level that is NOT a raw SDK thinking level — it means xhigh
+ * thinking PLUS Claude Code's ultracode mode (set via the `ultracode` flag in
+ * the --settings file). See {@link toSdkEffort} and claudeRemote.ts.
+ */
+export type ClaudeEffort = SdkEffort | 'ultracode';
+
+/**
+ * Resolve a Happy effort to the value handed to the SDK's `effort` option.
+ * 'ultracode' carries no SDK thinking level of its own, so it maps to 'xhigh';
+ * the ultracode behavior is enabled separately via the settings file.
+ */
+export function toSdkEffort(effort: ClaudeEffort | undefined): SdkEffort | undefined {
+    if (effort === undefined) {
+        return undefined;
+    }
+    return effort === 'ultracode' ? 'xhigh' : effort;
+}
 
 export interface EnhancedMode {
     permissionMode: PermissionMode;
