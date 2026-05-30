@@ -49,7 +49,7 @@ describe('modelModeOptions', () => {
     it('uses code defaults for agent defaults', () => {
         expect(getDefaultPermissionModeKey('claude')).toBe('bypassPermissions');
         expect(getDefaultModelKey('claude')).toBe('opus');
-        expect(getDefaultEffortKey('claude')).toBe('medium');
+        expect(getDefaultEffortKey('claude')).toBe('ultracode');
         expect(getDefaultPermissionModeKey('codex')).toBe('yolo');
         expect(getDefaultModelKey('codex')).toBe('gpt-5.5');
         expect(getDefaultEffortKey('codex')).toBe('medium');
