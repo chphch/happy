@@ -6,7 +6,7 @@
  */
 
 import { join, resolve } from 'node:path';
-import { writeFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
 import { configuration } from '@/configuration';
 import { logger } from '@/ui/logger';
 import { projectPath } from '@/projectPath';
@@ -30,6 +30,7 @@ export function generateHookSettingsFile(port: number): string {
     const hookCommand = `node "${forwarderScript}" ${port}`;
 
     const settings = {
+        ultracode: true,
         hooks: {
             SessionStart: [
                 {
@@ -49,6 +50,31 @@ export function generateHookSettingsFile(port: number): string {
     logger.debug(`[generateHookSettings] Created hook settings file: ${filepath}`);
 
     return filepath;
+}
+
+/**
+ * Toggle the `ultracode` flag inside an already-generated hook settings file,
+ * preserving the SessionStart hook. Called per query from claudeRemote so that
+ * the 'ultracode' effort (and only that effort) enables Claude Code's ultracode
+ * mode — any lower effort turns it off.
+ *
+ * No-ops when the flag already matches to avoid redundant writes.
+ *
+ * @param filepath - Path returned by {@link generateHookSettingsFile}
+ * @param enabled  - Desired ultracode state for the next Claude query
+ */
+export function setSettingsUltracode(filepath: string, enabled: boolean): void {
+    try {
+        const settings = JSON.parse(readFileSync(filepath, 'utf8'));
+        if (settings.ultracode === enabled) {
+            return;
+        }
+        settings.ultracode = enabled;
+        writeFileSync(filepath, JSON.stringify(settings, null, 2));
+        logger.debug(`[generateHookSettings] Set ultracode=${enabled} in ${filepath}`);
+    } catch (error) {
+        logger.debug(`[generateHookSettings] Failed to set ultracode flag: ${error}`);
+    }
 }
 
 /**
