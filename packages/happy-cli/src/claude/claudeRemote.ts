@@ -1,4 +1,5 @@
-import { EnhancedMode } from "./loop";
+import { EnhancedMode, toSdkEffort } from "./loop";
+import { setSettingsUltracode } from "./utils/generateHookSettings";
 import { query, type CanCallToolOptions, type QueryOptions, type SDKMessage, type SDKSystemMessage, AbortError, SDKUserMessage } from '@/claude/sdk'
 import type { MessageParam } from '@anthropic-ai/sdk/resources'
 import { mapToClaudeMode } from "./utils/permissionMode";
@@ -124,6 +125,16 @@ export async function claudeRemote(opts: {
 
     // Prepare SDK options
     let mode = initial.mode;
+
+    // 'ultracode' is a Happy-only effort: xhigh thinking PLUS Claude Code's
+    // ultracode mode, which is enabled via the `ultracode` flag in the
+    // --settings file rather than the SDK's `effort` option. Resolve both here.
+    // Effort is invariant for the lifetime of this query — the message queue
+    // isolates batches by a hash that includes effort, so a change ends this
+    // claudeRemote call and starts a new one (see claudeRemoteLauncher).
+    const ultracodeEnabled = initial.mode.effort === 'ultracode';
+    setSettingsUltracode(opts.hookSettingsPath, ultracodeEnabled);
+
     const sdkOptions: QueryOptions = {
         cwd: opts.path,
         resume: startFrom ?? undefined,
@@ -135,7 +146,7 @@ export async function claudeRemote(opts: {
         appendSystemPrompt: initial.mode.appendSystemPrompt ? initial.mode.appendSystemPrompt + '\n\n' + systemPrompt : systemPrompt,
         allowedTools: initial.mode.allowedTools ? initial.mode.allowedTools.concat(opts.allowedTools) : opts.allowedTools,
         disallowedTools: initial.mode.disallowedTools,
-        effort: initial.mode.effort,
+        effort: toSdkEffort(initial.mode.effort),
         canCallTool: (toolName: string, input: unknown, options: CanCallToolOptions) => opts.canCallTool(toolName, input, mode, options),
         abort: opts.signal,
         settingsPath: opts.hookSettingsPath,
