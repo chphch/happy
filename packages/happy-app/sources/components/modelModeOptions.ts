@@ -414,8 +414,15 @@ const CODEX_EFFORTS_BY_MODEL: Record<string, readonly string[]> = {
 };
 const CODEX_EFFORTS_FALLBACK = ['low', 'medium', 'high', 'xhigh'] as const;
 
+// 'ultracode' is not a raw SDK thinking level — it maps to xhigh thinking plus
+// Claude Code's ultracode mode (multi-agent orchestration), and the CLI resolves
+// it to xhigh + the `ultracode` settings flag (happy-cli claudeRemote.ts /
+// generateHookSettings.ts). Kept out of CLAUDE_EFFORTS so that constant stays a
+// faithful copy of the SDK union.
+const CLAUDE_EXTRA_EFFORTS = ['ultracode'] as const;
+
 export function getClaudeEffortLevels(): EffortLevel[] {
-    return effortLevels(CLAUDE_EFFORTS);
+    return effortLevels([...CLAUDE_EFFORTS, ...CLAUDE_EXTRA_EFFORTS]);
 }
 
 /**
