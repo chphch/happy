@@ -38,6 +38,11 @@ const codeAgentDefaults: Record<AgentKey, AgentDefaultConfig> = {
     openclaw: { permissionMode: 'default', modelMode: 'default', effortLevel: null },
     agy: { permissionMode: 'default', modelMode: 'Gemini 3.8 Flash', effortLevel: 'medium' },
 };
+// Fork delta: Happy-spawned Claude sessions default to 'ultracode' — they run
+// in ultracode mode unless the user dials the effort down in the picker
+// (opt-out). Set here rather than in the table so upstream's edits to the
+// table's rows and comment merge without touching this.
+codeAgentDefaults.claude = { ...codeAgentDefaults.claude, effortLevel: 'ultracode' };
 
 // `auto` first shipped in happy-cli 1.2.1-beta.2, for Claude and Codex alike.
 // Keep this with the code-default resolver so every spawn/send consumer uses
