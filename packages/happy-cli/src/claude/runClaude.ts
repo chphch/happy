@@ -7,7 +7,7 @@ import { loop } from '@/claude/loop';
 import { AgentGoalStatus, AgentState, Metadata } from '@/api/types';
 import packageJson from '../../package.json';
 import { Credentials, readSettings } from '@/persistence';
-import { EnhancedMode, PermissionMode } from './loop';
+import { EnhancedMode, PermissionMode, type ClaudeEffort } from './loop';
 import { MessageQueue2 } from '@/utils/MessageQueue2';
 import { hashObject } from '@/utils/deterministicJson';
 import { parseSpecialCommand } from '@/parsers/specialCommands';
@@ -59,7 +59,35 @@ export interface StartOptions {
 
 const DEFAULT_CLAUDE_PERMISSION_MODE: PermissionMode = 'yolo';
 const DEFAULT_CLAUDE_MODEL = 'opus';
-const DEFAULT_CLAUDE_EFFORT: 'low' | 'medium' | 'high' | 'xhigh' | 'max' = 'medium';
+
+const VALID_EFFORTS: ReadonlySet<ClaudeEffort> = new Set<ClaudeEffort>(['low', 'medium', 'high', 'xhigh', 'max', 'ultracode']);
+
+/**
+ * Resolve the session's default Claude effort (thinking depth) from the environment.
+ *
+ * Two env toggles, both optional:
+ *   - HAPPY_ULTRACODE=1 (or "true") — forces 'ultracode' (xhigh thinking + ultracode mode).
+ *   - HAPPY_EFFORT=<level>          — sets any valid level (low/medium/high/xhigh/max/ultracode).
+ *
+ * On conflict, HAPPY_ULTRACODE wins over HAPPY_EFFORT. A per-message effort
+ * override from the wire still takes precedence over this default at runtime.
+ *
+ * Defaults to 'ultracode' so Happy-spawned Claude sessions run in ultracode
+ * mode unless explicitly dialed down (matches the app's claude default).
+ */
+function resolveDefaultEffort(): ClaudeEffort {
+    const ultracode = process.env.HAPPY_ULTRACODE?.trim().toLowerCase();
+    if (ultracode === '1' || ultracode === 'true') {
+        return 'ultracode';
+    }
+    const effort = process.env.HAPPY_EFFORT?.trim().toLowerCase();
+    if (effort && VALID_EFFORTS.has(effort as ClaudeEffort)) {
+        return effort as ClaudeEffort;
+    }
+    return 'ultracode';
+}
+
+const DEFAULT_CLAUDE_EFFORT: ClaudeEffort = resolveDefaultEffort();
 type ClaudeGoalCommand = NonNullable<ReturnType<typeof parseClaudeGoalActionParams>>;
 type PendingClaudeGoalAction = {
     command: ClaudeGoalCommand;
@@ -71,6 +99,7 @@ type PendingClaudeGoalAction = {
 export async function runClaude(credentials: Credentials, options: StartOptions = {}): Promise<void> {
     logger.debug(`[CLAUDE] ===== CLAUDE MODE STARTING =====`);
     logger.debug(`[CLAUDE] This is the Claude agent, NOT Gemini`);
+    logger.debug(`[CLAUDE] Default effort resolved to '${DEFAULT_CLAUDE_EFFORT}' (HAPPY_ULTRACODE=${process.env.HAPPY_ULTRACODE ?? '<unset>'}, HAPPY_EFFORT=${process.env.HAPPY_EFFORT ?? '<unset>'})`);
     
     const workingDirectory = process.cwd();
     const sessionTag = randomUUID();
@@ -527,7 +556,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     let currentAppendSystemPrompt: string | undefined = undefined; // Track current append system prompt
     let currentAllowedTools: string[] | undefined = undefined; // Track current allowed tools
     let currentDisallowedTools: string[] | undefined = undefined; // Track current disallowed tools
-    let currentEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | undefined = options.effort ?? DEFAULT_CLAUDE_EFFORT; // Track current Claude effort (thinking depth)
+    let currentEffort: ClaudeEffort | undefined = options.effort ?? DEFAULT_CLAUDE_EFFORT; // Track current Claude effort (thinking depth)
 
     const resetCurrentModeDefaults = () => {
         currentPermissionMode = initialPermissionMode;
@@ -735,15 +764,14 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         // Validate against the SDK's accepted set so a stale/garbage value
         // from the wire doesn't poison the session.
         let messageEffort = currentEffort;
-        const VALID_EFFORTS: ReadonlySet<string> = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
         if (message.meta?.hasOwnProperty('effort')) {
             const incoming = (message.meta as Record<string, unknown>).effort;
             if (incoming === null || incoming === undefined) {
                 messageEffort = undefined;
                 currentEffort = undefined;
                 logger.debug(`[loop] Effort reset to default`);
-            } else if (typeof incoming === 'string' && VALID_EFFORTS.has(incoming)) {
-                messageEffort = incoming as 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+            } else if (typeof incoming === 'string' && VALID_EFFORTS.has(incoming as ClaudeEffort)) {
+                messageEffort = incoming as ClaudeEffort;
                 currentEffort = messageEffort;
                 logger.debug(`[loop] Effort updated from user message: ${messageEffort}`);
             } else {
