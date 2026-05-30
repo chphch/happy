@@ -241,7 +241,10 @@ describe('modelModeOptions', () => {
         // is silently downgraded, so every model gets the same list.
         for (const model of ['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']) {
             const keys = getEffortLevelsForModel('claude', model).map((level) => level.key);
-            expect(keys).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+            // Fork delta: this fork appends one level of its own — `ultracode`
+            // maps to xhigh plus Claude Code's ultracode mode — so it rides along
+            // on every model too.
+            expect(keys).toEqual(['low', 'medium', 'high', 'xhigh', 'max', 'ultracode']);
             // Claude's floor is `low`; there is no off.
             expect(keys).not.toContain('off');
         }
@@ -251,7 +254,7 @@ describe('modelModeOptions', () => {
         expect(getDefaultPermissionModeKey('claude')).toBe('auto');
         expect(getDefaultModelKey('claude')).toBe('claude-opus-5');
         expect(getDefaultModelKey('claude', '1.2.6-beta.0')).toBe('claude-opus-5-5');
-        expect(getDefaultEffortKey('claude')).toBe('medium');
+        expect(getDefaultEffortKey('claude')).toBe('ultracode');
         expect(getDefaultPermissionModeKey('codex')).toBe('auto');
         expect(getDefaultModelKey('codex')).toBe('gpt-6.1-sol');
         expect(getDefaultEffortKey('codex')).toBe('medium');
