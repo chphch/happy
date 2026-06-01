@@ -779,7 +779,10 @@ export async function startDaemon(): Promise<void> {
     };
 
     const reviveOrphans = async (options?: { maxAgeMs?: number }): Promise<{ attempted: { happySessionId: string; path: string; result: SpawnSessionResult }[] }> => {
-      const cutoffMs = Date.now() - (options?.maxAgeMs ?? 72 * 60 * 60 * 1000);
+      // `maxAgeMs` is an optional ceiling on `lifecycleStateSince` for callers who
+      // want to constrain the scan; by default we revive every unarchived
+      // daemon-spawned session whose host process is dead, regardless of age.
+      const cutoffMs = options?.maxAgeMs !== undefined ? Date.now() - options.maxAgeMs : undefined;
       const persisted = readPersistedSessions();
 
       // Build a set of cwds that already have an alive tracked session.
@@ -789,14 +792,21 @@ export async function startDaemon(): Promise<void> {
         if (p) aliveCwds.add(p);
       }
 
+      // The CLI treats both 'archived' and 'archiveRequested' as terminal — see
+      // apiSession.ts where the runtime exits on either. Reviving an
+      // archive-requested session would race the same exit signal, so skip both.
+      const isUnarchived = (s: string | undefined): boolean =>
+        s !== 'archived' && s !== 'archiveRequested';
+
       type Candidate = { happySessionId: string; path: string; lifecycleStateSince: number; hostPid?: number };
       const byCwd = new Map<string, Candidate>();
       for (const [id, s] of Object.entries(persisted)) {
         const md = s.metadata as Metadata | undefined;
         if (!md || !md.path) continue;
         if (!md.startedFromDaemon) continue;
+        if (!isUnarchived(md.lifecycleState)) continue;
         const since = (md.lifecycleStateSince ?? 0) as number;
-        if (since < cutoffMs) continue;
+        if (cutoffMs !== undefined && since < cutoffMs) continue;
         if (aliveCwds.has(md.path)) continue;
         if (isPidAlive(md.hostPid)) continue;
         const existing = byCwd.get(md.path);
@@ -805,7 +815,7 @@ export async function startDaemon(): Promise<void> {
         }
       }
 
-      logger.debug(`[DAEMON RUN] reviveOrphans: ${byCwd.size} candidates (cutoff=${new Date(cutoffMs).toISOString()})`);
+      logger.debug(`[DAEMON RUN] reviveOrphans: ${byCwd.size} candidates (cutoff=${cutoffMs !== undefined ? new Date(cutoffMs).toISOString() : 'none'})`);
 
       const attempted: { happySessionId: string; path: string; result: SpawnSessionResult }[] = [];
       // Fire in parallel — each spawn is independent; the per-spawn webhook
@@ -890,17 +900,19 @@ export async function startDaemon(): Promise<void> {
     apiMachine.connect();
 
     // Optional auto-revive on startup: if HAPPY_DAEMON_AUTO_REVIVE_ORPHANS=1,
-    // bulk-resume daemon-spawned sessions whose hostPid is dead. Window defaults
-    // to 24h since lifecycleStateSince — adjustable via
-    // HAPPY_DAEMON_AUTO_REVIVE_WINDOW_HOURS. Runs once after a short delay so the
-    // WebSocket is connected and ready to receive the spawned sessions' webhooks.
+    // bulk-resume every unarchived daemon-spawned session whose hostPid is dead.
+    // By default there is NO time window — set HAPPY_DAEMON_AUTO_REVIVE_WINDOW_HOURS
+    // only if you want a ceiling on `lifecycleStateSince`. Runs once after a short
+    // delay so the WebSocket is connected and ready to receive the spawned
+    // sessions' webhooks.
     if (process.env.HAPPY_DAEMON_AUTO_REVIVE_ORPHANS === '1') {
-      const hours = parseInt(process.env.HAPPY_DAEMON_AUTO_REVIVE_WINDOW_HOURS || '24');
-      const maxAgeMs = hours * 60 * 60 * 1000;
+      const hoursEnv = process.env.HAPPY_DAEMON_AUTO_REVIVE_WINDOW_HOURS;
+      const hoursParsed = hoursEnv ? parseInt(hoursEnv) : NaN;
+      const maxAgeMs = Number.isFinite(hoursParsed) && hoursParsed > 0 ? hoursParsed * 60 * 60 * 1000 : undefined;
       setTimeout(async () => {
         try {
-          logger.debug(`[DAEMON RUN] Auto-revive orphans (window=${hours}h) starting`);
-          const { attempted } = await reviveOrphans({ maxAgeMs });
+          logger.debug(`[DAEMON RUN] Auto-revive orphans starting${maxAgeMs !== undefined ? ` (window=${hoursParsed}h)` : ' (no time window — all unarchived)'}`);
+          const { attempted } = await reviveOrphans(maxAgeMs !== undefined ? { maxAgeMs } : undefined);
           const ok = attempted.filter(a => a.result.type === 'success').length;
           const failed = attempted.length - ok;
           logger.debug(`[DAEMON RUN] Auto-revive complete: ${ok} resumed, ${failed} failed (of ${attempted.length})`);

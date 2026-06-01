@@ -226,7 +226,7 @@ export function startDaemonControlServer({
       return { success: false, error: result.type === 'error' ? result.errorMessage : `unexpected: ${result.type}` };
     });
 
-    // Bulk-revive: scan persisted sessions, attempt resume for each
+    // Bulk-revive: scan persisted sessions, attempt resume for each unarchived
     // daemon-spawned session whose hostPid is dead AND no alive session for the same cwd.
     typed.post('/resume-orphans', {
       schema: {

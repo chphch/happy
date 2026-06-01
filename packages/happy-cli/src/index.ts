@@ -564,7 +564,8 @@ Conversation history is preserved on the server, but in-flight tool calls are in
       return
 
     } else if (daemonSubcommand === 'revive-orphans') {
-      // Optional --hours N to override the default 72h window.
+      // Default: no time window — revive every unarchived daemon-spawned session
+      // whose host process is dead. Optional --hours N caps `lifecycleStateSince`.
       let maxAgeMs: number | undefined
       const hoursIdx = args.indexOf('--hours')
       if (hoursIdx !== -1 && args[hoursIdx + 1]) {
@@ -662,8 +663,8 @@ ${chalk.bold('Usage:')}
   happy daemon status             Show daemon status
   happy daemon list               List active sessions
   happy daemon resume-session ID  Resume a single happy session by id (locally)
-  happy daemon revive-orphans     Bulk-resume daemon-spawned sessions whose host process died
-                                  (one per cwd within last 72h; --hours N to override)
+  happy daemon revive-orphans     Bulk-resume unarchived daemon-spawned sessions whose host process died
+                                  (one per cwd; --hours N optionally caps lifecycleStateSince)
 
   If you want to kill all happy related processes run 
   ${chalk.cyan('happy doctor clean')}
