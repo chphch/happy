@@ -447,7 +447,10 @@ export async function startDaemon(): Promise<void> {
           const resumeFragment = resumeId
             ? ` --resume ${shellescape(resumeId)}`
             : '';
-          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeFragment}`;
+          // When HAPPY_DAEMON_DEFAULT_YOLO=1, start daemon-spawned sessions in
+          // bypassPermissions mode (--yolo → --dangerously-skip-permissions).
+          const yoloFlag = process.env.HAPPY_DAEMON_DEFAULT_YOLO === '1' ? ' --yolo' : '';
+          const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon${resumeFragment}${yoloFlag}`;
 
           // Spawn in tmux with environment variables
           // IMPORTANT: Pass complete environment (process.env + extraEnv) because:
@@ -564,6 +567,15 @@ export async function startDaemon(): Promise<void> {
           }
           if (options.resumeCodexThreadId && agentCommand === 'codex') {
             args.push('--resume', options.resumeCodexThreadId);
+          }
+
+          // Optional: when HAPPY_DAEMON_DEFAULT_YOLO=1, daemon-spawned sessions
+          // (mobile/web "new session" button) start in bypassPermissions mode.
+          // --yolo is happy sugar for --dangerously-skip-permissions, which
+          // resolveInitialClaudePermissionMode() maps to 'bypassPermissions'.
+          // Mirrors the HAPPY_DAEMON_AUTO_REVIVE_ORPHANS env-gate pattern below.
+          if (process.env.HAPPY_DAEMON_DEFAULT_YOLO === '1') {
+            args.push('--yolo');
           }
 
           // TODO: In future, sessionId could be used with --resume to continue existing sessions
@@ -733,6 +745,16 @@ export async function startDaemon(): Promise<void> {
         }
         if (options?.permissionMode) {
           launch.args.push('--permission-mode', options.permissionMode);
+        }
+
+        // When HAPPY_DAEMON_DEFAULT_YOLO=1, keep resumed/revived sessions yolo-capable.
+        // --yolo → --dangerously-skip-permissions, which the Claude SDK requires at spawn
+        // time to permit a later runtime switch to bypassPermissions (the UI yolo toggle).
+        // Without it, a session resumed with --permission-mode <non-yolo> can never go yolo
+        // again — setPermissionMode('bypassPermissions') is rejected by the SDK. Mirrors the
+        // fresh-spawn yolo gate above. Covers reviveOrphans too (it calls resumeSession).
+        if (process.env.HAPPY_DAEMON_DEFAULT_YOLO === '1') {
+          launch.args.push('--yolo');
         }
 
         await fs.access(launch.cwd);
