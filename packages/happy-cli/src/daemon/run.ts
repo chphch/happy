@@ -157,12 +157,39 @@ export async function startDaemon(): Promise<void> {
     // Setup state - key by PID
     const pidToTrackedSession = new Map<number, TrackedSession>();
 
+    // Liveness probe. `process.kill(pid, 0)` doesn't signal the target — it just
+    // checks whether the PID currently exists for us.
+    const isPidAlive = (pid: number | undefined): boolean => {
+      if (!pid) return false;
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // A process recorded before the machine's current boot is definitely gone:
+    // a reboot resets the PID space, so a raw `isPidAlive(hostPid)` can give a
+    // false positive once an unrelated process reuses that PID. Gate the probe on
+    // "this record was saved during the current boot". `savedAt` is stamped when
+    // the session reports itself (its process was alive then), so
+    // `savedAt < bootTime` ⇒ the process can only have died since ⇒ treat as dead.
+    const bootTimeMs = Date.now() - os.uptime() * 1000;
+    const isPersistedHostAlive = (s: PersistedSession): boolean =>
+      s.savedAt >= bootTimeMs && isPidAlive(s.metadata?.hostPid);
+
     // Retain session data after process exits so resume can still find it.
-    // Pre-populate from disk so sessions survive daemon restarts.
+    // Pre-populate from disk so sessions survive daemon restarts. Sessions whose
+    // host process is still alive (daemon-only restart / upgrade — children are
+    // detached and survive the old daemon's exit) are ALSO re-tracked as live in
+    // `pidToTrackedSession`, so `daemon list`, stop, and revive-dedup stay
+    // accurate across a restart without the session having to re-register.
     const sessionIdToFinishedSession = new Map<string, TrackedSession>();
     const persisted = readPersistedSessions();
+    let rehydratedAlive = 0;
     for (const [id, s] of Object.entries(persisted)) {
-      sessionIdToFinishedSession.set(id, {
+      const tracked: TrackedSession = {
         startedBy: 'persisted',
         happySessionId: id,
         happySessionMetadataFromLocalWebhook: s.metadata,
@@ -174,10 +201,21 @@ export async function startDaemon(): Promise<void> {
           agentStateVersion: s.agentStateVersion,
         },
         pid: 0,
-      });
+      };
+      sessionIdToFinishedSession.set(id, tracked);
+
+      const hostPid = s.metadata?.hostPid;
+      if (hostPid && isPersistedHostAlive(s)) {
+        // Re-track the still-running session under its real PID. There is no
+        // childProcess handle (we didn't spawn it this boot), so stopSession
+        // falls back to process.kill(pid) and the heartbeat prunes it once the
+        // PID dies — at which point it remains resumable via the finished map.
+        pidToTrackedSession.set(hostPid, { ...tracked, pid: hostPid });
+        rehydratedAlive++;
+      }
     }
     if (Object.keys(persisted).length > 0) {
-      logger.debug(`[DAEMON RUN] Loaded ${Object.keys(persisted).length} persisted sessions from disk`);
+      logger.debug(`[DAEMON RUN] Loaded ${Object.keys(persisted).length} persisted sessions from disk (${rehydratedAlive} still alive, re-tracked)`);
     }
 
     // Session spawning awaiter system
@@ -767,17 +805,8 @@ export async function startDaemon(): Promise<void> {
     // Bulk-revive: scan persisted sessions, attempt resume for each
     // daemon-spawned session whose hostPid is dead AND no currently-tracked
     // session shares the same cwd. Idempotent: a second call only resumes
-    // sessions still missing.
-    const isPidAlive = (pid: number | undefined): boolean => {
-      if (!pid) return false;
-      try {
-        process.kill(pid, 0);
-        return true;
-      } catch {
-        return false;
-      }
-    };
-
+    // sessions still missing. (isPidAlive / isPersistedHostAlive are defined
+    // near the top of startDaemon, alongside the startup rehydration.)
     const reviveOrphans = async (options?: { maxAgeMs?: number }): Promise<{ attempted: { happySessionId: string; path: string; result: SpawnSessionResult }[] }> => {
       // `maxAgeMs` is an optional ceiling on `lifecycleStateSince` for callers who
       // want to constrain the scan; by default we revive every unarchived
@@ -808,7 +837,7 @@ export async function startDaemon(): Promise<void> {
         const since = (md.lifecycleStateSince ?? 0) as number;
         if (cutoffMs !== undefined && since < cutoffMs) continue;
         if (aliveCwds.has(md.path)) continue;
-        if (isPidAlive(md.hostPid)) continue;
+        if (isPersistedHostAlive(s)) continue;
         const existing = byCwd.get(md.path);
         if (!existing || existing.lifecycleStateSince < since) {
           byCwd.set(md.path, { happySessionId: id, path: md.path, lifecycleStateSince: since, hostPid: md.hostPid });
@@ -899,13 +928,17 @@ export async function startDaemon(): Promise<void> {
     // Connect to server
     apiMachine.connect();
 
-    // Optional auto-revive on startup: if HAPPY_DAEMON_AUTO_REVIVE_ORPHANS=1,
-    // bulk-resume every unarchived daemon-spawned session whose hostPid is dead.
+    // Auto-revive orphans on startup (default ON; opt out with
+    // HAPPY_DAEMON_AUTO_REVIVE_ORPHANS=0). After a machine reboot or crash the
+    // daemon comes back (systemd/launchd) but its daemon-spawned sessions are
+    // gone — this resurrects every unarchived one whose host process is dead.
+    // Sessions that survived a daemon-only restart were re-tracked above, so
+    // their cwd is already "alive" and they are skipped here (no double-spawn).
     // By default there is NO time window — set HAPPY_DAEMON_AUTO_REVIVE_WINDOW_HOURS
-    // only if you want a ceiling on `lifecycleStateSince`. Runs once after a short
-    // delay so the WebSocket is connected and ready to receive the spawned
-    // sessions' webhooks.
-    if (process.env.HAPPY_DAEMON_AUTO_REVIVE_ORPHANS === '1') {
+    // to put a ceiling on `lifecycleStateSince`. Runs once after a short delay so
+    // the WebSocket is connected and ready to receive the spawned sessions'
+    // webhooks.
+    if (process.env.HAPPY_DAEMON_AUTO_REVIVE_ORPHANS !== '0') {
       const hoursEnv = process.env.HAPPY_DAEMON_AUTO_REVIVE_WINDOW_HOURS;
       const hoursParsed = hoursEnv ? parseInt(hoursEnv) : NaN;
       const maxAgeMs = Number.isFinite(hoursParsed) && hoursParsed > 0 ? hoursParsed * 60 * 60 * 1000 : undefined;
