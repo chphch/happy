@@ -75,6 +75,12 @@ describe('daemon resume fallback', () => {
     mocks.persisted = {};
     mocks.persistSession.mockReset();
     mocks.access.mockResolvedValue(undefined);
+    // Fork delta: this build adds `--yolo` to daemon-spawned sessions when
+    // HAPPY_DAEMON_DEFAULT_YOLO=1, and that variable is set in the environment
+    // the daemon hands to its sessions — so it leaks into `pnpm test` here and
+    // breaks the exact-args assertion below. Pin it off so this test measures
+    // the upstream spawn contract on any machine.
+    vi.stubEnv('HAPPY_DAEMON_DEFAULT_YOLO', '');
     // Never register real process handlers, stop daemons, bind ports, or spawn providers.
     vi.spyOn(process, 'on').mockReturnValue(process);
     vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('test exit'); });
@@ -87,6 +93,7 @@ describe('daemon resume fallback', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
