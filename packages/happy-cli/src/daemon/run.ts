@@ -814,46 +814,84 @@ export async function startDaemon(): Promise<void> {
       const cutoffMs = options?.maxAgeMs !== undefined ? Date.now() - options.maxAgeMs : undefined;
       const persisted = readPersistedSessions();
 
-      // Build a set of cwds that already have an alive tracked session.
-      const aliveCwds = new Set<string>();
+      // Skip sessions that are ALREADY alive — keyed by happySessionId, not by
+      // cwd. The old per-cwd gate capped revival at one session per project;
+      // we now revive every unarchived dead session, so the liveness check must
+      // be per-session, or we'd refuse to revive a dead session just because a
+      // sibling in the same cwd happens to be up.
+      const aliveSessionIds = new Set<string>();
       for (const t of pidToTrackedSession.values()) {
-        const p = t.happySessionMetadataFromLocalWebhook?.path;
-        if (p) aliveCwds.add(p);
+        if (t.happySessionId) aliveSessionIds.add(t.happySessionId);
       }
 
       // The CLI treats both 'archived' and 'archiveRequested' as terminal — see
       // apiSession.ts where the runtime exits on either. Reviving an
       // archive-requested session would race the same exit signal, so skip both.
+      // Everything NOT archived is fair game — the intent is "revive all of a
+      // project's sessions except the ones explicitly archived".
       const isUnarchived = (s: string | undefined): boolean =>
         s !== 'archived' && s !== 'archiveRequested';
 
+      // CRITICAL: local sessions.json holds each session's INITIAL webhook
+      // metadata only — later archive/unarchive happens server-side and is never
+      // written back, so local `lifecycleState` is stale (~always 'running').
+      // Fetch the server's authoritative metadata once and decrypt each with the
+      // locally-cached per-session key, so "exclude archived" is actually correct.
+      // Sessions the server no longer lists aren't resumable anyway (resumeSession's
+      // own fetch would miss them), so they're skipped when the fetch succeeded.
+      const serverMd = new Map<string, Metadata>();
+      try {
+        const resp = await axios.get(`${configuration.serverUrl}/v1/sessions`, {
+          headers: { Authorization: `Bearer ${credentials.token}` }, timeout: 10_000,
+        });
+        for (const sv of ((resp.data as { sessions?: { id: string; metadata: string }[] }).sessions ?? [])) {
+          const local = persisted[sv.id];
+          if (!local?.encryptionKey) continue;
+          try {
+            serverMd.set(sv.id, decrypt(decodeBase64(local.encryptionKey), local.encryptionVariant, decodeBase64(sv.metadata)) as Metadata);
+          } catch { /* undecryptable — skip */ }
+        }
+      } catch (e) {
+        logger.debug(`[DAEMON RUN] reviveOrphans: server session fetch failed, falling back to (stale) local metadata: ${e instanceof Error ? e.message : e}`);
+      }
+      const serverFetchOk = serverMd.size > 0;
+
       type Candidate = { happySessionId: string; path: string; lifecycleStateSince: number; hostPid?: number };
-      const byCwd = new Map<string, Candidate>();
+      const candidates: Candidate[] = [];
       for (const [id, s] of Object.entries(persisted)) {
         const md = s.metadata as Metadata | undefined;
         if (!md || !md.path) continue;
         if (!md.startedFromDaemon) continue;
-        if (!isUnarchived(md.lifecycleState)) continue;
-        const since = (md.lifecycleStateSince ?? 0) as number;
+        // Server is the source of truth for archived state; skip server-unknown
+        // sessions when the fetch worked (they can't be resumed regardless).
+        const sm = serverMd.get(id);
+        if (serverFetchOk && !sm) continue;
+        if (!isUnarchived(sm?.lifecycleState ?? md.lifecycleState)) continue;
+        const since = (sm?.lifecycleStateSince ?? md.lifecycleStateSince ?? 0) as number;
         if (cutoffMs !== undefined && since < cutoffMs) continue;
-        if (aliveCwds.has(md.path)) continue;
-        if (isPersistedHostAlive(s)) continue;
-        const existing = byCwd.get(md.path);
-        if (!existing || existing.lifecycleStateSince < since) {
-          byCwd.set(md.path, { happySessionId: id, path: md.path, lifecycleStateSince: since, hostPid: md.hostPid });
-        }
+        if (aliveSessionIds.has(id)) continue;   // this exact session is already up
+        if (isPersistedHostAlive(s)) continue;    // its host process is still running
+        candidates.push({ happySessionId: id, path: md.path, lifecycleStateSince: since, hostPid: md.hostPid });
       }
 
-      logger.debug(`[DAEMON RUN] reviveOrphans: ${byCwd.size} candidates (cutoff=${cutoffMs !== undefined ? new Date(cutoffMs).toISOString() : 'none'})`);
+      const cwdCount = new Set(candidates.map((c) => c.path)).size;
+      logger.debug(`[DAEMON RUN] reviveOrphans: ${candidates.length} candidates across ${cwdCount} cwds (cutoff=${cutoffMs !== undefined ? new Date(cutoffMs).toISOString() : 'none'})`);
 
+      // Revive every candidate, but with bounded concurrency: a project can hold
+      // many dead sessions and firing all `happy claude --resume` spawns at once
+      // would thunder-herd the box (each spawn = a node process + websocket +
+      // agent subprocess). Batches of REVIVE_CONCURRENCY run in parallel; the
+      // next batch waits for the previous, capping peak load.
       const attempted: { happySessionId: string; path: string; result: SpawnSessionResult }[] = [];
-      // Fire in parallel — each spawn is independent; the per-spawn webhook
-      // awaiter has its own 15s timeout, so worst case the slowest one bounds it.
-      const results = await Promise.all(Array.from(byCwd.values()).map(async (c) => {
-        const result = await resumeSession(c.happySessionId);
-        return { happySessionId: c.happySessionId, path: c.path, result };
-      }));
-      attempted.push(...results);
+      const REVIVE_CONCURRENCY = 5;
+      for (let i = 0; i < candidates.length; i += REVIVE_CONCURRENCY) {
+        const batch = candidates.slice(i, i + REVIVE_CONCURRENCY);
+        const results = await Promise.all(batch.map(async (c) => {
+          const result = await resumeSession(c.happySessionId);
+          return { happySessionId: c.happySessionId, path: c.path, result };
+        }));
+        attempted.push(...results);
+      }
       return { attempted };
     };
 
