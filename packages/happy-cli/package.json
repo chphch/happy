@@ -1,6 +1,6 @@
 {
   "name": "happy",
-  "version": "1.2.1-beta.1",
+  "version": "1.2.1-beta.1-chphch.1",
   "description": "Mobile and Web client for Claude Code and Codex",
   "author": "Kirill Dubovitskiy",
   "license": "MIT",
@@ -108,6 +108,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@slopus/happy-wire": "workspace:*",
     "@eslint/compat": "^1",
     "@slopus/happy-wire": "workspace:*",
     "@types/inquirer": "^9.0.9",
