@@ -511,16 +511,24 @@ export class ApiSessionClient extends EventEmitter {
                 logger.debug('[SOCKET] Failed to send usage data:', error);
             }
 
-            // Also relay usage via the session protocol so the app can display context size
-            const usage = body.message.usage;
-            const usageEnvelope = createEnvelope('agent', {
-                t: 'usage',
-                input_tokens: usage.input_tokens,
-                output_tokens: usage.output_tokens,
-                cache_creation_input_tokens: usage.cache_creation_input_tokens,
-                cache_read_input_tokens: usage.cache_read_input_tokens,
-            }, { turn: this.claudeSessionProtocolState.currentTurnId ?? undefined });
-            this.sendSessionProtocolMessage(usageEnvelope);
+            // Also relay usage via the session protocol so the app can display context size.
+            // Defensive: if the installed @slopus/happy-wire predates the 'usage' event
+            // (the published version can lag this CLI's bundled mapper), createEnvelope's
+            // schema parse throws. That must NOT crash the whole session — an un-encodable
+            // telemetry event should degrade silently, not kill the user's conversation.
+            try {
+                const usage = body.message.usage;
+                const usageEnvelope = createEnvelope('agent', {
+                    t: 'usage',
+                    input_tokens: usage.input_tokens,
+                    output_tokens: usage.output_tokens,
+                    cache_creation_input_tokens: usage.cache_creation_input_tokens,
+                    cache_read_input_tokens: usage.cache_read_input_tokens,
+                }, { turn: this.claudeSessionProtocolState.currentTurnId ?? undefined });
+                this.sendSessionProtocolMessage(usageEnvelope);
+            } catch (error) {
+                logger.debug('[SOCKET] Failed to relay usage event (wire schema mismatch?):', error);
+            }
         }
 
         // Update metadata with summary if this is a summary message
