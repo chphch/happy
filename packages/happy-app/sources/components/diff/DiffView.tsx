@@ -3,6 +3,7 @@ import { View, Text, ViewStyle } from 'react-native';
 import { calculateUnifiedDiff, DiffToken } from '@/components/diff/calculateDiff';
 import { Typography } from '@/constants/Typography';
 import { useUnistyles } from 'react-native-unistyles';
+import { t } from '@/text';
 
 
 interface DiffViewProps {
@@ -18,6 +19,14 @@ interface DiffViewProps {
     maxHeight?: number;
     wrapLines?: boolean;
     fontScaleX?: number;
+    /**
+     * Cap on how many content lines are rendered inline. Beyond this, a
+     * "+N more lines" notice is shown instead. Prevents a huge file (e.g. a
+     * Write of a several-thousand-line file rendered as a pending permission)
+     * from emitting tens of thousands of synchronous <Text> nodes and pegging
+     * the JS thread. Defaults to no cap; chat tool views pass a finite value.
+     */
+    maxLines?: number;
 }
 
 export const DiffView: React.FC<DiffViewProps> = ({
@@ -29,6 +38,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
     wrapLines = false,
     style,
     fontScaleX = 1,
+    maxLines = Number.POSITIVE_INFINITY,
 }) => {
     const { theme } = useUnistyles();
     const colors = theme.colors.diff;
@@ -114,8 +124,12 @@ export const DiffView: React.FC<DiffViewProps> = ({
 
     const renderDiffContent = () => {
         const lines: React.ReactNode[] = [];
+        const totalLines = hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0);
+        let rendered = 0;
 
-        hunks.forEach((hunk, hunkIndex) => {
+        for (let hunkIndex = 0; hunkIndex < hunks.length && rendered < maxLines; hunkIndex++) {
+            const hunk = hunks[hunkIndex];
+
             if (hunkIndex > 0) {
                 lines.push(
                     <Text
@@ -136,7 +150,8 @@ export const DiffView: React.FC<DiffViewProps> = ({
                 );
             }
 
-            hunk.lines.forEach((line, lineIndex) => {
+            for (let lineIndex = 0; lineIndex < hunk.lines.length && rendered < maxLines; lineIndex++) {
+                const line = hunk.lines[lineIndex];
                 const isAdded = line.type === 'add';
                 const isRemoved = line.type === 'remove';
                 const textColor = isAdded ? colors.addedText : isRemoved ? colors.removedText : colors.contextText;
@@ -174,8 +189,28 @@ export const DiffView: React.FC<DiffViewProps> = ({
                         {renderLineContent(line.content, textColor, line.tokens)}
                     </Text>
                 );
-            });
-        });
+                rendered++;
+            }
+        }
+
+        if (rendered < totalLines) {
+            lines.push(
+                <Text
+                    key="diff-truncated"
+                    numberOfLines={1}
+                    style={{
+                        ...Typography.mono(),
+                        fontSize: 12,
+                        color: colors.hunkHeaderText,
+                        backgroundColor: colors.hunkHeaderBg,
+                        paddingVertical: 8,
+                        paddingHorizontal: 16,
+                    }}
+                >
+                    {t('toolView.diffTruncated', { count: totalLines - rendered })}
+                </Text>
+            );
+        }
 
         return lines;
     };
