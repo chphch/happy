@@ -3,6 +3,7 @@ import { Platform, Text, View } from 'react-native';
 import { useUnistyles } from 'react-native-unistyles';
 import { DiffView } from '@/components/diff/DiffView';
 import { Typography } from '@/constants/Typography';
+import { t } from '@/text';
 
 export interface PierreDiffViewProps {
     oldFile?: { name: string; contents: string };
@@ -20,6 +21,11 @@ export interface PierreDiffViewProps {
     renderCustomHeader?: (fileDiff: any) => React.ReactNode;
     /** Allow expanding collapsed unchanged lines. Web-only (Pierre feature). */
     expandUnchanged?: boolean;
+    /**
+     * Native-only: cap on inline-rendered diff lines. The web renderer
+     * (@pierre/diffs) virtualizes on its own, so this is a no-op there.
+     */
+    maxLines?: number;
 }
 
 export const PierreDiffView = React.memo(function PierreDiffView(props: PierreDiffViewProps) {
@@ -177,7 +183,7 @@ function DiffSkeleton() {
 
 const PierreDiffViewNative = React.memo(function PierreDiffViewNative(props: PierreDiffViewProps) {
     if (props.patch) {
-        return <PlainPatchView patch={props.patch} wrapLines={props.overflow === 'wrap'} />;
+        return <PlainPatchView patch={props.patch} wrapLines={props.overflow === 'wrap'} maxLines={props.maxLines} />;
     }
     if (props.oldFile && props.newFile) {
         return (
@@ -186,17 +192,20 @@ const PierreDiffViewNative = React.memo(function PierreDiffViewNative(props: Pie
                 newText={props.newFile.contents}
                 showLineNumbers={!props.disableLineNumbers}
                 wrapLines={props.overflow === 'wrap'}
+                maxLines={props.maxLines}
             />
         );
     }
     return <View />;
 });
 
-function PlainPatchView({ patch, wrapLines }: { patch: string; wrapLines: boolean }) {
+function PlainPatchView({ patch, wrapLines, maxLines = Number.POSITIVE_INFINITY }: { patch: string; wrapLines: boolean; maxLines?: number }) {
     const { theme } = useUnistyles();
     const colors = theme.colors.diff;
 
-    const lines = React.useMemo(() => patch.split('\n'), [patch]);
+    const allLines = React.useMemo(() => patch.split('\n'), [patch]);
+    const lines = maxLines < allLines.length ? allLines.slice(0, maxLines) : allLines;
+    const hiddenCount = allLines.length - lines.length;
 
     return (
         <View style={{ backgroundColor: theme.colors.surface, flex: 1, overflow: 'hidden' }}>
@@ -248,6 +257,21 @@ function PlainPatchView({ patch, wrapLines }: { patch: string; wrapLines: boolea
                     </Text>
                 );
             })}
+            {hiddenCount > 0 && (
+                <Text
+                    numberOfLines={1}
+                    style={{
+                        ...Typography.mono(),
+                        fontSize: 12,
+                        color: colors.hunkHeaderText,
+                        backgroundColor: colors.hunkHeaderBg,
+                        paddingHorizontal: 8,
+                        paddingVertical: 8,
+                    }}
+                >
+                    {t('toolView.diffTruncated', { count: hiddenCount })}
+                </Text>
+            )}
         </View>
     );
 }
