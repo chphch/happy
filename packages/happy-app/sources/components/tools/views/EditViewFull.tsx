@@ -26,12 +26,13 @@ export const EditViewFull = React.memo<EditViewFullProps>(({ tool, metadata }) =
 
     return (
         <View style={toolFullViewStyles.sectionFullWidth}>
-            <ToolDiffView 
-                oldText={oldString} 
-                newText={newString} 
+            <ToolDiffView
+                oldText={oldString}
+                newText={newString}
                 style={{ width: '100%' }}
                 showLineNumbers={true}
                 showPlusMinusSymbols={true}
+                maxLines={Number.POSITIVE_INFINITY}
             />
         </View>
     );
