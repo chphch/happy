@@ -506,6 +506,7 @@ export const pt: TranslationStructure = {
     toolView: {
         input: 'Entrada',
         output: 'Saída',
+        diffTruncated: ({ count }: { count: number }) => count === 1 ? '⋯ mais 1 linha' : `⋯ mais ${count} linhas`,
     },
 
     toolGroup: {
