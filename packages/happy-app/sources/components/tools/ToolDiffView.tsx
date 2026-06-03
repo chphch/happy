@@ -3,6 +3,15 @@ import { View } from 'react-native';
 import { PierreDiffView } from '@/components/diff/PierreDiffView';
 import { useSetting } from '@/sync/storage';
 
+/**
+ * Default cap on inline-rendered diff lines for chat tool views. A pending
+ * Write/Edit permission for a large file would otherwise render the whole
+ * file as synchronous <Text> nodes on session entry and peg the JS thread
+ * (frozen taps, dead back button, unrendered history). Full-screen views
+ * opt out by passing `maxLines={Number.POSITIVE_INFINITY}`.
+ */
+export const INLINE_DIFF_MAX_LINES = 200;
+
 interface ToolDiffViewProps {
     /** Pre-built unified-diff patch string. Preferred when available. */
     patch?: string;
@@ -16,6 +25,12 @@ interface ToolDiffViewProps {
     showLineNumbers?: boolean;
     /** No-op in the new renderer; pierre/diffs uses classic indicators. */
     showPlusMinusSymbols?: boolean;
+    /**
+     * Native-only cap on inline-rendered diff lines. Defaults to
+     * `INLINE_DIFF_MAX_LINES`. Full-screen views pass
+     * `Number.POSITIVE_INFINITY` to render the complete diff.
+     */
+    maxLines?: number;
 }
 
 export const ToolDiffView = React.memo<ToolDiffViewProps>(({
@@ -25,6 +40,7 @@ export const ToolDiffView = React.memo<ToolDiffViewProps>(({
     fileName,
     style,
     showLineNumbers,
+    maxLines = INLINE_DIFF_MAX_LINES,
 }) => {
     const wrapLines = useSetting('wrapLinesInDiffs');
     const showLineNumbersInToolViews = useSetting('showLineNumbersInToolViews');
@@ -43,7 +59,7 @@ export const ToolDiffView = React.memo<ToolDiffViewProps>(({
     if (patch) {
         return (
             <View style={[{ flex: 1 }, style]}>
-                <PierreDiffView patch={patch} {...common} />
+                <PierreDiffView patch={patch} maxLines={maxLines} {...common} />
             </View>
         );
     }
@@ -53,6 +69,7 @@ export const ToolDiffView = React.memo<ToolDiffViewProps>(({
             <PierreDiffView
                 oldFile={{ name: effectiveFileName, contents: oldText ?? '' }}
                 newFile={{ name: effectiveFileName, contents: newText ?? '' }}
+                maxLines={maxLines}
                 {...common}
             />
         </View>
