@@ -575,6 +575,7 @@ export const ru: TranslationStructure = {
     toolView: {
         input: 'Входные данные',
         output: 'Результат',
+        diffTruncated: ({ count }: { count: number }) => `⋯ ещё ${count} ${plural({ count, one: 'строка', few: 'строки', many: 'строк' })}`,
     },
 
     toolGroup: {
