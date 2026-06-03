@@ -543,6 +543,7 @@ export const ja: TranslationStructure = {
     toolView: {
         input: '入力',
         output: '出力',
+        diffTruncated: ({ count }: { count: number }) => `⋯ 他 ${count} 行`,
     },
 
     toolGroup: {
