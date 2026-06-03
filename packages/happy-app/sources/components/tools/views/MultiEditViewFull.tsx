@@ -44,7 +44,7 @@ export const MultiEditViewFull = React.memo<MultiEditViewFullProps>(({ tool, met
                                 </View>
                             )}
                         </View>
-                        <ToolDiffView oldText={oldString} newText={newString} showLineNumbers />
+                        <ToolDiffView oldText={oldString} newText={newString} showLineNumbers maxLines={Number.POSITIVE_INFINITY} />
                         {index < edits.length - 1 && <View style={styles.separator} />}
                     </View>
                 );
