@@ -145,7 +145,7 @@ export default {
                     root: "./sources/app"
                 }
             ],
-            ...(isSelfhost ? [] : ["expo-updates"]),
+            "expo-updates",
             "expo-asset",
             "expo-localization",
             "expo-mail-composer",
@@ -211,14 +211,14 @@ export default {
                 }
             ]
         ],
-        ...(isSelfhost ? {} : {
-            updates: {
-                url: "https://u.expo.dev/4558dd3d-cd5a-47cd-bad9-e591a241cc06",
-                requestHeaders: {
-                    "expo-channel-name": "production"
-                }
+        updates: {
+            url: isSelfhost
+                ? "https://u.expo.dev/11313486-e54f-4962-a6b2-3b8bef7a8386"
+                : "https://u.expo.dev/4558dd3d-cd5a-47cd-bad9-e591a241cc06",
+            requestHeaders: {
+                "expo-channel-name": isSelfhost ? "selfhost" : "production"
             }
-        }),
+        },
         experiments: {
             typedRoutes: true
         },
@@ -226,11 +226,11 @@ export default {
             router: {
                 root: "./sources/app"
             },
-            ...(isSelfhost ? {} : {
-                eas: {
-                    projectId: "4558dd3d-cd5a-47cd-bad9-e591a241cc06"
-                }
-            }),
+            eas: {
+                projectId: isSelfhost
+                    ? "11313486-e54f-4962-a6b2-3b8bef7a8386"
+                    : "4558dd3d-cd5a-47cd-bad9-e591a241cc06"
+            },
             app: {
                 postHogKey: process.env.EXPO_PUBLIC_POSTHOG_API_KEY,
                 revenueCatAppleKey: process.env.EXPO_PUBLIC_REVENUE_CAT_APPLE,
