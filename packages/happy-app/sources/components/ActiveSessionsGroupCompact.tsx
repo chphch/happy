@@ -8,7 +8,7 @@ import { type SessionState, formatPathRelativeToHome, vibingMessages, formatLast
 import { Avatar } from './Avatar';
 import { Typography } from '@/constants/Typography';
 import { StatusDot } from './StatusDot';
-import { useAllMachines, useSessionProjectGitStatus, useSessionGitStatus, useIsProjectStarred, useStarredProjects, storage, projectKey } from '@/sync/storage';
+import { useAllMachines, useSessionGitStatus, useIsProjectStarred, useStarredProjects, storage, projectKey } from '@/sync/storage';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
