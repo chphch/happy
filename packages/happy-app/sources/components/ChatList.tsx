@@ -19,20 +19,6 @@ import { useSessionQuickActions } from '@/hooks/useSessionQuickActions';
 
 const SCROLL_THRESHOLD = 300;
 
-// Per-session scroll offset cache (module scope, in-memory only).
-// The SessionView mounts <ChatList key={sessionId} ...> via expo-router's
-// Stack, so navigating away from a session unmounts this component entirely
-// and the FlatList's scroll state is destroyed. Without this cache, coming
-// back to a session always renders at offset 0 (visual bottom for an
-// inverted list), losing whatever position the user had while reading
-// older messages.
-//
-// Lives at module scope so it survives the unmount/remount cycle of the
-// component. Not persisted across app restarts — that would be a separate
-// requirement and adds storage coupling we don't need for the
-// switch-between-sessions case.
-const sessionScrollOffsets: Map<string, number> = new Map();
-
 export const ChatList = React.memo((props: { session: Session }) => {
     const { messages, hasMoreOlder, isLoadingOlder } = useSessionMessages(props.session.id);
     return (
@@ -170,84 +156,22 @@ const ChatListInternal = React.memo((props: {
 
     // In inverted FlatList, offset 0 = latest messages (visual bottom).
     // Offset increases as user scrolls up to see older messages.
-<<<<<<< HEAD
     // Auto-stick-to-bottom on new messages is handled natively by FlatList's
     // maintainVisibleContentPosition.autoscrollToBottomThreshold — no JS-side
     // scrollToOffset is needed (and running both produces a fight that drags
     // the user's viewport when reading older messages mid-stream).
-=======
-    //
-    // Stick-to-bottom on incoming messages is delegated entirely to
-    // FlatList's native maintainVisibleContentPosition (see config below).
-    // We do NOT track an isNearBottom flag here, because running both a
-    // JS-side scrollToOffset(0) fallthrough AND the native auto-stick fights
-    // the restore loop: clamped programmatic scrolls during restore flip
-    // an isNearBottom guard true and snap the viewport to bottom on the
-    // next size change. That was the "맨 아래로" symptom after PR #1323.
->>>>>>> 70ab33d8 (fix(happy-app): drop JS-side auto-scroll fight; let MVCP handle stick-to-bottom)
     const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
         const offsetY = e.nativeEvent.contentOffset.y;
-<<<<<<< HEAD
         const next = offsetY > SCROLL_THRESHOLD;
         if (next !== showScrollButtonRef.current) {
             showScrollButtonRef.current = next;
             setShowScrollButton(next);
-=======
-        setShowScrollButton(offsetY > SCROLL_THRESHOLD);
-        // Remember the user's position per session so we can restore it the
-        // next time this component mounts for the same session.
-        //
-        // Only write while restore is NOT in progress. During the restore
-        // loop our own programmatic scrollToOffset(cached) fires this
-        // handler with the CLAMPED offset (FlatList caps to current content
-        // height, which is still growing). Writing that clamped value back
-        // to the cache poisons the saved position.
-        if (hasRestoredRef.current) {
-            sessionScrollOffsets.set(props.sessionId, offsetY);
         }
-    }, [props.sessionId]);
-
-    // Restore the user's prior scroll position after this component has
-    // actual content to lay out. The FlatList renders at offset 0 (visual
-    // bottom of an inverted list) by default, which is wrong when the user
-    // was reading older messages and came back to this session from
-    // elsewhere.
-    //
-    // Why this is NOT a fire-once-on-first-change: inverted FlatList renders
-    // a windowed slice of items on mount, so the first `onContentSizeChange`
-    // can report a content height much smaller than the cached offset. If we
-    // marked ourselves "restored" on that first fire, `scrollToOffset` would
-    // get clamped to the current (small) content height and subsequent
-    // content growth (virtualizer expanding the window, lazy older pages)
-    // would never re-trigger the restore. So we keep retrying — and keep
-    // clamping intentionally so FlatList renders more items — until content
-    // height has caught up to the cached offset. Then we mark restored and
-    // stop. Subsequent size changes (incoming live messages) are left to
-    // FlatList's native maintainVisibleContentPosition.
-    const onContentSizeChange = useCallback((_w: number, h: number) => {
-        if (hasRestoredRef.current) return;
-        if (props.messages.length === 0) return;
-        const cached = sessionScrollOffsets.get(props.sessionId);
-        if (cached === undefined || cached <= 0) {
-            hasRestoredRef.current = true;
-            return;
-        }
-<<<<<<< HEAD
-        if (isNearBottom.current) {
-            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
->>>>>>> 3b564f18 (fix(happy-app): don't poison scroll cache during restore loop)
-=======
-        flatListRef.current?.scrollToOffset({ offset: cached, animated: false });
-        if (h >= cached) {
-            hasRestoredRef.current = true;
->>>>>>> 70ab33d8 (fix(happy-app): drop JS-side auto-scroll fight; let MVCP handle stick-to-bottom)
-        }
-    }, [props.sessionId, props.messages.length]);
+    }, []);
 
     const scrollToBottom = useCallback(() => {
         flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
     }, []);
-
 
     // In an inverted FlatList, `onEndReached` fires when the user scrolls
     // past the visual top — i.e. when they want to see older history.
@@ -290,17 +214,10 @@ const ChatListInternal = React.memo((props: {
                     // anchor and drag the viewport up.
                     //
                     // autoscrollToTopThreshold: for INVERTED lists this is
-<<<<<<< HEAD
                     // actually the auto-stick-to-visual-bottom threshold —
                     // contentOffset 0 is at the visual bottom in an inverted
                     // list, and this prop sticks the viewport to offset 0
                     // when the user is within N units of it.
-=======
-                    // the auto-stick-to-visual-bottom threshold — offset 0
-                    // is at the visual bottom in an inverted list, and this
-                    // prop sticks the viewport to offset 0 when the user is
-                    // within N units of it.
->>>>>>> 70ab33d8 (fix(happy-app): drop JS-side auto-scroll fight; let MVCP handle stick-to-bottom)
                     minIndexForVisible: 1,
                     autoscrollToTopThreshold: 50,
                 }}
