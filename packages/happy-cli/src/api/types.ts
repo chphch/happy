@@ -196,7 +196,8 @@ export const MessageMetaSchema = z.object({
   appendSystemPrompt: z.string().nullable().optional(), // Append to system prompt for this message (null = reset)
   allowedTools: z.array(z.string()).nullable().optional(), // Allowed tools for this message (null = reset)
   disallowedTools: z.array(z.string()).nullable().optional(), // Disallowed tools for this message (null = reset)
-  effortLevel: z.string().nullable().optional() // Effort level for this message (null = reset)
+  effortLevel: z.string().nullable().optional(), // [legacy alias] kept for clients that still emit this key
+  effort: z.string().nullable().optional() // Effort level for this message (null = reset). happy-app emits this key (sync.ts ~698)
 })
 
 export type MessageMeta = z.infer<typeof MessageMetaSchema>
