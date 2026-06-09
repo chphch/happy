@@ -24,6 +24,7 @@ import { Profile } from "./profile";
 import { UserProfile, RelationshipUpdatedEvent } from "./friendTypes";
 import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts, loadStarredProjects, saveStarredProjects, loadStarredSessions, saveStarredSessions } from "./persistence";
 import { isAgentModePushPending } from "./agentModesPending";
+import { projectManager } from "./projectManager";
 
 export const projectKey = (machineId: string, path: string): string => `${machineId}:${path}`;
 import type { PermissionModeKey } from '@/components/PermissionModeSelector';
