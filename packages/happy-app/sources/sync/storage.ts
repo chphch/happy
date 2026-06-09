@@ -23,6 +23,7 @@ import { Purchases, customerInfoToPurchases } from "./purchases";
 import { Profile } from "./profile";
 import { UserProfile, RelationshipUpdatedEvent } from "./friendTypes";
 import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts, loadSessionPermissionModes, saveSessionPermissionModes, loadSessionModelModes, saveSessionModelModes, loadSessionEffortLevels, saveSessionEffortLevels, loadStarredProjects, saveStarredProjects, loadStarredSessions, saveStarredSessions } from "./persistence";
+import { projectManager } from "./projectManager";
 
 export const projectKey = (machineId: string, path: string): string => `${machineId}:${path}`;
 import type { PermissionModeKey } from '@/components/PermissionModeSelector';
