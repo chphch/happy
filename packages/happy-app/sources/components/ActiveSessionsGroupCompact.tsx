@@ -227,12 +227,16 @@ export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: Acti
 export const CompactSessionRow = React.memo(({ session, selected, showBorder }: { session: SessionRowData; selected?: boolean; showBorder?: boolean }) => {
     const styles = stylesheet;
     const { theme } = useUnistyles();
-    const baseStatus = STATUS_CONFIG[session.state];
+    // Status dot reflects true liveness only, never reusing the blue
+    // "thinking/running" color for unread.
+    const status = STATUS_CONFIG[session.state];
+    // A session the agent is waiting on still owns the dot — that is attention,
+    // not unread.
     const needsUserAction = session.state === 'permission_required' || session.state === 'input_required';
-    // User action stays orange and pulsing even when the request also marked the session unread.
-    const status = session.hasUnread && !needsUserAction
-        ? { ...baseStatus, color: '#007AFF', dotColor: '#007AFF', isPulsing: false, isConnected: baseStatus.isConnected }
-        : baseStatus;
+    // Unread is shown as a bold title, but only once the agent has stopped —
+    // never while it's still running (thinking), so a re-activated session
+    // doesn't read as unread mid-turn.
+    const showUnreadTitle = session.hasUnread && session.state !== 'thinking';
     const navigateToSession = useNavigateToSession();
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
@@ -276,8 +280,6 @@ export const CompactSessionRow = React.memo(({ session, selected, showBorder }: 
 
         if (needsUserAction) {
             indicator = <StatusDot color={status.dotColor} isPulsing={status.isPulsing} />;
-        } else if (session.hasUnread) {
-            indicator = <StatusDot color={status.dotColor} isPulsing={false} />;
         } else if (session.state === 'waiting' && session.hasDraft) {
             indicator = (
                 <Ionicons
@@ -316,7 +318,8 @@ export const CompactSessionRow = React.memo(({ session, selected, showBorder }: 
                     <Text
                         style={[
                             styles.sessionTitle,
-                            status.isConnected ? styles.sessionTitleConnected : styles.sessionTitleDisconnected
+                            status.isConnected ? styles.sessionTitleConnected : styles.sessionTitleDisconnected,
+                            showUnreadTitle && styles.sessionTitleUnread
                         ]}
                         numberOfLines={2}
                     >
@@ -543,6 +546,13 @@ const stylesheet = StyleSheet.create((theme) => ({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
+    },
+    sessionTitleUnread: {
+        // Bold via the SemiBold face, not fontWeight: web sets
+        // `font-synthesis: none` and bundles no Bold(700) face, so a numeric
+        // fontWeight would render identically to the regular title.
+        ...Typography.default('semiBold'),
+        color: theme.colors.text,
     },
     leadingIndicatorSlot: {
         alignItems: 'center',
