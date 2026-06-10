@@ -12,6 +12,22 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 const SCROLL_THRESHOLD = 300;
 
+// Render windowing. The web variant renders messages into a plain
+// column-reverse <div> with no list virtualization (unlike the native
+// ChatList.tsx FlatList). Without a cap, every loaded message becomes a live
+// DOM node + React fiber — and prefetchOlderMessagesInBackground keeps growing
+// the store to the full session history, so a long session mounts thousands of
+// MessageViews on open and re-mounts all of them on every session switch.
+//
+// Fix: render only the newest INITIAL_WINDOW messages on mount, then reveal
+// WINDOW_STEP more whenever the user scrolls within REVEAL_THRESHOLD_PX of the
+// oldest rendered message. Messages are newest-first, so slice(0, n) is the
+// newest n — stable as background prefetch appends older messages to the tail,
+// which means that growth no longer triggers any re-render of the visible slice.
+const INITIAL_WINDOW = 50;
+const WINDOW_STEP = 50;
+const REVEAL_THRESHOLD_PX = 1500;
+
 // Per-session scroll offset cache (module scope, in-memory only).
 // Mirrors the native ChatList.tsx cache. SessionView mounts
 // <ChatList key={sessionId} ...> via expo-router's Stack, so navigating
@@ -51,6 +67,25 @@ const ChatListInternal = React.memo((props: {
     // guard in ChatList.tsx.
     const showScrollButtonRef = React.useRef(false);
 
+    // How many of the newest messages to actually render. Grows as the user
+    // scrolls toward older messages (see handleScroll / restore effect). Resets
+    // to INITIAL_WINDOW on every mount — ChatList is keyed by sessionId, so a
+    // session switch remounts and the window starts small again.
+    const [renderLimit, setRenderLimit] = React.useState(INITIAL_WINDOW);
+    // Debounces reveal: one window grow per committed render, so a single
+    // momentum scroll gesture (many onScroll frames before React re-renders)
+    // cannot stack several setRenderLimit updates into an over-reveal.
+    const revealPendingRef = React.useRef(false);
+    React.useEffect(() => {
+        revealPendingRef.current = false;
+    }, [renderLimit]);
+
+    // The newest `renderLimit` messages — the only ones mounted as DOM nodes.
+    const visibleMessages = React.useMemo(
+        () => props.messages.slice(0, renderLimit),
+        [props.messages, renderLimit],
+    );
+
     // Save scroll position on every scroll event. Skip writes while the
     // restore loop below is still in progress: during restore we set
     // scrollTop programmatically, which fires onScroll with the clamped
@@ -62,15 +97,30 @@ const ChatListInternal = React.memo((props: {
     // user scrolls up toward older messages. Sign varies by browser (Chromium
     // returns negative values, others positive), so abs() to be safe.
     const handleScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        const node = e.currentTarget;
+        const scrollTop = node.scrollTop;
+
+        // Reveal older messages as the user approaches the oldest rendered one.
+        // column-reverse: the visual top is reached as |scrollTop| approaches
+        // (scrollHeight - clientHeight). Reveal a buffer early so older content
+        // is already mounted before it scrolls into view. revealPendingRef caps
+        // a single momentum gesture to one WINDOW_STEP grow.
+        if (!revealPendingRef.current && renderLimit < props.messages.length) {
+            const distanceToTop = node.scrollHeight - node.clientHeight - Math.abs(scrollTop);
+            if (distanceToTop < REVEAL_THRESHOLD_PX) {
+                revealPendingRef.current = true;
+                setRenderLimit((prev) => Math.min(prev + WINDOW_STEP, props.messages.length));
+            }
+        }
+
         if (!hasRestoredRef.current) return;
-        const scrollTop = e.currentTarget.scrollTop;
         sessionScrollOffsets.set(props.sessionId, scrollTop);
         const next = Math.abs(scrollTop) > SCROLL_THRESHOLD;
         if (next !== showScrollButtonRef.current) {
             showScrollButtonRef.current = next;
             setShowScrollButton(next);
         }
-    }, [props.sessionId]);
+    }, [props.sessionId, props.messages.length, renderLimit]);
 
     const scrollToBottom = React.useCallback(() => {
         const node = scrollRef.current;
@@ -82,12 +132,12 @@ const ChatListInternal = React.memo((props: {
     // <div> starts with scrollTop=0 at the visual bottom; scrolling up takes
     // scrollTop negative. Cached values are negative for non-bottom positions.
     //
-    // Why a retry loop: messages render asynchronously (virtualized
-    // MessageView children may settle their height after layout). The first
-    // attempt to set scrollTop=cached may be clamped by the browser if
-    // scrollHeight isn't large enough yet. We keep retrying on each new
-    // messages.length / content resize until the actual scrollTop matches
-    // (or content has stabilised), then mark restored.
+    // Why a retry loop: a deep cached position may sit above the initial render
+    // window. Setting scrollTop=cached would be clamped by the browser while
+    // scrollHeight is still too short, so we first grow renderLimit until the
+    // rendered slice is tall enough to contain the cached offset, then set it.
+    // The effect re-runs on renderLimit / messages.length changes until the
+    // actual scrollTop matches (or there are no more messages to reveal).
     React.useLayoutEffect(() => {
         if (hasRestoredRef.current) return;
         const node = scrollRef.current;
@@ -99,13 +149,20 @@ const ChatListInternal = React.memo((props: {
             hasRestoredRef.current = true;
             return;
         }
+        // Grow the window until the rendered content can reach the cached
+        // offset, instead of clamping to a wrong (too-shallow) position.
+        const needed = Math.abs(cached) + node.clientHeight;
+        if (node.scrollHeight < needed && renderLimit < props.messages.length) {
+            setRenderLimit((prev) => Math.min(prev + WINDOW_STEP, props.messages.length));
+            return; // retry after the wider slice renders (renderLimit in deps)
+        }
         node.scrollTop = cached;
         // Mark restored only once the browser accepted the value. Negative
         // scrollTop values get clamped toward 0 if content isn't tall enough.
         if (Math.abs(node.scrollTop - cached) < 1) {
             hasRestoredRef.current = true;
         }
-    }, [props.sessionId, props.messages.length]);
+    }, [props.sessionId, props.messages.length, renderLimit]);
 
     // Capture the final position right before unmount so re-mounting this
     // session can restore. onScroll already keeps the cache fresh during
@@ -139,7 +196,7 @@ const ChatListInternal = React.memo((props: {
             >
                 {/* In column-reverse, first DOM element = visual bottom */}
                 <ChatFooter controlledByUser={session.agentState?.controlledByUser || false} />
-                {props.messages.map((message) => (
+                {visibleMessages.map((message) => (
                     <MessageView
                         key={message.id}
                         message={message}
