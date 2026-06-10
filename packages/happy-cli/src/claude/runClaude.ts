@@ -7,7 +7,7 @@ import { loop } from '@/claude/loop';
 import { AgentState, Metadata } from '@/api/types';
 import packageJson from '../../package.json';
 import { Credentials, readSettings } from '@/persistence';
-import { EnhancedMode, PermissionMode } from './loop';
+import { EnhancedMode, PermissionMode, type ClaudeEffort } from './loop';
 import { MessageQueue2 } from '@/utils/MessageQueue2';
 import { hashObject } from '@/utils/deterministicJson';
 import { parseSpecialCommand } from '@/parsers/specialCommands';
@@ -52,29 +52,31 @@ export interface StartOptions {
 const DEFAULT_CLAUDE_PERMISSION_MODE: PermissionMode = 'yolo';
 const DEFAULT_CLAUDE_MODEL = 'opus';
 
-type ClaudeEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-const VALID_EFFORTS: ReadonlySet<ClaudeEffort> = new Set<ClaudeEffort>(['low', 'medium', 'high', 'xhigh', 'max']);
+const VALID_EFFORTS: ReadonlySet<ClaudeEffort> = new Set<ClaudeEffort>(['low', 'medium', 'high', 'xhigh', 'max', 'ultracode']);
 
 /**
  * Resolve the session's default Claude effort (thinking depth) from the environment.
  *
  * Two env toggles, both optional:
- *   - HAPPY_ULTRACODE=1 (or "true") — forces 'xhigh' ("ultracode" mode).
- *   - HAPPY_EFFORT=<level>          — sets any valid level (low/medium/high/xhigh/max).
+ *   - HAPPY_ULTRACODE=1 (or "true") — forces 'ultracode' (xhigh thinking + ultracode mode).
+ *   - HAPPY_EFFORT=<level>          — sets any valid level (low/medium/high/xhigh/max/ultracode).
  *
  * On conflict, HAPPY_ULTRACODE wins over HAPPY_EFFORT. A per-message effort
  * override from the wire still takes precedence over this default at runtime.
+ *
+ * Defaults to 'ultracode' so Happy-spawned Claude sessions run in ultracode
+ * mode unless explicitly dialed down (matches the app's claude default).
  */
 function resolveDefaultEffort(): ClaudeEffort {
     const ultracode = process.env.HAPPY_ULTRACODE?.trim().toLowerCase();
     if (ultracode === '1' || ultracode === 'true') {
-        return 'xhigh';
+        return 'ultracode';
     }
     const effort = process.env.HAPPY_EFFORT?.trim().toLowerCase();
     if (effort && VALID_EFFORTS.has(effort as ClaudeEffort)) {
         return effort as ClaudeEffort;
     }
-    return 'medium';
+    return 'ultracode';
 }
 
 const DEFAULT_CLAUDE_EFFORT: ClaudeEffort = resolveDefaultEffort();
