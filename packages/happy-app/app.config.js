@@ -231,6 +231,12 @@ export default {
                     ? "11313486-e54f-4962-a6b2-3b8bef7a8386"
                     : "4558dd3d-cd5a-47cd-bad9-e591a241cc06"
             },
+            // Self-host server URL baked into every bundle (incl. OTA) so
+            // `eas update` no longer depends on the publisher exporting
+            // EXPO_PUBLIC_HAPPY_SERVER_URL. Read by getServerUrl() in
+            // sources/sync/serverConfig.ts. Lives beside the updates.url /
+            // eas.projectId selfhost ternaries above. (DD, 2026-06-10)
+            serverUrl: isSelfhost ? "https://happy.bingsucouple.com" : undefined,
             app: {
                 postHogKey: process.env.EXPO_PUBLIC_POSTHOG_API_KEY,
                 revenueCatAppleKey: process.env.EXPO_PUBLIC_REVENUE_CAT_APPLE,
