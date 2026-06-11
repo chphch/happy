@@ -857,22 +857,43 @@ export async function startDaemon(): Promise<void> {
       // locally-cached per-session key, so "exclude archived" is actually correct.
       // Sessions the server no longer lists aren't resumable anyway (resumeSession's
       // own fetch would miss them), so they're skipped when the fetch succeeded.
+      // FAIL CLOSED: if the server can't be reached we CANNOT tell which
+      // sessions are archived (local lifecycleState is uselessly stale, per
+      // above). Reviving on stale state resurrects archived sessions — the
+      // 2026-06-11 over-revive: a daemon reboot mid-deploy raced the swapping
+      // server, the fetch aborted on its 10s timeout, the (then) stale-local
+      // fallback yielded 250 candidates incl. archived ones. So RETRY the fetch
+      // (a just-restarted server is briefly unready), and if it still fails,
+      // skip the whole revive rather than reviving everything. `serverFetchOk`
+      // tracks the GET succeeding — NOT `serverMd.size`, so a legitimately empty
+      // session list doesn't read as a failure.
       const serverMd = new Map<string, Metadata>();
-      try {
-        const resp = await axios.get(`${configuration.serverUrl}/v1/sessions`, {
-          headers: { Authorization: `Bearer ${credentials.token}` }, timeout: 10_000,
-        });
-        for (const sv of ((resp.data as { sessions?: { id: string; metadata: string }[] }).sessions ?? [])) {
-          const local = persisted[sv.id];
-          if (!local?.encryptionKey) continue;
-          try {
-            serverMd.set(sv.id, decrypt(decodeBase64(local.encryptionKey), local.encryptionVariant, decodeBase64(sv.metadata)) as Metadata);
-          } catch { /* undecryptable — skip */ }
+      let serverFetchOk = false;
+      for (let attempt = 1; attempt <= 3 && !serverFetchOk; attempt++) {
+        try {
+          const resp = await axios.get(`${configuration.serverUrl}/v1/sessions`, {
+            headers: { Authorization: `Bearer ${credentials.token}` }, timeout: 2_500,
+          });
+          serverFetchOk = true;
+          for (const sv of ((resp.data as { sessions?: { id: string; metadata: string }[] }).sessions ?? [])) {
+            const local = persisted[sv.id];
+            if (!local?.encryptionKey) continue;
+            try {
+              serverMd.set(sv.id, decrypt(decodeBase64(local.encryptionKey), local.encryptionVariant, decodeBase64(sv.metadata)) as Metadata);
+            } catch { /* undecryptable — skip */ }
+          }
+        } catch (e) {
+          logger.debug(`[DAEMON RUN] reviveOrphans: server session fetch attempt ${attempt}/3 failed: ${e instanceof Error ? e.message : e}`);
+          // Keep total retry budget < the 10s daemonPost client timeout so a
+          // manual /resume-orphans call doesn't abort client-side mid-retry:
+          // worst case 3×2.5s + 0.5s + 1s = 9s.
+          if (attempt < 3) await new Promise<void>((resolve) => setTimeout(resolve, 500 * attempt));
         }
-      } catch (e) {
-        logger.debug(`[DAEMON RUN] reviveOrphans: server session fetch failed, falling back to (stale) local metadata: ${e instanceof Error ? e.message : e}`);
       }
-      const serverFetchOk = serverMd.size > 0;
+      if (!serverFetchOk) {
+        logger.debug('[DAEMON RUN] reviveOrphans: server unreachable after 3 attempts — skipping revive (cannot verify archive state; failing closed to avoid resurrecting archived sessions)');
+        return { attempted: [] };
+      }
 
       type Candidate = { happySessionId: string; path: string; lifecycleStateSince: number; hostPid?: number };
       const candidates: Candidate[] = [];
@@ -880,12 +901,14 @@ export async function startDaemon(): Promise<void> {
         const md = s.metadata as Metadata | undefined;
         if (!md || !md.path) continue;
         if (!md.startedFromDaemon) continue;
-        // Server is the source of truth for archived state; skip server-unknown
-        // sessions when the fetch worked (they can't be resumed regardless).
+        // Server is the source of truth for archived state. The fetch is
+        // guaranteed to have succeeded here (fail-closed return above), so skip
+        // sessions the server no longer lists, and trust ONLY server
+        // lifecycleState — never the stale local copy that can't see archives.
         const sm = serverMd.get(id);
-        if (serverFetchOk && !sm) continue;
-        if (!isUnarchived(sm?.lifecycleState ?? md.lifecycleState)) continue;
-        const since = (sm?.lifecycleStateSince ?? md.lifecycleStateSince ?? 0) as number;
+        if (!sm) continue;
+        if (!isUnarchived(sm.lifecycleState)) continue;
+        const since = (sm.lifecycleStateSince ?? 0) as number;
         if (cutoffMs !== undefined && since < cutoffMs) continue;
         if (aliveSessionIds.has(id)) continue;   // this exact session is already up
         if (isPersistedHostAlive(s)) continue;    // its host process is still running
