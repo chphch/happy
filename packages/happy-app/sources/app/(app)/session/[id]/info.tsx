@@ -137,11 +137,6 @@ function SessionInfoContent({ session }: { session: Session }) {
 
     // Use HappyAction for archiving - it handles errors automatically
     const [archivingSession, performArchive] = useHappyAction(async () => {
-        // Prompt for worktree cleanup before killing (needs an active machine connection)
-        if (!session.metadata?.bot) {
-            await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
-        }
-
         // Try to kill the CLI process; if it's already dead, force-archive via server
         const killResult = await sessionKill(session.id);
         if (!killResult.success) {
@@ -149,6 +144,12 @@ function SessionInfoContent({ session }: { session: Session }) {
                 throw new HappyError(killResult.message || 'Connect to the bot’s machine to archive it.', false);
             }
             await sessionArchive(session.id);
+        }
+
+        // Only then offer to delete the worktree: removing it stops every process
+        // still inside, which would cut the CLI's own shutdown short
+        if (!session.metadata?.bot) {
+            await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
         }
         // Leave this screen, then leave the chat behind it — unless the chat was
         // one tab of a checkout, in which case its neighbour takes the tab over
@@ -169,8 +170,6 @@ function SessionInfoContent({ session }: { session: Session }) {
     // Use HappyAction for deletion - kills session first if needed, then deletes
     const [deletingSession, performDelete] = useHappyAction(async () => {
         if (session.metadata?.bot) throw new HappyError('Archive the bot instead of deleting its conversation.', false);
-        // Prompt for worktree cleanup before killing (needs an active machine connection)
-        await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
 
         // Navigate back optimistically
         router.back();
@@ -180,6 +179,10 @@ function SessionInfoContent({ session }: { session: Session }) {
         if (sessionStatus.isConnected || session.active) {
             await sessionKill(session.id).catch(() => {});
         }
+
+        // Then offer to delete the worktree, while the session record still exists:
+        // the cleanup waits for the session to go inactive before removing anything
+        await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
 
         const result = await sessionDelete(session.id);
         if (!result.success) {
