@@ -141,7 +141,7 @@ export const settingsDefaults: Settings = {
     groupToolCalls: false,
     // Full tool views by default: edit diffs render inline in the chat.
     compactToolCalls: false,
-    expImageUpload: false,
+    expImageUpload: true,
     reviewPromptAnswered: false,
     reviewPromptLikedApp: null,
     voiceAssistantLanguage: null,
