@@ -31,9 +31,10 @@ export type AgentDefaultConfig = {
 const codeAgentDefaults: Record<AgentKey, AgentDefaultConfig> = {
     // The Claude UI key for YOLO is `bypassPermissions`; the CLI also accepts
     // `yolo` and maps it to the Claude SDK's bypass mode.
-    // Default to 'ultracode' — Happy-spawned Claude sessions run in ultracode
-    // mode unless the user dials the effort down in the picker (opt-out).
-    claude: { permissionMode: 'auto', modelMode: 'claude-opus-5', effortLevel: 'ultracode' },
+    // Default to 'auto' — Happy-spawned Claude sessions self-pace via adaptive
+    // thinking (the model decides how much to think) unless the user picks a
+    // fixed effort level or 'ultracode' in the picker.
+    claude: { permissionMode: 'auto', modelMode: 'claude-opus-5', effortLevel: 'auto' },
     codex: { permissionMode: 'auto', modelMode: 'gpt-5.6-sol', effortLevel: 'medium' },
     gemini: { permissionMode: 'default', modelMode: 'gemini-2.5-pro', effortLevel: null },
     openclaw: { permissionMode: 'default', modelMode: 'default', effortLevel: null },
