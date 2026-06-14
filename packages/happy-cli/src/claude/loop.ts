@@ -19,20 +19,25 @@ import type { PermissionMode } from "@/api/types"
 export type SdkEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 /**
- * Happy's effort levels. Superset of {@link SdkEffort}: 'ultracode' is a
- * Happy-only level that is NOT a raw SDK thinking level — it means xhigh
- * thinking PLUS Claude Code's ultracode mode (set via the `ultracode` flag in
- * the --settings file). See {@link toSdkEffort} and claudeRemote.ts.
+ * Happy's effort levels. Superset of {@link SdkEffort} with two Happy-only
+ * levels that are NOT raw SDK thinking levels:
+ *  - 'ultracode' — xhigh thinking PLUS Claude Code's ultracode mode (set via
+ *    the `ultracode` flag in the --settings file).
+ *  - 'auto' — pins no effort at all; the model self-paces via adaptive thinking
+ *    (Claude decides how much to think per turn).
+ * See {@link toSdkEffort} and claudeRemote.ts.
  */
-export type ClaudeEffort = SdkEffort | 'ultracode';
+export type ClaudeEffort = SdkEffort | 'ultracode' | 'auto';
 
 /**
  * Resolve a Happy effort to the value handed to the SDK's `effort` option.
- * 'ultracode' carries no SDK thinking level of its own, so it maps to 'xhigh';
- * the ultracode behavior is enabled separately via the settings file.
+ * 'ultracode' carries no SDK thinking level of its own, so it maps to 'xhigh'
+ * (the ultracode behavior is enabled separately via the settings file).
+ * 'auto' maps to `undefined` — the `effort` option is omitted so the model's
+ * adaptive thinking decides the depth.
  */
 export function toSdkEffort(effort: ClaudeEffort | undefined): SdkEffort | undefined {
-    if (effort === undefined) {
+    if (effort === undefined || effort === 'auto') {
         return undefined;
     }
     return effort === 'ultracode' ? 'xhigh' : effort;
