@@ -16,6 +16,10 @@ describe('toSdkEffort', () => {
         expect(toSdkEffort('ultracode')).toBe('xhigh');
     });
 
+    it("maps 'auto' to undefined (omit the SDK effort option)", () => {
+        expect(toSdkEffort('auto')).toBeUndefined();
+    });
+
     it('passes every real SDK effort through unchanged', () => {
         for (const e of ['low', 'medium', 'high', 'xhigh', 'max'] as const) {
             expect(toSdkEffort(e)).toBe(e);
