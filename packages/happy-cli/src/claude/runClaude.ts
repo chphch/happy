@@ -59,20 +59,20 @@ export interface StartOptions {
 const DEFAULT_CLAUDE_PERMISSION_MODE: PermissionMode = 'yolo';
 const DEFAULT_CLAUDE_MODEL = 'opus';
 
-const VALID_EFFORTS: ReadonlySet<ClaudeEffort> = new Set<ClaudeEffort>(['low', 'medium', 'high', 'xhigh', 'max', 'ultracode']);
+const VALID_EFFORTS: ReadonlySet<ClaudeEffort> = new Set<ClaudeEffort>(['low', 'medium', 'high', 'xhigh', 'max', 'ultracode', 'auto']);
 
 /**
  * Resolve the session's default Claude effort (thinking depth) from the environment.
  *
  * Two env toggles, both optional:
  *   - HAPPY_ULTRACODE=1 (or "true") — forces 'ultracode' (xhigh thinking + ultracode mode).
- *   - HAPPY_EFFORT=<level>          — sets any valid level (low/medium/high/xhigh/max/ultracode).
+ *   - HAPPY_EFFORT=<level>          — sets any valid level (low/medium/high/xhigh/max/ultracode/auto).
  *
  * On conflict, HAPPY_ULTRACODE wins over HAPPY_EFFORT. A per-message effort
  * override from the wire still takes precedence over this default at runtime.
  *
- * Defaults to 'ultracode' so Happy-spawned Claude sessions run in ultracode
- * mode unless explicitly dialed down (matches the app's claude default).
+ * Defaults to 'auto' so Happy-spawned Claude sessions self-pace via adaptive
+ * thinking unless explicitly set otherwise (matches the app's claude default).
  */
 function resolveDefaultEffort(): ClaudeEffort {
     const ultracode = process.env.HAPPY_ULTRACODE?.trim().toLowerCase();
@@ -83,7 +83,7 @@ function resolveDefaultEffort(): ClaudeEffort {
     if (effort && VALID_EFFORTS.has(effort as ClaudeEffort)) {
         return effort as ClaudeEffort;
     }
-    return 'ultracode';
+    return 'auto';
 }
 
 const DEFAULT_CLAUDE_EFFORT: ClaudeEffort = resolveDefaultEffort();
