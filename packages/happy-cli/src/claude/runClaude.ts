@@ -255,6 +255,9 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
                         void session.sendClaudeSessionMessageFromLocalTranscript(msg);
                     },
                     onTranscriptEvent: updateClaudeGoalState,
+                    // Follow mid-session cwd changes (EnterWorktree fires no hook) so
+                    // the app's dir/diff/file views and --resume track the worktree.
+                    onCwdChange: (cwd) => session.updateMetadata((m) => ({ ...m, path: cwd })),
                 });
                 if (offlineSessionId) scanner.onNewSession(offlineSessionId);
                 return { session, scanner };
@@ -489,6 +492,9 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             session.sendClaudeSessionMessage(raw);
         },
         onTranscriptEvent: updateClaudeGoalState,
+        // Follow mid-session cwd changes (EnterWorktree fires no hook) so the
+        // app's dir/diff/file views and --resume track the worktree.
+        onCwdChange: (cwd) => session.updateMetadata((m) => ({ ...m, path: cwd })),
     });
 
     // Start Happy MCP server
