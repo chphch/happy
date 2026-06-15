@@ -100,7 +100,7 @@ export interface SessionRowData {
     hasUnread: boolean;
 }
 
-function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): SessionRowData {
+function buildSessionRowData(session: Session, unreadSessionIds: Set<string>): SessionRowData {
     const isOnline = session.presence === "online";
     const hasPermissions = !!(session.agentState?.requests && Object.keys(session.agentState.requests).length > 0);
 
@@ -131,7 +131,7 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
         homeDir: session.metadata?.homeDir ?? null,
         completedTodosCount: session.todos?.filter(todo => todo.status === 'completed').length ?? 0,
         totalTodosCount: session.todos?.length ?? 0,
-        hasUnread: unreadSessionIds?.has(session.id) ?? false,
+        hasUnread: unreadSessionIds.has(session.id),
     };
 }
 
@@ -244,7 +244,7 @@ interface StorageState {
 // Helper function to build unified list view data from sessions and machines
 function buildSessionListViewData(
     sessions: Record<string, Session>,
-    unreadSessionIds?: Set<string>,
+    unreadSessionIds: Set<string>,
 ): SessionListViewItem[] {
     // Partition: starred sessions go to a dedicated "Starred" section regardless
     // of active/inactive status so users can find pinned conversations in one place.
@@ -1076,7 +1076,7 @@ export const storage = create<StorageState>()((set, get) => {
             return {
                 ...state,
                 sessions: updatedSessions,
-                sessionListViewData: buildSessionListViewData(updatedSessions)
+                sessionListViewData: buildSessionListViewData(updatedSessions, state.unreadSessionIds)
             };
         }),
         updateSessionPermissionMode: (sessionId: string, mode: string | null) => set((state) => {
@@ -1215,7 +1215,7 @@ export const storage = create<StorageState>()((set, get) => {
             return {
                 ...state,
                 sessions: updatedSessions,
-                sessionListViewData: buildSessionListViewData(updatedSessions),
+                sessionListViewData: buildSessionListViewData(updatedSessions, state.unreadSessionIds),
             };
         }),
         // Project management methods
@@ -1248,7 +1248,8 @@ export const storage = create<StorageState>()((set, get) => {
 
             // Rebuild sessionListViewData to reflect machine changes
             const sessionListViewData = buildSessionListViewData(
-                state.sessions
+                state.sessions,
+                state.unreadSessionIds,
             );
 
             return {
@@ -1265,7 +1266,7 @@ export const storage = create<StorageState>()((set, get) => {
             return {
                 ...state,
                 machines: remaining,
-                sessionListViewData: buildSessionListViewData(state.sessions)
+                sessionListViewData: buildSessionListViewData(state.sessions, state.unreadSessionIds)
             };
         }),
         // Artifact methods
@@ -1339,7 +1340,7 @@ export const storage = create<StorageState>()((set, get) => {
             saveSessionEffortLevels(effortLevels);
             
             // Rebuild sessionListViewData without the deleted session
-            const sessionListViewData = buildSessionListViewData(remainingSessions);
+            const sessionListViewData = buildSessionListViewData(remainingSessions, state.unreadSessionIds);
             
             return {
                 ...state,
