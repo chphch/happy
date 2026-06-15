@@ -109,7 +109,7 @@ export interface SessionRowData {
     hasUnread: boolean;
 }
 
-function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): SessionRowData {
+function buildSessionRowData(session: Session, unreadSessionIds: Set<string>): SessionRowData {
     const isOnline = session.presence === "online";
     const hasPermissions = !!(session.agentState?.requests && Object.keys(session.agentState.requests).length > 0);
 
@@ -149,7 +149,7 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
         homeDir: session.metadata?.homeDir ?? null,
         completedTodosCount: session.todos?.filter(todo => todo.status === 'completed').length ?? 0,
         totalTodosCount: session.todos?.length ?? 0,
-        hasUnread: unreadSessionIds?.has(session.id) ?? false,
+        hasUnread: unreadSessionIds.has(session.id),
     };
 }
 
@@ -1170,7 +1170,7 @@ export const storage = create<StorageState>()((set, get) => {
             return {
                 ...state,
                 sessions: updatedSessions,
-                sessionListViewData: buildSessionListViewData(updatedSessions),
+                sessionListViewData: buildSessionListViewData(updatedSessions, state.unreadSessionIds),
             };
         }),
         // Project management methods
