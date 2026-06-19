@@ -228,6 +228,12 @@ export const ru: TranslationStructure = {
         imageUploadSubtitle: 'Прикрепляйте изображения к сообщениям для анализа поддерживаемыми агентами',
     },
 
+    bashMode: {
+        noOutput: 'нет вывода',
+        exitCode: ({ code }: { code: number }) => `завершено с кодом ${code}`,
+        failed: ({ error }: { error: string }) => `Не удалось выполнить команду: ${error}`,
+    },
+
     errors: {
         networkError: 'Произошла ошибка сети',
         serverError: 'Произошла ошибка сервера',

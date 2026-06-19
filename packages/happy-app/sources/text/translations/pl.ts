@@ -260,6 +260,12 @@ export const pl: TranslationStructure = {
         imageUploadSubtitle: 'Dołączaj obrazy do wiadomości, aby obsługiwani agenci mogli je analizować',
     },
 
+    bashMode: {
+        noOutput: 'brak danych wyjściowych',
+        exitCode: ({ code }: { code: number }) => `zakończono z kodem ${code}`,
+        failed: ({ error }: { error: string }) => `Nie można uruchomić polecenia: ${error}`,
+    },
+
     errors: {
         networkError: 'Wystąpił błąd sieci',
         serverError: 'Wystąpił błąd serwera',

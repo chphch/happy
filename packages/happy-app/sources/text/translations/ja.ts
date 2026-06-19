@@ -244,6 +244,12 @@ export const ja: TranslationStructure = {
         imageUploadSubtitle: '対応エージェントに分析させるため、メッセージに画像を添付する',
     },
 
+    bashMode: {
+        noOutput: '出力なし',
+        exitCode: ({ code }: { code: number }) => `コード ${code} で終了しました`,
+        failed: ({ error }: { error: string }) => `コマンドを実行できませんでした: ${error}`,
+    },
+
     errors: {
         networkError: 'ネットワークエラーが発生しました',
         serverError: 'サーバーエラーが発生しました',

@@ -244,6 +244,12 @@ export const zhHans: TranslationStructure = {
         imageUploadSubtitle: '将图片附加到消息中，以便受支持的代理进行分析',
     },
 
+    bashMode: {
+        noOutput: '无输出',
+        exitCode: ({ code }: { code: number }) => `已退出，退出码 ${code}`,
+        failed: ({ error }: { error: string }) => `无法运行命令：${error}`,
+    },
+
     errors: {
         networkError: '发生网络错误',
         serverError: '发生服务器错误',

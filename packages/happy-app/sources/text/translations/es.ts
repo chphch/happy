@@ -243,6 +243,12 @@ export const es: TranslationStructure = {
         imageUploadSubtitle: 'Adjunta imágenes a los mensajes para que los agentes compatibles las analicen',
     },
 
+    bashMode: {
+        noOutput: 'sin salida',
+        exitCode: ({ code }: { code: number }) => `terminó con el código ${code}`,
+        failed: ({ error }: { error: string }) => `No se pudo ejecutar el comando: ${error}`,
+    },
+
     errors: {
         networkError: 'Error de conexión',
         serverError: 'Error del servidor',

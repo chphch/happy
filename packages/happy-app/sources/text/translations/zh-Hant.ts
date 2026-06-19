@@ -243,6 +243,12 @@ export const zhHant: TranslationStructure = {
         imageUploadSubtitle: '將圖片附加到訊息中，讓支援的代理分析',
     },
 
+    bashMode: {
+        noOutput: '無輸出',
+        exitCode: ({ code }: { code: number }) => `結束，退出碼為 ${code}`,
+        failed: ({ error }: { error: string }) => `無法執行命令：${error}`,
+    },
+
     errors: {
         networkError: '發生網路錯誤',
         serverError: '發生伺服器錯誤',
