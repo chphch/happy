@@ -771,6 +771,9 @@ export function SessionViewLoaded({
         }
     }, [canUseAttachments, selectedImages.length, clearImages]);
 
+    // !-prefix bash command mode (expBashMode feature flag)
+    const expBashMode = useSetting('expBashMode');
+
     // ChatComposer owns the message state + useDraft subscription. We only
     // hold an imperative handle so handleSend can read the live text and
     // clear it without subscribing to it (which would re-render the whole
@@ -823,6 +826,19 @@ export function SessionViewLoaded({
     // need to re-create on every keystroke.
     const handleSend = React.useCallback(() => {
         const liveMessage = composerHandleRef.current?.getMessage() ?? '';
+        // !-prefix bash mode: a message starting with `!` runs as a one-off
+        // shell command in the session's cwd instead of being sent to the agent.
+        if (expBashMode) {
+            const trimmed = liveMessage.trim();
+            if (trimmed.startsWith('!')) {
+                const command = trimmed.slice(1).trim();
+                if (command) {
+                    composerHandleRef.current?.clearMessage();
+                    sync.runBashCommand(sessionId, command);
+                    return;
+                }
+            }
+        }
         if (liveMessage.trim() || (expImageUpload && selectedImages.length > 0)) {
             const attachments = expImageUpload ? selectedImages : undefined;
             const communicationsToDismiss = [...pendingCommunications];
@@ -853,7 +869,7 @@ export function SessionViewLoaded({
                 }
             })();
         }
-    }, [sessionId, expImageUpload, selectedImages, clearImages, pendingCommunications]);
+    }, [sessionId, expImageUpload, expBashMode, selectedImages, clearImages, pendingCommunications]);
 
     const handleAbort = React.useCallback(() => {
         // Mode picks live in synced metadata — clear them there, otherwise the
