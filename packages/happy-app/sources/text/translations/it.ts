@@ -237,6 +237,14 @@ export const it: TranslationStructure = {
         groupToolCallsSubtitle: 'Comprimi le chiamate consecutive agli strumenti in un unico contenitore',
         imageUpload: 'Caricamento immagini',
         imageUploadSubtitle: 'Allega immagini ai messaggi per farle analizzare dagli agenti supportati',
+        bashMode: 'Modalità comando Bash',
+        bashModeSubtitle: 'Inizia un messaggio con ! per eseguirlo come comando della shell',
+    },
+
+    bashMode: {
+        noOutput: 'nessun output',
+        exitCode: ({ code }: { code: number }) => `uscito con codice ${code}`,
+        failed: ({ error }: { error: string }) => `Impossibile eseguire il comando: ${error}`,
     },
 
     errors: {

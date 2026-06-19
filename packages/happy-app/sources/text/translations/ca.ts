@@ -239,6 +239,14 @@ export const ca: TranslationStructure = {
         groupToolCallsSubtitle: 'Replega les crides consecutives a eines en un sol contenidor',
         imageUpload: 'Pujada d\'imatges',
         imageUploadSubtitle: 'Adjunta imatges als missatges perquè els agents compatibles les analitzin',
+        bashMode: 'Mode de comandes Bash',
+        bashModeSubtitle: 'Comença un missatge amb ! per executar-lo com a comanda de l\'intèrpret d\'ordres',
+    },
+
+    bashMode: {
+        noOutput: 'sense sortida',
+        exitCode: ({ code }: { code: number }) => `ha finalitzat amb el codi ${code}`,
+        failed: ({ error }: { error: string }) => `No s'ha pogut executar la comanda: ${error}`,
     },
 
     errors: {

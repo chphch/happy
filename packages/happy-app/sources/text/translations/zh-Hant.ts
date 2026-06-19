@@ -239,6 +239,14 @@ export const zhHant: TranslationStructure = {
         groupToolCallsSubtitle: '將連續的工具呼叫摺疊到單一容器中',
         imageUpload: '圖片上傳',
         imageUploadSubtitle: '將圖片附加到訊息中，讓支援的代理分析',
+        bashMode: 'Bash 命令模式',
+        bashModeSubtitle: '以 ! 開頭的訊息會作為 shell 命令執行',
+    },
+
+    bashMode: {
+        noOutput: '無輸出',
+        exitCode: ({ code }: { code: number }) => `結束，退出碼為 ${code}`,
+        failed: ({ error }: { error: string }) => `無法執行命令：${error}`,
     },
 
     errors: {

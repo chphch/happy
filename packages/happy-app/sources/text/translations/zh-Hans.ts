@@ -240,6 +240,14 @@ export const zhHans: TranslationStructure = {
         groupToolCallsSubtitle: '将连续的工具调用折叠到一个容器中',
         imageUpload: '图片上传',
         imageUploadSubtitle: '将图片附加到消息中，以便受支持的代理进行分析',
+        bashMode: 'Bash 命令模式',
+        bashModeSubtitle: '以 ! 开头的消息将作为 Shell 命令运行',
+    },
+
+    bashMode: {
+        noOutput: '无输出',
+        exitCode: ({ code }: { code: number }) => `已退出，退出码 ${code}`,
+        failed: ({ error }: { error: string }) => `无法运行命令：${error}`,
     },
 
     errors: {

@@ -224,6 +224,14 @@ export const ru: TranslationStructure = {
         groupToolCallsSubtitle: 'Сворачивать подряд идущие вызовы инструментов в один блок',
         imageUpload: 'Загрузка изображений',
         imageUploadSubtitle: 'Прикрепляйте изображения к сообщениям для анализа поддерживаемыми агентами',
+        bashMode: 'Режим команд Bash',
+        bashModeSubtitle: 'Начните сообщение с !, чтобы выполнить его как команду оболочки',
+    },
+
+    bashMode: {
+        noOutput: 'нет вывода',
+        exitCode: ({ code }: { code: number }) => `завершено с кодом ${code}`,
+        failed: ({ error }: { error: string }) => `Не удалось выполнить команду: ${error}`,
     },
 
     errors: {
