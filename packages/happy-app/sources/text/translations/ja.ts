@@ -242,6 +242,14 @@ export const ja: TranslationStructure = {
         groupToolCallsSubtitle: '連続するツール呼び出しを1つのコンテナにまとめる',
         imageUpload: '画像アップロード',
         imageUploadSubtitle: '対応エージェントに分析させるため、メッセージに画像を添付する',
+        bashMode: 'Bashコマンドモード',
+        bashModeSubtitle: 'メッセージを ! で始めるとシェルコマンドとして実行します',
+    },
+
+    bashMode: {
+        noOutput: '出力なし',
+        exitCode: ({ code }: { code: number }) => `コード ${code} で終了しました`,
+        failed: ({ error }: { error: string }) => `コマンドを実行できませんでした: ${error}`,
     },
 
     errors: {
