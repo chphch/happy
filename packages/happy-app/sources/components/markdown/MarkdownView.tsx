@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as WebBrowser from 'expo-web-browser';
 import { MermaidRenderer } from './MermaidRenderer';
+import { ImageViewer } from '@/components/ImageViewer';
 import { t } from '@/text';
 import { isHttpMarkdownLink } from './linkUtils';
 import { openExternalUrl } from '@/utils/openExternalUrl';
@@ -226,6 +227,10 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
     // owns the platform split. Non-SVG images keep using <Image> unchanged.
     const isSvg = React.useMemo(() => isSvgImageUrl(props.url), [props.url]);
 
+    const openViewer = React.useCallback(() => {
+        Modal.show({ component: ImageViewer, props: { uri: props.url } } as any);
+    }, [props.url]);
+
     return (
         <View style={[style.imageBlock, props.first && style.first, props.last && style.last]}>
             {isSvg ? (
@@ -233,12 +238,14 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
                 // one's size.
                 <RenderSvgImage key={props.url} url={props.url} accessibilityLabel={accessibleLabel} />
             ) : (
-                <Image
-                    source={{ uri: props.url }}
-                    style={style.image}
-                    accessibilityLabel={accessibleLabel}
-                    resizeMode="contain"
-                />
+                <Pressable onPress={openViewer} accessibilityRole="imagebutton">
+                    <Image
+                        source={{ uri: props.url }}
+                        style={style.image}
+                        accessibilityLabel={accessibleLabel}
+                        resizeMode="contain"
+                    />
+                </Pressable>
             )}
             {props.alt ? (
                 <Text style={style.imageCaption}>{props.alt}</Text>
