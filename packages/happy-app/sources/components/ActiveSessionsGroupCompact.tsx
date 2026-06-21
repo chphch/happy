@@ -4,6 +4,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { Text } from '@/components/StyledText';
 import { Machine } from '@/sync/storageTypes';
 import { SessionRowData } from '@/sync/storage';
+import { orderSessionRowsByForkLineage } from '@/utils/forkLineage';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { type SessionState, formatPathRelativeToHome, vibingMessages, formatLastSeen } from '@/utils/sessionUtils';
 import { Avatar } from './Avatar';
@@ -13,6 +14,7 @@ import { useAllMachines, useSessionGitStatus, useIsProjectStarred, useStarredPro
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
+import { ForkLineageConnector, forkIndentPadding } from './ForkLineageConnector';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { HappyError } from '@/utils/errors';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
@@ -235,6 +237,8 @@ export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: Acti
         byMachine.forEach(mg => {
             mg.projects.forEach(pg => {
                 pg.sessions.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+                // Nest forked children under their parent within this project group.
+                pg.sessions = orderSessionRowsByForkLineage(pg.sessions);
             });
         });
 
@@ -375,11 +379,13 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
             style={[
                 styles.sessionRow,
                 showBorder && styles.sessionRowWithBorder,
-                selected && styles.sessionRowSelected
+                selected && styles.sessionRowSelected,
+                { paddingLeft: forkIndentPadding(session.forkDepth, 16) },
             ]}
             onPress={handlePress}
             {...menuProps}
         >
+            <ForkLineageConnector forkDepth={session.forkDepth} rowHeight={56} basePadding={16} />
             <View style={styles.sessionContent}>
                 <View style={styles.sessionTitleRow}>
                     {renderLeadingIndicator()}
