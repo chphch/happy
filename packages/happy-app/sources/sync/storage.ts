@@ -114,6 +114,13 @@ export interface SessionRowData {
     // Names the git worktree this session runs in; null in the primary tree.
     workspaceId: string | null;
     workspaceName: string | null;
+    // Fork lineage: the Happy session this one was forked from (null if not a
+    // fork), and its nesting depth within the group it renders in (0 = root /
+    // not nested). forkDepth is stamped at render time — after the archive and
+    // search filters have run — so a child is never indented under a parent the
+    // filter removed.
+    parentSessionId: string | null;
+    forkDepth: number;
 }
 
 function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): SessionRowData {
@@ -162,9 +169,10 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
         projectName: session.metadata?.project?.name ?? null,
         workspaceId: session.metadata?.workspace?.id ?? null,
         workspaceName: session.metadata?.workspace?.name ?? null,
+        parentSessionId: session.metadata?.parentSessionId ?? null,
+        forkDepth: 0,
     };
 }
-
 
 // Unified list item type for SessionsList component
 export type SessionListViewItem =
