@@ -5,6 +5,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Text } from '@/components/StyledText';
 import { Typography } from '@/constants/Typography';
 import { ProjectGroupData, ProjectWorkspaceGroup, useAllMachines, useLocalSettingMutable } from '@/sync/storage';
+import { orderSessionRowsByForkLineage } from '@/utils/forkLineage';
 import { CompactSessionRow } from './ActiveSessionsGroupCompact';
 
 interface ProjectGroupProps {
@@ -80,6 +81,15 @@ const WorkspaceSection = React.memo(({ workspace, showLabel, selectedSessionId }
     const styles = stylesheet;
     const { theme } = useUnistyles();
 
+    // Nesting runs here, not where the list data is built: the list is filtered
+    // after that (archive toggle, search box), and a depth stamped before the
+    // filter leaves a child indented under a parent that is no longer on screen.
+    // What this section receives is exactly what renders.
+    const sessions = React.useMemo(
+        () => orderSessionRowsByForkLineage(workspace.sessions),
+        [workspace.sessions],
+    );
+
     return (
         <View style={styles.workspace}>
             {showLabel && (
@@ -94,7 +104,7 @@ const WorkspaceSection = React.memo(({ workspace, showLabel, selectedSessionId }
                     </Text>
                 </View>
             )}
-            {workspace.sessions.map((session, index) => (
+            {sessions.map((session, index) => (
                 <CompactSessionRow
                     key={session.id}
                     session={session}

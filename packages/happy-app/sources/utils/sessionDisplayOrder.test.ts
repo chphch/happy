@@ -131,4 +131,38 @@ describe('session display order', () => {
             'happy-session',
         ]);
     });
+
+    it('numbers a forked child right after its parent inside a project card', () => {
+        const child = session('child', 'machine-a', '/happy');
+        const data: SessionListViewItem[] = [
+            { type: 'projects-header', source: 'happy' },
+            {
+                type: 'project',
+                source: 'happy',
+                project: {
+                    id: 'happy-project',
+                    name: 'happy',
+                    machineId: 'machine-a',
+                    activeCount: 0,
+                    sessionCount: 3,
+                    workspaces: [{
+                        id: '',
+                        name: null,
+                        // Newest-first: the fork sorts above the parent it came from.
+                        sessions: [
+                            { ...child, parentSessionId: 'parent' },
+                            session('parent', 'machine-a', '/happy'),
+                            session('unrelated', 'machine-a', '/happy'),
+                        ],
+                    }],
+                },
+            },
+        ];
+
+        expect(getSessionShortcutIdsInDisplayOrder(data, machines, 'Unknown')).toEqual([
+            'parent',
+            'child',
+            'unrelated',
+        ]);
+    });
 });
