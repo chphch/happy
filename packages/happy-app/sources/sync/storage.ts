@@ -17,6 +17,7 @@ import { Message } from "./typesMessage";
 import { NormalizedMessage } from "./typesRaw";
 import { isMachineOnline } from '@/utils/machineUtils';
 import { getSessionName, getSessionSubtitle, getSessionAvatarId, type SessionState } from '@/utils/sessionUtils';
+import { orderSessionRowsByForkLineage } from '@/utils/forkLineage';
 import { applySettings, Settings } from "./settings";
 import { LocalSettings, applyLocalSettings } from "./localSettings";
 import { Purchases, customerInfoToPurchases } from "./purchases";
@@ -99,6 +100,12 @@ export interface SessionRowData {
     completedTodosCount: number;
     totalTodosCount: number;
     hasUnread: boolean;
+    // Fork lineage: the Happy session this one was forked from (null if not a
+    // fork), and its nesting depth within the current list section (0 = root /
+    // not nested). forkDepth is stamped by orderSessionRowsByForkLineage during
+    // list assembly so the renderer can indent forked children under their parent.
+    parentSessionId: string | null;
+    forkDepth: number;
 }
 
 function buildSessionRowData(session: Session, unreadSessionIds: Set<string>): SessionRowData {
@@ -133,7 +140,14 @@ function buildSessionRowData(session: Session, unreadSessionIds: Set<string>): S
         completedTodosCount: session.todos?.filter(todo => todo.status === 'completed').length ?? 0,
         totalTodosCount: session.todos?.length ?? 0,
         hasUnread: unreadSessionIds.has(session.id),
+        parentSessionId: session.metadata?.parentSessionId ?? null,
+        forkDepth: 0,
     };
+}
+
+/** Build display rows for a section's sessions and nest forks within it. */
+function buildOrderedSessionRows(sessions: Session[], unreadSessionIds: Set<string>): SessionRowData[] {
+    return orderSessionRowsByForkLineage(sessions.map(s => buildSessionRowData(s, unreadSessionIds)));
 }
 
 // Unified list item type for SessionsList component
@@ -274,8 +288,8 @@ function buildSessionListViewData(
     // Starred section at the very top (lifts all starred — active + inactive)
     if (starredSessions.length > 0) {
         listData.push({ type: 'header', title: 'Starred' });
-        starredSessions.forEach(sess => {
-            listData.push({ type: 'session', session: buildSessionRowData(sess, unreadSessionIds) });
+        buildOrderedSessionRows(starredSessions, unreadSessionIds).forEach(row => {
+            listData.push({ type: 'session', session: row });
         });
     }
 
@@ -314,8 +328,8 @@ function buildSessionListViewData(
                 }
 
                 listData.push({ type: 'header', title: headerTitle });
-                currentDateGroup.forEach(sess => {
-                    listData.push({ type: 'session', session: buildSessionRowData(sess, unreadSessionIds) });
+                buildOrderedSessionRows(currentDateGroup, unreadSessionIds).forEach(row => {
+                    listData.push({ type: 'session', session: row });
                 });
             }
 
@@ -344,8 +358,8 @@ function buildSessionListViewData(
         }
 
         listData.push({ type: 'header', title: headerTitle });
-        currentDateGroup.forEach(sess => {
-            listData.push({ type: 'session', session: buildSessionRowData(sess, unreadSessionIds) });
+        buildOrderedSessionRows(currentDateGroup, unreadSessionIds).forEach(row => {
+            listData.push({ type: 'session', session: row });
         });
     }
 
