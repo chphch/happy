@@ -18,7 +18,6 @@ import { ForkLineageConnector, forkIndentPadding } from './ForkLineageConnector'
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { HappyError } from '@/utils/errors';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
-import { useSessionActionAlert } from '@/hooks/useSessionQuickActions';
 import { sessionKill } from '@/sync/ops';
 import { isWorktreePath, getRepoPath, getWorktreeName } from '@/utils/worktree';
 import { useNewSessionDraft } from '@/hooks/useNewSessionDraft';
@@ -343,11 +342,20 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
         });
     }, []);
 
-    const showActionAlert = useSessionActionAlert(session.id);
+    // Native long-press opens the cross-platform actions sheet (SessionActionsPopover),
+    // NOT Modal.alert → RN Alert.alert: Android caps Alert at 3 buttons, which silently
+    // drops most quick-actions (e.g. "Copy session ID"). The popover renders all items.
+    const handleLongPress = React.useCallback((event: any) => {
+        setActionsAnchor({
+            type: 'point',
+            x: event?.nativeEvent?.pageX ?? 0,
+            y: event?.nativeEvent?.pageY ?? 0,
+        });
+    }, []);
     const menuProps = Platform.OS === 'web' ? {
         onContextMenu: handleContextMenu,
     } as any : {
-        onLongPress: showActionAlert,
+        onLongPress: handleLongPress,
     };
 
     const renderLeadingIndicator = () => {
@@ -433,14 +441,23 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     );
 
     return (
-        <Swipeable
-            ref={swipeableRef}
-            renderRightActions={renderRightActions}
-            overshootRight={false}
-            enabled={!archivingSession}
-        >
-            {itemContent}
-        </Swipeable>
+        <>
+            <Swipeable
+                ref={swipeableRef}
+                renderRightActions={renderRightActions}
+                overshootRight={false}
+                enabled={!archivingSession}
+            >
+                {itemContent}
+            </Swipeable>
+            {/* Native long-press opens this sheet; must be mounted in the swipe branch too. */}
+            <SessionActionsPopover
+                anchor={actionsAnchor}
+                onClose={() => setActionsAnchor(null)}
+                sessionId={session.id}
+                visible={!!actionsAnchor}
+            />
+        </>
     );
 });
 
