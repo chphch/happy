@@ -138,6 +138,14 @@ export function startDaemonControlServer({
           modelMode: z.string().optional(),
           effortLevel: z.string().optional(),
           environmentVariables: z.record(z.string(), z.string()).optional(),
+          // Fork passthrough — mirrors the mobile app's spawn-happy-session RPC
+          // (apiMachine.ts). When set, the daemon spawns `claude --resume <id>`
+          // and backfills the prior conversation, so the new local session is a
+          // true FORK of an existing one rather than a blank session. Used by the
+          // /fork command (fork.mjs) to fan out context-inheriting children.
+          resumeClaudeSessionId: z.string().optional(),
+          parentSessionId: z.string().optional(),
+          forkedFromMessageId: z.string().optional(),
         }),
         response: {
           200: z.object({
@@ -158,10 +166,10 @@ export function startDaemonControlServer({
         }
       }
     }, async (request, reply) => {
-      const { directory, sessionId, agent, permissionMode, modelMode, effortLevel, environmentVariables } = request.body;
+      const { directory, sessionId, agent, permissionMode, modelMode, effortLevel, environmentVariables, resumeClaudeSessionId, parentSessionId, forkedFromMessageId } = request.body;
 
-      logger.debug(`[CONTROL SERVER] Spawn session request: dir=${directory}, sessionId=${sessionId || 'new'}, agent=${agent || 'default'}`);
-      const result = await spawnSession({ directory, sessionId, agent, permissionMode, modelMode, effortLevel, environmentVariables });
+      logger.debug(`[CONTROL SERVER] Spawn session request: dir=${directory}, sessionId=${sessionId || 'new'}, agent=${agent || 'default'}, resume=${resumeClaudeSessionId || 'none'}`);
+      const result = await spawnSession({ directory, sessionId, agent, permissionMode, modelMode, effortLevel, environmentVariables, resumeClaudeSessionId, parentSessionId, forkedFromMessageId });
 
       switch (result.type) {
         case 'success':
