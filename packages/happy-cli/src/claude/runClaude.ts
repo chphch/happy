@@ -1,5 +1,6 @@
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 import { ApiClient } from '@/api/api';
 import { logger } from '@/ui/logger';
@@ -853,6 +854,49 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         messageQueue.push(message.content.text, currentEnhancedMode(), attachmentsForThisMessage);
         logger.debugLargeJson('User message pushed to queue:', message)
     });
+
+    // Initial prompt for spawned/forked sessions.
+    //
+    // A session spawned with a first task (e.g. by /fork) must NOT rely on a
+    // post-spawn message PUSH: that races the session's startup. During fork
+    // startup the agent re-emits its resumed transcript as a backfill storm,
+    // and an externally-pushed message can land before the agent loop has
+    // subscribed / while seq bookkeeping is still settling — so it is dropped
+    // and the session sits idle until a later (post-subscription) message
+    // arrives. Instead the spawner hands the task via env and we enqueue it
+    // directly onto the loop's MessageQueue here — after onUserMessage is wired
+    // and before loop() consumes — so it lands exactly once as the first turn,
+    // with no server round-trip and no race. HAPPY_INITIAL_PROMPT_FILE is
+    // preferred (no arg-size limit, multiline-safe); HAPPY_INITIAL_PROMPT is an
+    // inline fallback.
+    {
+        const initialPromptFile = process.env.HAPPY_INITIAL_PROMPT_FILE;
+        let initialPrompt: string | undefined;
+        if (initialPromptFile) {
+            try {
+                initialPrompt = readFileSync(initialPromptFile, 'utf8');
+            } catch (error) {
+                logger.debug(`[start] Failed to read HAPPY_INITIAL_PROMPT_FILE (${initialPromptFile}):`, error);
+            }
+        } else if (process.env.HAPPY_INITIAL_PROMPT) {
+            initialPrompt = process.env.HAPPY_INITIAL_PROMPT;
+        }
+        if (initialPrompt && initialPrompt.trim()) {
+            const enhancedMode: EnhancedMode = {
+                permissionMode: currentPermissionMode || 'default',
+                model: currentModel,
+                fallbackModel: currentFallbackModel,
+                customSystemPrompt: currentCustomSystemPrompt,
+                appendSystemPrompt: currentAppendSystemPrompt,
+                allowedTools: currentAllowedTools,
+                disallowedTools: currentDisallowedTools,
+                effort: currentEffort,
+            };
+            recordAppPrompt(initialPrompt);
+            messageQueue.push(initialPrompt, enhancedMode, []);
+            logger.debug(`[start] Enqueued initial prompt (${initialPrompt.length} chars) from ${initialPromptFile ? 'file' : 'env'} as first turn`);
+        }
+    }
 
     // Setup signal handlers for graceful shutdown
     //
