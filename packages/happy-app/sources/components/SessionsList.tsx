@@ -543,14 +543,13 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                 </View>
             </View>
         </Pressable>
-        {Platform.OS === 'web' && (
-            <SessionActionsPopover
-                anchor={actionsAnchor}
-                onClose={() => setActionsAnchor(null)}
-                sessionId={session.id}
-                visible={!!actionsAnchor}
-            />
-        )}
+        {/* Mounted on all platforms: web opens it via onContextMenu, native via onLongPress. */}
+        <SessionActionsPopover
+            anchor={actionsAnchor}
+            onClose={() => setActionsAnchor(null)}
+            sessionId={session.id}
+            visible={!!actionsAnchor}
+        />
         </View>
     );
 });
