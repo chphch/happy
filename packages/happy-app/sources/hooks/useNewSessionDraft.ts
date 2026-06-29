@@ -17,7 +17,6 @@ import { rollBotFaceSeeds, type BotFaceSeeds, type BotFaceSlot } from '@/utils/b
 
 interface NewSessionDraftState {
     input: string;
-    attachments: AttachmentPreview[];
     selectedMachineId: string | null;
     selectedPath: string | null;
     /**
@@ -43,9 +42,9 @@ interface NewSessionDraftState {
     /** The four faces on offer; `botFaceSlot` says which one the bot gets. */
     botFaceSeeds: BotFaceSeeds;
     botFaceSlot: BotFaceSlot;
+    attachments: AttachmentPreview[];
 
     setInput: (input: string) => void;
-    setAttachments: (attachments: AttachmentPreview[]) => void;
     setMachineId: (id: string | null) => void;
     /**
      * Renames the machine this draft already points at, keeping everything chosen on it.
@@ -70,6 +69,7 @@ interface NewSessionDraftState {
     setBotFaceSlot: (slot: BotFaceSlot) => void;
     /** Rolls four new faces. The picked position stays picked, now wearing its new face. */
     rollBotFaces: () => void;
+    setAttachments: (attachments: AttachmentPreview[]) => void;
 }
 
 function persist(state: NewSessionDraftState) {
@@ -84,6 +84,7 @@ function persist(state: NewSessionDraftState) {
         effortLevel: state.effortLevel,
         sessionType: state.sessionType,
         worktreeKey: state.worktreeKey,
+        attachments: state.attachments,
         updatedAt: Date.now(),
     });
 }
@@ -92,9 +93,6 @@ const initial = loadNewSessionDraft();
 
 export const useNewSessionDraft = create<NewSessionDraftState>()((set, get) => ({
     input: initial?.input ?? '',
-    // Image picker URIs are temporary, so attachments intentionally stay out
-    // of MMKV persistence and only bridge Home -> New session in memory.
-    attachments: [],
     selectedMachineId: initial?.selectedMachineId ?? null,
     selectedPath: initial?.selectedPath ?? null,
     selectedProjectId: initial?.selectedProjectId ?? null,
@@ -108,9 +106,9 @@ export const useNewSessionDraft = create<NewSessionDraftState>()((set, get) => (
     botName: '',
     botFaceSeeds: rollBotFaceSeeds(),
     botFaceSlot: 0,
+    attachments: initial?.attachments ?? [],
 
     setInput: (input) => { set({ input }); persist(get()); },
-    setAttachments: (attachments) => { set({ attachments }); },
     setMachineId: (id) => { set({ selectedMachineId: id, selectedPath: null, selectedProjectId: null, worktreeKey: null }); persist(get()); },
     renameMachineId: (id) => { set({ selectedMachineId: id }); persist(get()); },
     setPath: (path) => { set({ selectedPath: path, selectedProjectId: null, worktreeKey: null }); persist(get()); },
@@ -125,4 +123,5 @@ export const useNewSessionDraft = create<NewSessionDraftState>()((set, get) => (
     setBotName: (botName) => { set({ botName }); },
     setBotFaceSlot: (botFaceSlot) => { set({ botFaceSlot }); },
     rollBotFaces: () => { set({ botFaceSeeds: rollBotFaceSeeds() }); },
+    setAttachments: (attachments) => { set({ attachments }); persist(get()); },
 }));
