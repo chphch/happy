@@ -189,6 +189,7 @@ describe('settings', () => {
                 avatarStyle: 'brutalist',
                 showFlavorIcons: false,
                 hideInactiveSessions: false,
+                sortSessionsByActivity: false,
                 archivedSessionsSortBy: 'createdAt',
                 expResumeSession: false,
                 fileDiffsSidebar: false,
