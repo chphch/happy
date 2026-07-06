@@ -93,12 +93,13 @@ async function main() {
   server.registerTool(
     'open_session',
     {
-      description: 'Open a new Happy session (a separate agent process) on this machine — the programmatic equivalent of the client UI\'s "new session". Optionally create an isolated git worktree first and open the session inside it. Returns the new session id.',
+      description: 'Open a new Happy session (a separate agent process) on this machine — the programmatic equivalent of the client UI\'s "new session". Opens a top-level session by default (no parent lineage); set linkToParent to stamp it as forked-from the calling session. Optionally create an isolated git worktree first and open the session inside it. Returns the new session id.',
       title: 'Open Happy Session',
       inputSchema: {
         directory: z.string().optional().describe("Absolute path to open the session in. Defaults to the current session's working directory."),
         agent: z.enum(['claude', 'codex', 'gemini', 'openclaw']).optional().describe('Which agent to launch (default: claude).'),
         worktree: z.boolean().optional().describe('If true, create a new git worktree under <directory>/.dev/worktree/<name> and open the session there. <directory> must be inside a git repo.'),
+        linkToParent: z.boolean().optional().describe('If true, stamp the new session as forked-from the calling session so it appears under "Forked from" in the app\'s fork-lineage view. Default false = a top-level session with no parent lineage (matches the client\'s "new session"). Lineage is metadata only; history is never backfilled.'),
       },
     },
     async (args) => {
