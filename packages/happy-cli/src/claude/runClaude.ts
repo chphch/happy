@@ -47,7 +47,7 @@ export type JsRuntime = 'node' | 'bun'
 export interface StartOptions {
     model?: string
     permissionMode?: PermissionMode
-    effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+    effort?: ClaudeEffort
     startingMode?: 'local' | 'remote'
     shouldStartDaemon?: boolean
     claudeEnvVars?: Record<string, string>
