@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { View, Text, ScrollView, Pressable, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { useRouter } from 'expo-router';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { useSession } from '@/sync/storage';
@@ -14,7 +13,6 @@ import {
     type ForkSource,
 } from '@/sync/ops';
 import { getSessionForkSource } from '@/utils/sessionFork';
-import { replaceToSession } from '@/hooks/useNavigateToSession';
 import { MobileGlassSurface } from './MobileGlass';
 
 export interface DuplicateSheetProps {
@@ -46,7 +44,6 @@ type RewindPoint = {
 export const DuplicateSheet = React.memo(function DuplicateSheet(props: DuplicateSheetProps) {
     const { sessionId, initialClaudeUuid, initialRewindPointId, initialMessageText, initialForkedFromMessageId, onClose } = props;
     const session = useSession(sessionId);
-    const router = useRouter();
     const { theme } = useUnistyles();
     const windowSize = useWindowDimensions();
     const sheetFrame = React.useMemo(
@@ -154,8 +151,11 @@ export const DuplicateSheet = React.memo(function DuplicateSheet(props: Duplicat
             });
 
         if (result.type === 'success') {
+            // No navigation on purpose: spawn only *starts* the agent, so
+            // jumping there lands on a session still booting, with nothing
+            // actionable on screen. The new row shows up in the list; the user
+            // opens it if they want it.
             onClose?.();
-            replaceToSession(router, result.sessionId);
             return;
         }
 
