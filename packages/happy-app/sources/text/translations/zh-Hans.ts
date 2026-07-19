@@ -394,6 +394,7 @@ export const zhHans: TranslationStructure = {
         happySessionId: 'Happy 会话 ID',
         copySessionId: '复制 Happy 会话 ID',
         copyOriginalSessionId: '复制原始会话 ID',
+        markAsUnread: '标记为未读',
         claudeCodeSessionId: 'Claude Code 会话 ID',
         claudeCodeSessionIdCopied: 'Claude Code 会话 ID 已复制到剪贴板',
         codexThreadId: 'Codex 线程 ID',

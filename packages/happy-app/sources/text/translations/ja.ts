@@ -394,6 +394,7 @@ export const ja: TranslationStructure = {
         happySessionId: 'Happy Session ID',
         copySessionId: 'HappyセッションIDをコピー',
         copyOriginalSessionId: '元のセッションIDをコピー',
+        markAsUnread: '未読にする',
         claudeCodeSessionId: 'Claude Code Session ID',
         claudeCodeSessionIdCopied: 'Claude Code Session IDがクリップボードにコピーされました',
         codexThreadId: 'Codex Thread ID',

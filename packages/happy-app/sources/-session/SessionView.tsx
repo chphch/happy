@@ -25,7 +25,7 @@ import { Modal } from '@/modal';
 import { voiceHooks } from '@/realtime/hooks/voiceHooks';
 import { getCurrentVoiceConversationId, getCurrentVoiceSessionDurationSeconds, startRealtimeSession, stopRealtimeSession } from '@/realtime/RealtimeSession';
 import { gitStatusSync } from '@/sync/gitStatusSync';
-import { sessionAbort, sessionGoalAction, sessionSetAgentModes } from '@/sync/ops';
+import { sessionAbort, sessionGoalAction, sessionSetAgentModes, sessionMarkRead } from '@/sync/ops';
 import { storage, useIsDataReady, useLocalSetting, useRealtimeStatus, useSessionGitStatus, useSessionMessages, useSessionUsage, useSetting } from '@/sync/storage';
 import { useSession } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
@@ -695,18 +695,22 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         // Trigger session sync
         sync.onSessionVisible(sessionId);
 
-        // Mark session as currently being viewed (clears unread)
+        // Mark session as currently being viewed (excluded from unread) and
+        // advance the synced read position to the latest message.
         storage.getState().setCurrentViewingSession(sessionId);
+        sessionMarkRead(sessionId);
 
         // Initialize git status sync for this session
         gitStatusSync.getSync(sessionId).invalidate();
 
         return () => {
-            // Clear viewing session on unmount
+            // Clear viewing session on unmount and catch the read position up to
+            // any messages that arrived while it was open.
             const current = storage.getState().currentViewingSessionId;
             if (current === sessionId) {
                 storage.getState().setCurrentViewingSession(null);
             }
+            sessionMarkRead(sessionId);
         };
     }, [sessionId, realtimeStatus]);
 
