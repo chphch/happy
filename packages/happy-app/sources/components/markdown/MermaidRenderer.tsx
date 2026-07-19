@@ -6,6 +6,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Typography } from '@/constants/Typography';
 import { t } from '@/text';
 import { Modal } from '@/modal';
+import { useSetting } from '@/sync/storage';
 import { MermaidViewer } from './MermaidViewer';
 
 // Tall diagrams scroll inside a capped container instead of taking over the chat
@@ -40,6 +41,7 @@ export const MermaidRenderer = React.memo((props: {
     content: string;
 }) => {
     const { theme } = useUnistyles();
+    const expMermaidZoom = useSetting('expMermaidZoom');
     const [dimensions, setDimensions] = React.useState({ width: 0, height: 200 });
     const [svgContent, setSvgContent] = React.useState<string | null>(null);
 
@@ -125,7 +127,7 @@ export const MermaidRenderer = React.memo((props: {
                     style={webStyle(theme.colors.surfaceHighest)}
                     dangerouslySetInnerHTML={{ __html: svgContent }}
                 />
-                <ExpandButton onPress={openViewer} />
+                {expMermaidZoom && <ExpandButton onPress={openViewer} />}
             </View>
         );
     }
@@ -223,7 +225,7 @@ export const MermaidRenderer = React.memo((props: {
                     }}
                 />
             </View>
-            <ExpandButton onPress={openViewer} />
+            {expMermaidZoom && <ExpandButton onPress={openViewer} />}
         </View>
     );
 });

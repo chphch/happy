@@ -135,6 +135,7 @@ export function useSessionQuickActions(
     const machine = useMachine(machineId);
     const devModeEnabled = useLocalSetting('devModeEnabled');
     const continuationExperimentsEnabled = useSetting('expResumeSession');
+    const expCopySessionId = useSetting('expCopySessionId');
     const resumeAvailability = React.useMemo(
         () => getResumeAvailability(session, machine, sessionStatus.isConnected),
         [machine, session, sessionStatus.isConnected],
@@ -317,10 +318,13 @@ export function useSessionQuickActions(
             items.push({ id: 'duplicate', icon: 'time-outline', label: t('session.duplicateAction'), onPress: openDuplicateSheet });
         }
 
-        items.push({ id: 'copy-session-id', icon: 'copy-outline', label: t('sessionInfo.copySessionId'), onPress: copySessionId });
+        // Copy-session-ID actions — experimental, gated behind expCopySessionId.
+        if (expCopySessionId) {
+            items.push({ id: 'copy-session-id', icon: 'copy-outline', label: t('sessionInfo.copySessionId'), onPress: copySessionId });
 
-        if (originalSessionId) {
-            items.push({ id: 'copy-original-session-id', icon: 'code-slash-outline', label: t('sessionInfo.copyOriginalSessionId'), onPress: copyOriginalSessionId });
+            if (originalSessionId) {
+                items.push({ id: 'copy-original-session-id', icon: 'code-slash-outline', label: t('sessionInfo.copyOriginalSessionId'), onPress: copyOriginalSessionId });
+            }
         }
 
         if (canCopySessionMetadata) {
@@ -346,6 +350,7 @@ export function useSessionQuickActions(
         openDuplicateSheet,
         resumeAvailability.canShowResume,
         resumeSession,
+        expCopySessionId,
     ]);
 
     const showActionAlert = React.useCallback(() => {
