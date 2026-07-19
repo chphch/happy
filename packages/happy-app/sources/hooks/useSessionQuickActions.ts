@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { Modal } from '@/modal';
-import { machineResumeSession, sessionArchive, sessionKill, sessionSetAgentModes, forkAndSpawn, type ForkSource } from '@/sync/ops';
+import { machineResumeSession, sessionArchive, sessionKill, sessionSetAgentModes, sessionMarkUnread, forkAndSpawn, type ForkSource } from '@/sync/ops';
 import { maybeCleanupWorktree } from '@/hooks/useWorktreeCleanup';
 import { storage, useLocalSetting, useMachine, useSetting } from '@/sync/storage';
 import { Machine, Session } from '@/sync/storageTypes';
@@ -282,10 +282,21 @@ export function useSessionQuickActions(
 
     const canCopySessionMetadata = __DEV__ || devModeEnabled;
 
+    const markUnread = React.useCallback(() => {
+        sessionMarkUnread(session.id);
+    }, [session.id]);
+
     const actionItems = React.useMemo<SessionActionItem[]>(() => {
         const items: SessionActionItem[] = [
             { id: 'details', icon: 'information-circle-outline', label: t('profile.details'), onPress: openDetails },
         ];
+
+        items.push({
+            id: 'mark-unread',
+            icon: 'mail-unread-outline',
+            label: t('sessionInfo.markAsUnread'),
+            onPress: markUnread,
+        });
 
         if (resumeAvailability.canShowResume) {
             items.push({ id: 'resume', icon: 'play-circle-outline', label: t('sessionInfo.resumeSession'), onPress: resumeSession });
@@ -329,6 +340,7 @@ export function useSessionQuickActions(
         resumeAvailability.canShowResume,
         resumeSession,
         expCopySessionId,
+        markUnread,
     ]);
 
     const showActionAlert = React.useCallback(() => {
