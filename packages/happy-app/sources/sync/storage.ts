@@ -10,6 +10,7 @@ function useDeepEqual<T>(selector: (state: StorageState) => T): (state: StorageS
     };
 }
 import { Session, Machine, GitStatus, SessionAgentModesPatch } from "./storageTypes";
+import { sessionActivitySortKey } from "./sessionActivitySort";
 import type { GitStatusFiles } from "./gitStatusFiles";
 import type { ProjectFilesList } from "./projectFiles";
 import { buildPathProjectGroups, buildProjectGroups, isProjectSession, type ProjectGroupData } from "./projectGroups";
@@ -283,7 +284,7 @@ interface StorageState {
     currentViewingSessionId: string | null;
     setCurrentViewingSession: (sessionId: string | null) => void;
     // Optimistic local mirrors for the sync-engine + ops.ts writers.
-    applySessionLastMessageSeq: (sessionId: string, seq: number) => void;
+    applySessionLastMessage: (sessionId: string, seq: number, createdAt?: number) => void;
     setSessionLastReadSeqOptimistic: (sessionId: string, seq: number) => void;
 }
 
@@ -313,12 +314,12 @@ function buildSessionListViewData(
         }
     });
 
-    // Sort by last activity or creation date (newest first), per user setting — matches applySessions behavior
-    // Activity sort keys off the last user-sent message, not updatedAt: updatedAt
-    // bumps on every background agent update, which would make the list jump while
-    // several sessions stream at once. lastMessageSentAt only moves when the user acts.
+    // Sort each bucket by last message or creation date (newest first), per user setting — matches applySessions behavior.
+    // "By activity" keys on lastMessageAt (real message arrivals), NOT updatedAt,
+    // so merely viewing a session (writes read-position → bumps updatedAt) does
+    // not lift it to the top; falls back to updatedAt until messages are synced.
     const sortKey = storage.getState().settings.sortSessionsByActivity
-        ? (s: Session) => s.lastMessageSentAt ?? s.createdAt
+        ? sessionActivitySortKey
         : (s: Session) => s.createdAt;
     const sortProjectSessions = (items: Session[]) => items.sort((a, b) => {
         const activeDelta = Number(isSessionActive(b)) - Number(isSessionActive(a));
@@ -462,9 +463,14 @@ export const storage = create<StorageState>()((set, get) => {
                 const resolvedLastReadSeq = isAgentModePushPending(session.id, 'lastReadSeq')
                     ? existing?.metadata?.lastReadSeq
                     : session.metadata?.lastReadSeq;
-                // lastMessageSeq is owned by the sync engine (trackSessionLastSeq);
-                // inbound session payloads may not carry it, so preserve the mirror.
+                // lastMessageSeq/lastMessageAt are owned by the sync engine
+                // (trackSessionLastSeq); inbound session payloads may not carry
+                // them, so preserve the mirrors.
                 const resolvedLastMessageSeq = session.lastMessageSeq ?? existing?.lastMessageSeq;
+                const resolvedLastMessageAt = session.lastMessageAt ?? existing?.lastMessageAt;
+                // lastTurnCompletedAt is set live from turn-end events; inbound
+                // session payloads don't carry it, so preserve the mirror.
+                const resolvedLastTurnCompletedAt = session.lastTurnCompletedAt ?? existing?.lastTurnCompletedAt;
                 const mergedMetadata = session.metadata
                     ? { ...session.metadata, lastReadSeq: resolvedLastReadSeq }
                     : session.metadata;
@@ -482,6 +488,8 @@ export const storage = create<StorageState>()((set, get) => {
                     effortLevel: resolvedEffortLevel,
                     lastMessageSentAt: resolvedLastMessageSentAt,
                     lastMessageSeq: resolvedLastMessageSeq,
+                    lastMessageAt: resolvedLastMessageAt,
+                    lastTurnCompletedAt: resolvedLastTurnCompletedAt,
                 };
             });
 
@@ -510,9 +518,10 @@ export const storage = create<StorageState>()((set, get) => {
                 }
             });
 
-            // Sort both arrays by last activity or creation date (newest first), per user setting
+            // Sort both arrays by last message or creation date (newest first), per user setting.
+            // See sessionActivitySortKey — keyed on message arrivals, not updatedAt.
             const sortKey = get().settings.sortSessionsByActivity
-                ? (s: Session) => s.lastMessageSentAt ?? s.createdAt
+                ? sessionActivitySortKey
                 : (s: Session) => s.createdAt;
             activeSessions.sort((a, b) => sortKey(b) - sortKey(a));
             inactiveSessions.sort((a, b) => sortKey(b) - sortKey(a));
@@ -1335,10 +1344,16 @@ export const storage = create<StorageState>()((set, get) => {
                 sessionListViewData: buildSessionListViewData(state.sessions, sessionId),
             };
         }),
-        applySessionLastMessageSeq: (sessionId: string, seq: number) => set((state) => {
+        applySessionLastMessage: (sessionId: string, seq: number, createdAt?: number) => set((state) => {
             const session = state.sessions[sessionId];
-            if (!session || (session.lastMessageSeq ?? 0) >= seq) return state;
-            const sessions = { ...state.sessions, [sessionId]: { ...session, lastMessageSeq: seq } };
+            if (!session) return state;
+            const seqIsNewer = (session.lastMessageSeq ?? 0) < seq;
+            const atIsNewer = createdAt != null && (session.lastMessageAt ?? 0) < createdAt;
+            if (!seqIsNewer && !atIsNewer) return state;
+            const updated = { ...session };
+            if (seqIsNewer) updated.lastMessageSeq = seq;
+            if (atIsNewer) updated.lastMessageAt = createdAt;
+            const sessions = { ...state.sessions, [sessionId]: updated };
             return {
                 ...state,
                 sessions,
@@ -1473,9 +1488,11 @@ export function useAllSessions(): Session[] {
     return storage(useShallow((state) => {
         if (!state.isDataReady) return [];
         // Side chats are hidden children — exclude them from every list.
+        // Key on message arrivals (see sessionActivitySortKey) so viewing a
+        // session does not reorder the recent list.
         return Object.values(state.sessions)
             .filter((s) => !s.metadata?.isSideChat)
-            .sort((a, b) => b.updatedAt - a.updatedAt);
+            .sort((a, b) => sessionActivitySortKey(b) - sessionActivitySortKey(a));
     }));
 }
 
