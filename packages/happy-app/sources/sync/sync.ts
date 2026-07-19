@@ -139,6 +139,15 @@ class Sync {
     private sendSync = new Map<string, InvalidateSync>();
     private sendAbortControllers = new Map<string, AbortController>();
     private sessionLastSeq = new Map<string, number>();
+
+    // Record the highest message seq seen for a session in BOTH the private
+    // cursor map (used for incremental sync) and the Session state's
+    // `lastMessageSeq` mirror (used to derive the cross-client unread flag —
+    // Session.seq/updatedAt can't be used because metadata writes bump them).
+    private trackSessionLastSeq(sessionId: string, seq: number) {
+        this.sessionLastSeq.set(sessionId, seq);
+        storage.getState().applySessionLastMessageSeq(sessionId, seq);
+    }
     // Lowest seq value we have already fetched and applied for a session.
     // Used as the cursor for backward pagination when the user scrolls up to
     // load older history. Set after the initial latest-page fetch and
@@ -2057,7 +2066,7 @@ class Sync {
                         maxSeq = message.seq;
                     }
                 }
-                this.sessionLastSeq.set(sessionId, maxSeq);
+                this.trackSessionLastSeq(sessionId, maxSeq);
             }
         } catch (error) {
             this.maybeStartBackgroundSendWatchdog();
@@ -2182,7 +2191,7 @@ class Sync {
             if (message.seq > maxSeq) maxSeq = message.seq;
             if (message.seq < minSeq) minSeq = message.seq;
         }
-        this.sessionLastSeq.set(sessionId, maxSeq);
+        this.trackSessionLastSeq(sessionId, maxSeq);
         if (messages.length > 0) {
             this.sessionOldestSeq.set(sessionId, minSeq);
         }
@@ -2211,7 +2220,7 @@ class Sync {
             for (const message of messages) {
                 if (message.seq > maxSeq) maxSeq = message.seq;
             }
-            this.sessionLastSeq.set(sessionId, maxSeq);
+            this.trackSessionLastSeq(sessionId, maxSeq);
 
             if (!data.hasMore) break;
             if (maxSeq === afterSeq) {
@@ -2446,7 +2455,7 @@ class Sync {
                     const incomingSeq = updateData.body.message.seq;
                     if (lastMessage && currentLastSeq !== undefined && incomingSeq === currentLastSeq + 1) {
                         this.enqueueMessages(updateData.body.sid, [lastMessage]);
-                        this.sessionLastSeq.set(updateData.body.sid, incomingSeq);
+                        this.trackSessionLastSeq(updateData.body.sid, incomingSeq);
                         let hasMutableTool = false;
                         if (lastMessage.role === 'agent' && lastMessage.content[0] && lastMessage.content[0].type === 'tool-result') {
                             hasMutableTool = storage.getState().isMutableToolCall(updateData.body.sid, lastMessage.content[0].tool_use_id);
