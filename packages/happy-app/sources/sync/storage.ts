@@ -183,6 +183,7 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
         state,
         ...(!session.active && { activeAt: session.activeAt, createdAt: session.createdAt }),
         hasDraft: !!session.draft,
+        // starred so the indicator and standalone-row handling stay upstream.
         active: session.active,
         archived: isSessionArchived(session),
         machineId: session.metadata?.machineId ?? null,

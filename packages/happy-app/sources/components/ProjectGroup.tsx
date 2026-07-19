@@ -6,7 +6,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Text } from '@/components/StyledText';
 import { Typography } from '@/constants/Typography';
 import { t } from '@/text';
-import { ProjectGroupData, ProjectWorkspaceGroup } from '@/sync/storage';
+import { ProjectGroupData, ProjectWorkspaceGroup, useSetting } from '@/sync/storage';
 import { orderSessionRowsByForkLineage } from '@/utils/forkLineage';
 import { CompactSessionRow } from './ActiveSessionsGroupCompact';
 import { Avatar } from './Avatar';
@@ -85,9 +85,10 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId }: 
     // after that (archive toggle, search box), and a depth stamped before the
     // filter leaves a child indented under a parent that is no longer on screen.
     // What this section receives is exactly what renders.
+    const expForkNesting = useSetting('expForkNesting');
     const sessions = React.useMemo(
-        () => orderSessionRowsByForkLineage(workspace.sessions),
-        [workspace.sessions],
+        () => (expForkNesting ? orderSessionRowsByForkLineage(workspace.sessions) : workspace.sessions),
+        [expForkNesting, workspace.sessions],
     );
 
     return (
