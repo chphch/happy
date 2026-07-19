@@ -143,9 +143,12 @@ class Sync {
     // cursor map (used for incremental sync) and the Session state's
     // `lastMessageSeq` mirror (used to derive the cross-client unread flag —
     // Session.seq/updatedAt can't be used because metadata writes bump them).
-    private trackSessionLastSeq(sessionId: string, seq: number) {
+    // `createdAt` (the newest message's timestamp, when known) feeds the
+    // `lastMessageAt` mirror that drives "sort by activity" — same reason: it
+    // must reflect real message arrivals, not metadata-write updatedAt bumps.
+    private trackSessionLastSeq(sessionId: string, seq: number, createdAt?: number) {
         this.sessionLastSeq.set(sessionId, seq);
-        storage.getState().applySessionLastMessageSeq(sessionId, seq);
+        storage.getState().applySessionLastMessage(sessionId, seq, createdAt);
     }
     // Lowest seq value we have already fetched and applied for a session.
     // Used as the cursor for backward pagination when the user scrolls up to
@@ -2026,12 +2029,14 @@ class Sync {
             if (Array.isArray(data.messages) && data.messages.length > 0) {
                 const currentLastSeq = this.sessionLastSeq.get(sessionId) ?? 0;
                 let maxSeq = currentLastSeq;
+                let maxSeqCreatedAt: number | undefined;
                 for (const message of data.messages) {
                     if (message.seq > maxSeq) {
                         maxSeq = message.seq;
+                        maxSeqCreatedAt = message.createdAt;
                     }
                 }
-                this.trackSessionLastSeq(sessionId, maxSeq);
+                this.trackSessionLastSeq(sessionId, maxSeq, maxSeqCreatedAt);
             }
         } catch (error) {
             this.maybeStartBackgroundSendWatchdog();
@@ -2152,11 +2157,15 @@ class Sync {
         // maxSeq, and loadOlderMessages can page backward from minSeq.
         let maxSeq = 0;
         let minSeq = Number.POSITIVE_INFINITY;
+        let maxSeqCreatedAt: number | undefined;
         for (const message of messages) {
-            if (message.seq > maxSeq) maxSeq = message.seq;
+            if (message.seq > maxSeq) {
+                maxSeq = message.seq;
+                maxSeqCreatedAt = message.createdAt;
+            }
             if (message.seq < minSeq) minSeq = message.seq;
         }
-        this.trackSessionLastSeq(sessionId, maxSeq);
+        this.trackSessionLastSeq(sessionId, maxSeq, maxSeqCreatedAt);
         if (messages.length > 0) {
             this.sessionOldestSeq.set(sessionId, minSeq);
         }
@@ -2182,10 +2191,14 @@ class Sync {
             await this.applyFetchedMessages(sessionId, encryption, messages);
 
             let maxSeq = afterSeq;
+            let maxSeqCreatedAt: number | undefined;
             for (const message of messages) {
-                if (message.seq > maxSeq) maxSeq = message.seq;
+                if (message.seq > maxSeq) {
+                    maxSeq = message.seq;
+                    maxSeqCreatedAt = message.createdAt;
+                }
             }
-            this.trackSessionLastSeq(sessionId, maxSeq);
+            this.trackSessionLastSeq(sessionId, maxSeq, maxSeqCreatedAt);
 
             if (!data.hasMore) break;
             if (maxSeq === afterSeq) {
@@ -2420,7 +2433,7 @@ class Sync {
                     const incomingSeq = updateData.body.message.seq;
                     if (lastMessage && currentLastSeq !== undefined && incomingSeq === currentLastSeq + 1) {
                         this.enqueueMessages(updateData.body.sid, [lastMessage]);
-                        this.trackSessionLastSeq(updateData.body.sid, incomingSeq);
+                        this.trackSessionLastSeq(updateData.body.sid, incomingSeq, updateData.createdAt);
                         let hasMutableTool = false;
                         if (lastMessage.role === 'agent' && lastMessage.content[0] && lastMessage.content[0].type === 'tool-result') {
                             hasMutableTool = storage.getState().isMutableToolCall(updateData.body.sid, lastMessage.content[0].tool_use_id);

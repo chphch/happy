@@ -205,6 +205,13 @@ export interface Session {
     // per-session message counter (NOT Session.seq, which is bumped by metadata
     // writes). Compared against metadata.lastReadSeq to derive unread.
     lastMessageSeq?: number;
+    // Timestamp (ms) of the newest actual message seen for this session — the
+    // createdAt of the highest-seq message. Like lastMessageSeq, this is a
+    // client-owned mirror updated ONLY by real message arrivals, NOT by metadata
+    // writes (read-position/star/mode) which bump Session.updatedAt. Used as the
+    // "sort by activity" key so merely viewing a session (which writes read
+    // position and bumps updatedAt) does not re-order it to the top.
+    lastMessageAt?: number;
     // IMPORTANT: latestUsage is extracted from reducerState.latestUsage after message processing.
     // We store it directly on Session to ensure it's available immediately on load.
     // Do NOT store reducerState itself on Session - it's mutable and should only exist in SessionMessages.
