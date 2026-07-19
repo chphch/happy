@@ -262,6 +262,8 @@ export const zhHans: TranslationStructure = {
         starConversationsSubtitle: '为对话加星标或收藏，并将其置顶',
         bashMode: 'Bash 命令模式',
         bashModeSubtitle: '以 ! 开头的消息将作为 Shell 命令运行',
+        archiveSortByLastSeen: '按最近活动排序归档',
+        archiveSortByLastSeenSubtitle: '显示一个开关，可按最近活动而非创建日期对归档会话排序',
     },
 
     bashMode: {

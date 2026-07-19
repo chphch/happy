@@ -262,6 +262,8 @@ export const ja: TranslationStructure = {
         starConversationsSubtitle: '会話にスターやブックマークを付けて、リストの上部に固定する',
         bashMode: 'Bashコマンドモード',
         bashModeSubtitle: 'メッセージを ! で始めるとシェルコマンドとして実行します',
+        archiveSortByLastSeen: 'アーカイブを最終アクティビティ順に並べ替え',
+        archiveSortByLastSeenSubtitle: '作成日ではなく最終アクティビティでアーカイブされたセッションを並べ替えるトグルを表示します',
     },
 
     bashMode: {

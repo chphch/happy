@@ -261,6 +261,8 @@ export const es: TranslationStructure = {
         starConversationsSubtitle: 'Destaca o marca conversaciones y fíjalas en la parte superior de la lista',
         bashMode: 'Modo de comando Bash',
         bashModeSubtitle: 'Empieza un mensaje con ! para ejecutarlo como un comando de shell',
+        archiveSortByLastSeen: 'Ordenar archivados por última actividad',
+        archiveSortByLastSeenSubtitle: 'Muestra un interruptor para ordenar las sesiones archivadas por última actividad en lugar de la fecha de creación',
     },
 
     bashMode: {
