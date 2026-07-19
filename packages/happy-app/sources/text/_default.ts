@@ -409,6 +409,7 @@ export const en = {
         happySessionId: 'Happy Session ID',
         copySessionId: 'Copy Happy session ID',
         copyOriginalSessionId: 'Copy original session ID',
+        markAsUnread: 'Mark as unread',
         claudeCodeSessionId: 'Claude Code Session ID',
         claudeCodeSessionIdCopied: 'Claude Code Session ID copied to clipboard',
         codexThreadId: 'Codex Thread ID',
