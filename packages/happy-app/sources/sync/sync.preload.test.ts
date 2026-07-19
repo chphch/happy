@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     applyMessages: vi.fn(),
     applyMessagesLoaded: vi.fn(),
     applyOlderMessagesPagination: vi.fn(),
+    applySessionLastMessage: vi.fn(),
     setModes: vi.fn(),
     gitInvalidate: vi.fn(),
     voiceFocus: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock('@/sync/storage', () => ({ storage: { getState: () => ({
     applyMessages: mocks.applyMessages,
     applyMessagesLoaded: mocks.applyMessagesLoaded,
     applyOlderMessagesPagination: mocks.applyOlderMessagesPagination,
+    applySessionLastMessage: mocks.applySessionLastMessage,
 }) } }));
 vi.mock('@/sync/ops', () => ({ sessionSetAgentModes: mocks.setModes }));
 vi.mock('@/sync/persistence', () => ({ loadPendingSettings: () => ({}), savePendingSettings: vi.fn() }));
