@@ -25,7 +25,7 @@ function transport(state: ReturnType<typeof createReducer>) {
     const parsed = source('./sync.ts');
     const klass = parsed.statements.find((node): node is ts.ClassDeclaration =>
         ts.isClassDeclaration(node) && node.name?.text === 'Sync')!;
-    const names = ['flushOutbox', 'fetchForwardSince', 'applyFetchedMessages'];
+    const names = ['flushOutbox', 'fetchForwardSince', 'applyFetchedMessages', 'trackSessionLastSeq'];
     const methods = klass.members
         .filter((member) => member.name && names.includes(member.name.getText(parsed)))
         .map((member) => member.getText(parsed)).join('\n');
@@ -61,6 +61,9 @@ function transport(state: ReturnType<typeof createReducer>) {
     };
     const storage = { getState: () => ({
         applyUserMessageServerIds: (_sid: string, pairs: { serverId: string; localId: string }[]) => registerUserMessageServerIds(state, pairs),
+        // The fork mirrors the cursor into session state to derive the
+        // cross-client unread flag; the transport under test does not read it back.
+        applySessionLastMessage: () => {},
     }) };
     const javascript = ts.transpile(`class Sync { ${methods} }; return Sync;`, { target: ts.ScriptTarget.ES2022 });
     const Harness = new Function('apiSocket', 'storage', 'normalizeRawMessage', 'log', javascript)(
