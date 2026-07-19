@@ -132,7 +132,9 @@ function buildSessionRowData(session: Session, unreadSessionIds: Set<string>): S
         state,
         ...(!session.active && { activeAt: session.activeAt, createdAt: session.createdAt }),
         hasDraft: !!session.draft,
-        starred: !!session.starred,
+        // Gated behind expStarConversations — when off, rows never report as
+        // starred so the indicator and standalone-row handling stay upstream.
+        starred: storage.getState().settings.expStarConversations && !!session.starred,
         active: session.active,
         machineId: session.metadata?.machineId ?? null,
         path: session.metadata?.path ?? null,
@@ -145,9 +147,12 @@ function buildSessionRowData(session: Session, unreadSessionIds: Set<string>): S
     };
 }
 
-/** Build display rows for a section's sessions and nest forks within it. */
+/** Build display rows for a section's sessions and nest forks within it
+ *  (fork nesting gated behind expForkNesting — when off, rows keep their
+ *  original order and stay at depth 0 so the renderer shows no indentation). */
 function buildOrderedSessionRows(sessions: Session[], unreadSessionIds: Set<string>): SessionRowData[] {
-    return orderSessionRowsByForkLineage(sessions.map(s => buildSessionRowData(s, unreadSessionIds)));
+    const rows = sessions.map(s => buildSessionRowData(s, unreadSessionIds));
+    return storage.getState().settings.expForkNesting ? orderSessionRowsByForkLineage(rows) : rows;
 }
 
 // Unified list item type for SessionsList component
@@ -260,12 +265,15 @@ function buildSessionListViewData(
 ): SessionListViewItem[] {
     // Partition: starred sessions go to a dedicated "Starred" section regardless
     // of active/inactive status so users can find pinned conversations in one place.
+    // Gated behind expStarConversations — when off, starred state is ignored and
+    // sessions partition by active/inactive as upstream.
+    const expStar = storage.getState().settings.expStarConversations;
     const starredSessions: Session[] = [];
     const activeSessions: Session[] = [];
     const unstarredInactive: Session[] = [];
 
     Object.values(sessions).forEach(session => {
-        if (session.starred) {
+        if (expStar && session.starred) {
             starredSessions.push(session);
         } else if (isSessionActive(session)) {
             activeSessions.push(session);

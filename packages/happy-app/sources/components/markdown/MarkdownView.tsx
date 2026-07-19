@@ -8,7 +8,7 @@ import { Text } from '../StyledText';
 import { Typography } from '@/constants/Typography';
 import { SimpleSyntaxHighlighter } from '../SimpleSyntaxHighlighter';
 import { Modal } from '@/modal';
-import { useLocalSetting } from '@/sync/storage';
+import { useLocalSetting, useSetting } from '@/sync/storage';
 import { storeTempText } from '@/sync/persistence';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -32,7 +32,10 @@ export const MarkdownView = React.memo((props: {
     onOptionPress?: (option: Option) => void;
     sessionId?: string;
 }) => {
-    const blocks = React.useMemo(() => parseMarkdown(props.markdown), [props.markdown]);
+    // Experimental: render `$…$` / `$$…$$` LaTeX as math (KaTeX). Off by default,
+    // so the delimiters otherwise show as literal text (upstream behavior).
+    const enableMath = useSetting('expMathRendering');
+    const blocks = React.useMemo(() => parseMarkdown(props.markdown, enableMath), [props.markdown, enableMath]);
     
     // Backwards compatibility: The original version just returned the view, wrapping the list of blocks.
     // It made each of the individual text elements selectable. When we enable the markdownCopyV2 feature,
@@ -231,6 +234,7 @@ function RenderCodeBlock(props: { content: string, language: string | null, firs
 }
 
 function RenderImageBlock(props: { url: string, alt: string, first: boolean, last: boolean }) {
+    const expImageZoom = useSetting('expImageZoom');
     const accessibleLabel = props.alt || 'Markdown image';
     // RN's <Image> only decodes raster formats, so an SVG (data URI or .svg)
     // renders blank on native. Route SVG through react-native-svg instead:
@@ -242,6 +246,15 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
         Modal.show({ component: ImageViewer, props: { uri: props.url } } as any);
     }, [props.url]);
 
+    const image = (
+        <Image
+            source={{ uri: props.url }}
+            style={style.image}
+            accessibilityLabel={accessibleLabel}
+            resizeMode="contain"
+        />
+    );
+
     return (
         <View style={[style.imageBlock, props.first && style.first, props.last && style.last]}>
             {svg ? (
@@ -252,7 +265,7 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
                         <SvgUri uri={svg.uri} width="100%" height="100%" />
                     )}
                 </View>
-            ) : (
+            ) : expImageZoom ? (
                 <Pressable onPress={openViewer} accessibilityRole="imagebutton">
                     <Image
                         source={{ uri: props.url }}
@@ -261,6 +274,13 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
                         resizeMode="contain"
                     />
                 </Pressable>
+            ) : (
+                <Image
+                    source={{ uri: props.url }}
+                    style={style.image}
+                    accessibilityLabel={accessibleLabel}
+                    resizeMode="contain"
+                />
             )}
             {props.alt ? (
                 <Text style={style.imageCaption}>{props.alt}</Text>
