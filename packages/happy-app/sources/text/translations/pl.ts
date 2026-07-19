@@ -411,6 +411,7 @@ export const pl: TranslationStructure = {
         happySessionId: 'ID sesji Happy',
         copySessionId: 'Kopiuj ID sesji Happy',
         copyOriginalSessionId: 'Kopiuj oryginalny ID sesji',
+        markAsUnread: 'Oznacz jako nieprzeczytane',
         claudeCodeSessionId: 'ID sesji Claude Code',
         claudeCodeSessionIdCopied: 'ID sesji Claude Code skopiowane do schowka',
         codexThreadId: 'ID wątku Codex',
