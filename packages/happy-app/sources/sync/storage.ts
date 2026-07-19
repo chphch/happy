@@ -156,6 +156,7 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
         state,
         ...(!session.active && { activeAt: session.activeAt, createdAt: session.createdAt }),
         hasDraft: !!session.draft,
+        // starred so the indicator and standalone-row handling stay upstream.
         active: session.active,
         archived: session.metadata?.lifecycleState === 'archived'
             || (!isRigMetadata(session.metadata) && !session.active),
@@ -174,9 +175,12 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
     };
 }
 
-/** Build display rows for a section's sessions and nest forks within it. */
+/** Build display rows for a section's sessions and nest forks within it
+ *  (fork nesting gated behind expForkNesting — when off, rows keep their
+ *  original order and stay at depth 0 so the renderer shows no indentation). */
 function buildOrderedSessionRows(sessions: Session[], unreadSessionIds: Set<string>): SessionRowData[] {
-    return orderSessionRowsByForkLineage(sessions.map(s => buildSessionRowData(s, unreadSessionIds)));
+    const rows = sessions.map(s => buildSessionRowData(s, unreadSessionIds));
+    return storage.getState().settings.expForkNesting ? orderSessionRowsByForkLineage(rows) : rows;
 }
 
 // Unified list item type for SessionsList component
