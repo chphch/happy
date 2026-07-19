@@ -246,6 +246,8 @@ export const ru: TranslationStructure = {
         starConversationsSubtitle: 'Отмечайте беседы звёздочкой или закладкой и закрепляйте их вверху списка',
         bashMode: 'Режим команд Bash',
         bashModeSubtitle: 'Начните сообщение с !, чтобы выполнить его как команду оболочки',
+        archiveSortByLastSeen: 'Сортировать архивные по последней активности',
+        archiveSortByLastSeenSubtitle: 'Показать переключатель для сортировки архивных сессий по последней активности вместо даты создания',
     },
 
     bashMode: {

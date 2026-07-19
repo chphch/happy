@@ -258,6 +258,8 @@ export const it: TranslationStructure = {
         starConversationsSubtitle: 'Aggiungi le conversazioni ai preferiti e fissale in cima all\'elenco',
         bashMode: 'Modalità comando Bash',
         bashModeSubtitle: 'Inizia un messaggio con ! per eseguirlo come comando della shell',
+        archiveSortByLastSeen: 'Ordina archiviati per ultima attività',
+        archiveSortByLastSeenSubtitle: 'Mostra un interruttore per ordinare le sessioni archiviate per ultima attività invece che per data di creazione',
     },
 
     bashMode: {

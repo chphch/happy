@@ -277,6 +277,8 @@ export const pl: TranslationStructure = {
         starConversationsSubtitle: 'Oznaczaj rozmowy gwiazdką lub zakładką i przypinaj je na górze listy',
         bashMode: 'Tryb poleceń Bash',
         bashModeSubtitle: 'Rozpocznij wiadomość od !, aby uruchomić ją jako polecenie powłoki',
+        archiveSortByLastSeen: 'Sortuj zarchiwizowane wg ostatniej aktywności',
+        archiveSortByLastSeenSubtitle: 'Pokaż przełącznik do sortowania zarchiwizowanych sesji według ostatniej aktywności zamiast daty utworzenia',
     },
 
     bashMode: {
