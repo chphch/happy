@@ -229,6 +229,15 @@ export const MetadataSchema = z.object({
     permissionMode: z.string().nullish(),
     modelMode: z.string().nullish(),
     effortLevel: z.string().nullish(),
+    /**
+     * Cross-client read state, synced through session metadata (same mechanism
+     * as the mode picks above). `lastReadSeq` is the highest message seq the
+     * user has read on any device; unread = latest message seq > lastReadSeq.
+     * Absent lastReadSeq means "read" (no unread) — this matches the previous
+     * in-memory behavior where unread cleared on app restart, and avoids
+     * flagging all history unread on first run.
+     */
+    lastReadSeq: z.number().optional(),
     // Passthrough so read-modify-write metadata updates from this app never
     // drop fields written by newer CLI or app versions.
 }).passthrough();
@@ -456,6 +465,24 @@ export interface Session {
     /** Happy Agent only: service tier carried in the composer draft; the UI does not expose it. */
     serviceTier?: string | null;
     lastMessageSentAt?: number; // Local timestamp of last user-sent message, not synced to server; used for activity-based sort
+    // Highest message seq seen for this session — mirrored from the sync engine's
+    // per-session message counter (NOT Session.seq, which is bumped by metadata
+    // writes). Compared against metadata.lastReadSeq to derive unread.
+    lastMessageSeq?: number;
+    // Timestamp (ms) of the newest actual message seen for this session — the
+    // createdAt of the highest-seq message. Like lastMessageSeq, this is a
+    // client-owned mirror updated ONLY by real message arrivals, NOT by metadata
+    // writes (read-position/star/mode) which bump Session.updatedAt. Used as the
+    // "sort by activity" key so merely viewing a session (which writes read
+    // position and bumps updatedAt) does not re-order it to the top.
+    lastMessageAt?: number;
+    // Timestamp (ms) of when this session last COMPLETED a turn (task_complete /
+    // turn-end / turn_aborted). Unlike lastMessageAt (which bumps on every
+    // streamed message mid-turn), this bumps ONCE at turn end — so it is the
+    // "sort by activity" key: a session moves to the top only when its turn
+    // finishes, not while it is still working. Live-only (set from turn-end
+    // events), so it falls back to lastMessageAt across a fresh app start.
+    lastTurnCompletedAt?: number;
     // IMPORTANT: latestUsage is extracted from reducerState.latestUsage after message processing.
     // We store it directly on Session to ensure it's available immediately on load.
     // Do NOT store reducerState itself on Session - it's mutable and should only exist in SessionMessages.
