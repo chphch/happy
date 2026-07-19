@@ -27,7 +27,7 @@ import { useImagePicker } from '@/hooks/useImagePicker';
 import { Modal } from '@/modal';
 import { voiceHooks } from '@/realtime/hooks/voiceHooks';
 import { getCurrentVoiceConversationId, getCurrentVoiceSessionDurationSeconds, startRealtimeSession, stopRealtimeSession } from '@/realtime/RealtimeSession';
-import { sessionAbort, sessionCancelCommunication, sessionGoalAction, sessionSetAgentModes, spawnSideChat, sessionKill, sessionArchive } from '@/sync/ops';
+import { sessionAbort, sessionCancelCommunication, sessionGoalAction, sessionSetAgentModes, spawnSideChat, sessionKill, sessionArchive, sessionMarkRead } from '@/sync/ops';
 import { dismissPendingChat, getPendingChat, setPendingChatDraft, submitPendingChat, usePendingChat, type PendingChat } from '@/sync/pendingChats';
 import { claimComposerFocus } from '@/utils/composerFocus';
 import { storage, useIsDataReady, useLocalSetting, useRealtimeStatus, useSessionGitStatus, useSessionMessages, useSessionPendingCommunications, useSessionAvatar, useSessionUsage, useSetting, useSideChatSessions } from '@/sync/storage';
@@ -1132,6 +1132,25 @@ export function SessionViewLoaded({
     }), [handleMicrophonePress, voiceSessionActive]);
 
     useSessionVisibility(sessionId, active, embedded, realtimeStatus);
+
+    // Advance the synced read position to the latest message while this session
+    // is on screen, and once more on the way out so anything that arrived while
+    // it was open is caught up. Owning "currently viewing" is useSessionVisibility's
+    // job; this is only the cross-client read marker.
+    //
+    // Gated the same way that hook gates itself: `active` because a chat that was
+    // merely prewarmed on touch-down must not be marked read without being opened,
+    // and `!embedded` so the side-chat panel never clears the primary session's
+    // unread.
+    React.useLayoutEffect(() => {
+        if (!sessionId || !active || embedded) {
+            return;
+        }
+        sessionMarkRead(sessionId);
+        return () => {
+            sessionMarkRead(sessionId);
+        };
+    }, [sessionId, active, embedded, realtimeStatus]);
 
     let content = session ? (
         <>

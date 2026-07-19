@@ -27,7 +27,9 @@ visit(storeSource);
 expect(adapters).toHaveLength(adapterNames.length);
 const syncSource = source('./sync.ts');
 const klass = syncSource.statements.find((node): node is ts.ClassDeclaration => ts.isClassDeclaration(node) && node.name?.text === 'Sync')!;
-const methodNames = ['fetchMessages', 'fetchInitialLatestPage', 'fetchForwardSince', 'applyFetchedMessages', 'loadOlderMessages', 'preloadLatestPage', 'fetchOlderMessagesInBackground'];
+// trackSessionLastSeq is this build's own: the extracted methods call it, so it
+// has to be extracted too or the synthetic class has no such method.
+const methodNames = ['fetchMessages', 'fetchInitialLatestPage', 'fetchForwardSince', 'applyFetchedMessages', 'loadOlderMessages', 'preloadLatestPage', 'fetchOlderMessagesInBackground', 'trackSessionLastSeq'];
 const methods = klass.members.filter(node => node.name && methodNames.includes(node.name.getText(syncSource))).map(node => node.getText(syncSource));
 expect(methods).toHaveLength(methodNames.length);
 
@@ -39,7 +41,9 @@ function record(seq: number, visible = false) {
     return { id: `m${seq}`, seq, localId: null, createdAt: seq, content };
 }
 function setup(rows: ReturnType<typeof record>[], archived = false) {
-    let state: any = { sessions: { session: { id: 'session', active: !archived, metadata: null, agentState: null } }, sessionMessages: {} };
+    // applySessionLastMessage is the store call trackSessionLastSeq makes; these
+    // tests assert on pagination, not on the last-message mirror, so it stubs out.
+    let state: any = { sessions: { session: { id: 'session', active: !archived, metadata: null, agentState: null } }, sessionMessages: {}, applySessionLastMessage: () => {} };
     Object.assign(state, compile(`return ({${adapters.join(',')}});`, {
         set: (update: (state: any) => any) => { state = update(state); },
         createReducer, reducer, messageSortKey, messagePlanMode, rigSendsMessageReceipts: () => false,
