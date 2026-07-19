@@ -259,6 +259,8 @@ export const zhHant: TranslationStructure = {
         copySessionIdsSubtitle: '在長按選單中新增複製工作階段 ID 的操作',
         bashMode: 'Bash 命令模式',
         bashModeSubtitle: '以 ! 開頭的訊息會作為 shell 命令執行',
+        archiveSortByLastSeen: '依最近活動排序封存',
+        archiveSortByLastSeenSubtitle: '顯示一個開關，可依最近活動而非建立日期排序封存的工作階段',
     },
 
     bashMode: {

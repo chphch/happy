@@ -258,6 +258,8 @@ export const pt: TranslationStructure = {
         copySessionIdsSubtitle: 'Adiciona ações para copiar o ID da sessão ao menu de pressão longa',
         bashMode: 'Modo de comando Bash',
         bashModeSubtitle: 'Inicie uma mensagem com ! para executá-la como um comando do shell',
+        archiveSortByLastSeen: 'Ordenar arquivados por última atividade',
+        archiveSortByLastSeenSubtitle: 'Mostra um botão para ordenar as sessões arquivadas por última atividade em vez da data de criação',
     },
 
     bashMode: {

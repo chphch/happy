@@ -259,6 +259,8 @@ export const ca: TranslationStructure = {
         copySessionIdsSubtitle: 'Afegeix accions per copiar l\'ID de sessió al menú de pressió llarga',
         bashMode: 'Mode de comandes Bash',
         bashModeSubtitle: 'Comença un missatge amb ! per executar-lo com a comanda de l\'intèrpret d\'ordres',
+        archiveSortByLastSeen: 'Ordena arxivats per última activitat',
+        archiveSortByLastSeenSubtitle: 'Mostra un commutador per ordenar les sessions arxivades per última activitat en lloc de la data de creació',
     },
 
     bashMode: {

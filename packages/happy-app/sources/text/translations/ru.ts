@@ -245,6 +245,8 @@ export const ru: TranslationStructure = {
         copySessionIdsSubtitle: 'Добавить действия копирования ID сессии в меню долгого нажатия',
         bashMode: 'Режим команд Bash',
         bashModeSubtitle: 'Начните сообщение с !, чтобы выполнить его как команду оболочки',
+        archiveSortByLastSeen: 'Сортировать архивные по последней активности',
+        archiveSortByLastSeenSubtitle: 'Показать переключатель для сортировки архивных сессий по последней активности вместо даты создания',
     },
 
     bashMode: {

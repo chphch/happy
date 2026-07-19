@@ -20,6 +20,7 @@ export default function FeaturesSettingsScreen() {
     const [expImageUpload, setExpImageUpload] = useSettingMutable('expImageUpload');
     const [sortSessionsByActivity, setSortSessionsByActivity] = useSettingMutable('sortSessionsByActivity');
     const [expBashMode, setExpBashMode] = useSettingMutable('expBashMode');
+    const [expArchiveSort, setExpArchiveSort] = useSettingMutable('expArchiveSortByLastSeen');
     const [expForkNesting, setExpForkNesting] = useSettingMutable('expForkNesting');
     const [expMathRendering, setExpMathRendering] = useSettingMutable('expMathRendering');
     const [expUnreadBoldTitle, setExpUnreadBoldTitle] = useSettingMutable('expUnreadBoldTitle');
@@ -134,6 +135,18 @@ export default function FeaturesSettingsScreen() {
                         <Switch
                             value={expBashMode}
                             onValueChange={setExpBashMode}
+                        />
+                    }
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.archiveSortByLastSeen')}
+                    subtitle={t('settingsFeatures.archiveSortByLastSeenSubtitle')}
+                    icon={<Ionicons name="swap-vertical-outline" size={29} color="#64D2FF" />}
+                    rightElement={
+                        <Switch
+                            value={expArchiveSort}
+                            onValueChange={setExpArchiveSort}
                         />
                     }
                     showChevron={false}

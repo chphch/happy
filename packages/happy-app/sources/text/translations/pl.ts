@@ -276,6 +276,8 @@ export const pl: TranslationStructure = {
         copySessionIdsSubtitle: 'Dodaj akcje kopiowania ID sesji do menu długiego naciśnięcia',
         bashMode: 'Tryb poleceń Bash',
         bashModeSubtitle: 'Rozpocznij wiadomość od !, aby uruchomić ją jako polecenie powłoki',
+        archiveSortByLastSeen: 'Sortuj zarchiwizowane wg ostatniej aktywności',
+        archiveSortByLastSeenSubtitle: 'Pokaż przełącznik do sortowania zarchiwizowanych sesji według ostatniej aktywności zamiast daty utworzenia',
     },
 
     bashMode: {
