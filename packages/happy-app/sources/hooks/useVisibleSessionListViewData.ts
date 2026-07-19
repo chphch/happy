@@ -53,6 +53,7 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
     const data = useSessionListViewData();
     const hideInactiveSessions = useSetting('hideInactiveSessions');
     const archivedSortBy = useSetting('archivedSessionsSortBy');
+    const expArchiveSort = useSetting('expArchiveSortByLastSeen');
 
     return React.useMemo(() => {
         if (!data) {
@@ -87,11 +88,13 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
         }
 
         if (!hideInactiveSessions && inactiveSessions.length > 0) {
-            result.push({ type: 'archive-sort', current: archivedSortBy });
-            const dateKey = archivedSortBy === 'lastSeenAt' ? 'activeAt' : 'createdAt';
+            if (expArchiveSort) {
+                result.push({ type: 'archive-sort', current: archivedSortBy });
+            }
+            const dateKey = expArchiveSort && archivedSortBy === 'lastSeenAt' ? 'activeAt' : 'createdAt';
             result.push(...buildArchiveSection(inactiveSessions, dateKey));
         }
 
         return result;
-    }, [data, hideInactiveSessions, archivedSortBy]);
+    }, [data, hideInactiveSessions, archivedSortBy, expArchiveSort]);
 }

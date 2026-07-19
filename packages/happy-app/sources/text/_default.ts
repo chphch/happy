@@ -259,6 +259,8 @@ export const en = {
         starConversationsSubtitle: 'Star/bookmark conversations and pin them to the top',
         bashMode: 'Bash Command Mode',
         bashModeSubtitle: 'Start a message with ! to run it as a shell command',
+        archiveSortByLastSeen: 'Sort archived by last seen',
+        archiveSortByLastSeenSubtitle: 'Show a toggle to sort archived sessions by last activity instead of creation date',
     },
 
     imageUpload: {

@@ -199,6 +199,7 @@ describe('settings', () => {
                 groupToolCalls: false,
                 expImageUpload: true,
                 expBashMode: true,
+                expArchiveSortByLastSeen: true,
                 expForkNesting: true,
                 expMathRendering: true,
                 expUnreadBoldTitle: true,

@@ -43,6 +43,7 @@ export const SettingsSchema = z.object({
     groupToolCalls: z.boolean().describe('Collapse consecutive tool calls into grouped containers in chat'),
     expImageUpload: z.boolean().describe('Enable experimental image upload in chat'),
     expBashMode: z.boolean().describe('Enable experimental !-prefix bash command mode in chat input'),
+    expArchiveSortByLastSeen: z.boolean().describe('Enable experimental sort-archived-by-last-seen toggle'),
     expForkNesting: z.boolean().describe('Nest forked sessions under their parent in the session list (experimental)'),
     expMathRendering: z.boolean().describe('Render LaTeX math ($…$, $$…$$) in markdown via KaTeX (experimental)'),
     expUnreadBoldTitle: z.boolean().describe('Show unread sessions as a bold title instead of a blue status dot (experimental)'),
@@ -130,6 +131,7 @@ export const settingsDefaults: Settings = {
     groupToolCalls: false,
     expImageUpload: true,
     expBashMode: true,
+    expArchiveSortByLastSeen: true,
     // Self-host keeps these features ON by default; the toggles let users turn them off.
     expForkNesting: true,
     expMathRendering: true,
