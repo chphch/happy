@@ -159,9 +159,14 @@ describe('session display order', () => {
             },
         ];
 
-        expect(getSessionShortcutIdsInDisplayOrder(data, machines, 'Unknown')).toEqual([
+        expect(getSessionShortcutIdsInDisplayOrder(data, machines, 'Unknown', true)).toEqual([
             'parent',
             'child',
+            'unrelated',
+        ]);
+        expect(getSessionShortcutIdsInDisplayOrder(data, machines, 'Unknown', false)).toEqual([
+            'child',
+            'parent',
             'unrelated',
         ]);
     });
