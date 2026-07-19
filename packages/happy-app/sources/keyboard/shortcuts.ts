@@ -34,6 +34,7 @@ export type SessionActionShortcutId =
 // here). SESSION_ACTION_SHORTCUTS stays keyed only by the chord-bearing ids.
 export type SessionActionId =
     | SessionActionShortcutId
+    | 'mark-unread'
     | 'copy-session-id'
     | 'copy-original-session-id';
 
