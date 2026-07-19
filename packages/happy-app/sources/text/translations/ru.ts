@@ -348,6 +348,7 @@ export const ru: TranslationStructure = {
         happySessionId: 'ID сессии Happy',
         copySessionId: 'Копировать ID сессии Happy',
         copyOriginalSessionId: 'Копировать оригинальный ID сессии',
+        markAsUnread: 'Отметить как непрочитанное',
         claudeCodeSessionId: 'ID сессии Claude Code',
         claudeCodeSessionIdCopied: 'ID сессии Claude Code скопирован в буфер обмена',
         codexThreadId: 'ID треда Codex',
