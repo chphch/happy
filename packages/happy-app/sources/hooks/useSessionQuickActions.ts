@@ -123,6 +123,8 @@ export function useSessionQuickActions(
     const machine = useMachine(machineId);
     const devModeEnabled = useLocalSetting('devModeEnabled');
     const expResumeSession = useSetting('expResumeSession');
+    const expCopySessionId = useSetting('expCopySessionId');
+    const expStarConversations = useSetting('expStarConversations');
     const resumeAvailability = React.useMemo(
         () => expResumeSession ? getResumeAvailability(session, machine, sessionStatus.isConnected) : { canResume: false, canShowResume: false, subtitle: '', message: '' },
         [machine, session, sessionStatus.isConnected, expResumeSession],
@@ -289,13 +291,17 @@ export function useSessionQuickActions(
         const isStarred = !!session.starred;
         const items: SessionActionItem[] = [
             { id: 'details', icon: 'information-circle-outline', label: t('profile.details'), onPress: openDetails },
-            {
+        ];
+
+        // Star/unstar action — experimental, gated behind expStarConversations.
+        if (expStarConversations) {
+            items.push({
                 id: 'star',
                 icon: isStarred ? 'star' : 'star-outline',
                 label: isStarred ? 'Unstar' : 'Star',
                 onPress: toggleStarred,
-            },
-        ];
+            });
+        }
 
         if (resumeAvailability.canShowResume) {
             items.push({ id: 'resume', icon: 'play-circle-outline', label: t('sessionInfo.resumeSession'), onPress: resumeSession });
@@ -306,10 +312,13 @@ export function useSessionQuickActions(
             items.push({ id: 'duplicate', icon: 'time-outline', label: t('session.duplicateAction'), onPress: openDuplicateSheet });
         }
 
-        items.push({ id: 'copy-session-id', icon: 'copy-outline', label: t('sessionInfo.copySessionId'), onPress: copySessionId });
+        // Copy-session-ID actions — experimental, gated behind expCopySessionId.
+        if (expCopySessionId) {
+            items.push({ id: 'copy-session-id', icon: 'copy-outline', label: t('sessionInfo.copySessionId'), onPress: copySessionId });
 
-        if (originalSessionId) {
-            items.push({ id: 'copy-original-session-id', icon: 'code-slash-outline', label: t('sessionInfo.copyOriginalSessionId'), onPress: copyOriginalSessionId });
+            if (originalSessionId) {
+                items.push({ id: 'copy-original-session-id', icon: 'code-slash-outline', label: t('sessionInfo.copyOriginalSessionId'), onPress: copyOriginalSessionId });
+            }
         }
 
         if (canCopySessionMetadata) {
@@ -335,6 +344,8 @@ export function useSessionQuickActions(
         openDuplicateSheet,
         resumeAvailability.canShowResume,
         resumeSession,
+        expCopySessionId,
+        expStarConversations,
         session.starred,
         toggleStarred,
     ]);
