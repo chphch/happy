@@ -202,6 +202,7 @@ function buildSessionRowData(
         lastActivityAt: getSessionActivityAt(session),
         ...(!session.active && { activeAt: session.activeAt }),
         hasDraft: !!session.draft,
+        // starred so the indicator and standalone-row handling stay upstream.
         active: session.active,
         archived: isSessionArchived(session),
         machineId,
