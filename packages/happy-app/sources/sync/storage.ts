@@ -123,7 +123,7 @@ export interface SessionRowData {
     forkDepth: number;
 }
 
-function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): SessionRowData {
+function buildSessionRowData(session: Session, currentViewingSessionId: string | null): SessionRowData {
     const isOnline = session.presence === "online";
     const hasPermissions = !!(session.agentState?.requests && Object.keys(session.agentState.requests).length > 0);
 
@@ -165,7 +165,15 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
         homeDir: session.metadata?.homeDir ?? null,
         completedTodosCount: session.todos?.filter(todo => todo.status === 'completed').length ?? 0,
         totalTodosCount: session.todos?.length ?? 0,
-        hasUnread: unreadSessionIds?.has(session.id) ?? false,
+        // Read-position unread, synced cross-client via metadata.lastReadSeq:
+        // unread when there are messages past the read point. Absent lastReadSeq
+        // means "read" (no unread) — matches the old restart-clears-unread
+        // behavior and avoids flagging all history on first run. The session
+        // you're currently viewing never shows unread (its read point catches up
+        // when you leave).
+        hasUnread: session.metadata?.lastReadSeq != null
+            && (session.lastMessageSeq ?? 0) > session.metadata.lastReadSeq
+            && currentViewingSessionId !== session.id,
         projectId: session.metadata?.project?.id ?? null,
         projectName: session.metadata?.project?.name ?? null,
         workspaceId: session.metadata?.workspace?.id ?? null,
@@ -178,8 +186,8 @@ function buildSessionRowData(session: Session, unreadSessionIds?: Set<string>): 
 /** Build display rows for a section's sessions and nest forks within it
  *  (fork nesting gated behind expForkNesting — when off, rows keep their
  *  original order and stay at depth 0 so the renderer shows no indentation). */
-function buildOrderedSessionRows(sessions: Session[], unreadSessionIds: Set<string>): SessionRowData[] {
-    const rows = sessions.map(s => buildSessionRowData(s, unreadSessionIds));
+function buildOrderedSessionRows(sessions: Session[], currentViewingSessionId: string | null): SessionRowData[] {
+    const rows = sessions.map(s => buildSessionRowData(s, currentViewingSessionId));
     return storage.getState().settings.expForkNesting ? orderSessionRowsByForkLineage(rows) : rows;
 }
 
@@ -278,20 +286,19 @@ interface StorageState {
     // Feed methods
     applyFeedItems: (items: FeedItem[]) => void;
     clearFeed: () => void;
-    // Unread session tracking (memory-only)
-    unreadSessionIds: Set<string>;
+    // Which session the user is currently viewing (memory-only) — excluded from
+    // the unread indicator. Unread itself is derived from synced read position.
     currentViewingSessionId: string | null;
-    markSessionRead: (sessionId: string) => void;
-    markSessionUnread: (sessionId: string) => void;
     setCurrentViewingSession: (sessionId: string | null) => void;
+    // Optimistic local mirrors for the sync-engine + ops.ts writers.
+    applySessionLastMessageSeq: (sessionId: string, seq: number) => void;
+    setSessionLastReadSeqOptimistic: (sessionId: string, seq: number) => void;
 }
 
 // Helper function to build unified list view data from sessions and machines
 function buildSessionListViewData(
     sessions: Record<string, Session>,
-    // Required on purpose: an omitted set silently rebuilds the list with
-    // hasUnread=false everywhere — exactly the bug this parameter caused twice.
-    unreadSessionIds: Set<string>,
+    currentViewingSessionId: string | null,
 ): SessionListViewItem[] {
     const rigProjectSessions: Session[] = [];
     const rigPathSessions: Session[] = [];
@@ -398,7 +405,6 @@ export const storage = create<StorageState>()((set, get) => {
         socketLastDisconnectedAt: null,
         isDataReady: false,
         nativeUpdateStatus: null,
-        unreadSessionIds: new Set<string>(),
         currentViewingSessionId: null,
         isMutableToolCall: (sessionId: string, callId: string) => {
             const sessionMessages = get().sessionMessages[sessionId];
@@ -457,17 +463,33 @@ export const storage = create<StorageState>()((set, get) => {
                 const resolvedModelMode = resolveModePick('modelMode');
                 const resolvedEffortLevel = resolveModePick('effortLevel');
 
+                const existing = state.sessions[session.id];
+                // Read position syncs through metadata like the mode picks:
+                // metadata wins over the local mirror EXCEPT while an optimistic
+                // push is in flight (inbound events still carry the old value).
+                const resolvedLastReadSeq = isAgentModePushPending(session.id, 'lastReadSeq')
+                    ? existing?.metadata?.lastReadSeq
+                    : session.metadata?.lastReadSeq;
+                // lastMessageSeq is owned by the sync engine (trackSessionLastSeq);
+                // inbound session payloads may not carry it, so preserve the mirror.
+                const resolvedLastMessageSeq = session.lastMessageSeq ?? existing?.lastMessageSeq;
+                const mergedMetadata = session.metadata
+                    ? { ...session.metadata, lastReadSeq: resolvedLastReadSeq }
+                    : session.metadata;
+
                 // Local activity timestamp — preserve in-memory value, else restore from MMKV.
                 const resolvedLastMessageSentAt = state.sessions[session.id]?.lastMessageSentAt ?? savedLastMessageSentAt[session.id];
 
                 mergedSessions[session.id] = {
                     ...session,
+                    metadata: mergedMetadata,
                     presence,
                     draft: existingDraft || savedDraft || session.draft || null,
                     permissionMode: resolvedPermissionMode,
                     modelMode: resolvedModelMode,
                     effortLevel: resolvedEffortLevel,
                     lastMessageSentAt: resolvedLastMessageSentAt,
+                    lastMessageSeq: resolvedLastMessageSeq,
                 };
             });
 
@@ -596,32 +618,13 @@ export const storage = create<StorageState>()((set, get) => {
                 }
             });
 
-            // Track unread: detect when agent finishes all work for a request.
-            // "Was active" = thinking or had pending permission requests.
-            // "Now idle" = online, not thinking, no pending permissions.
-            let unreadSessionIds = state.unreadSessionIds;
-            sessions.forEach(session => {
-                const oldSession = state.sessions[session.id];
-                if (!oldSession) return;
-                const wasActive = oldSession.thinking === true
-                    || (oldSession.agentState?.requests && Object.keys(oldSession.agentState.requests).length > 0);
-                const newSession = mergedSessions[session.id];
-                if (!newSession || !wasActive) return;
-                const isNowIdle = newSession.thinking !== true
-                    && newSession.presence === 'online'
-                    && (!newSession.agentState?.requests || Object.keys(newSession.agentState.requests).length === 0);
-                if (isNowIdle && state.currentViewingSessionId !== session.id) {
-                    if (!unreadSessionIds.has(session.id)) {
-                        unreadSessionIds = new Set(unreadSessionIds);
-                        unreadSessionIds.add(session.id);
-                    }
-                }
-            });
+            // Unread is now derived per-row from metadata.lastReadSeq vs
+            // lastMessageSeq (read-position, synced cross-client) — no local set.
 
             // Build new unified list view data
             const sessionListViewData = buildSessionListViewData(
                 mergedSessions,
-                unreadSessionIds,
+                state.currentViewingSessionId,
             );
 
             return {
@@ -630,7 +633,6 @@ export const storage = create<StorageState>()((set, get) => {
                 sessionsData: listData,  // Legacy - to be removed
                 sessionListViewData,
                 sessionMessages: updatedSessionMessages,
-                unreadSessionIds,
             };
         }),
         applyLoaded: () => set((state) => {
@@ -1035,7 +1037,7 @@ export const storage = create<StorageState>()((set, get) => {
             return {
                 ...state,
                 sessions: updatedSessions,
-                sessionListViewData: buildSessionListViewData(updatedSessions, state.unreadSessionIds)
+                sessionListViewData: buildSessionListViewData(updatedSessions, state.currentViewingSessionId)
             };
         }),
         // Permission / model / effort picks are local mirrors of synced session
@@ -1081,8 +1083,6 @@ export const storage = create<StorageState>()((set, get) => {
             saveSessionLastMessageSentAt(allTimestamps);
 
             // Rebuild list view data — this timestamp drives activity-based sort.
-            // Pass unreadSessionIds so other sessions keep their unread badges
-            // (omitting it drops every badge until the next rebuild).
             return {
                 ...state,
                 sessions: updatedSessions,
@@ -1115,7 +1115,7 @@ export const storage = create<StorageState>()((set, get) => {
             // Rebuild sessionListViewData to reflect machine changes
             const sessionListViewData = buildSessionListViewData(
                 state.sessions,
-                state.unreadSessionIds
+                state.currentViewingSessionId,
             );
 
             return {
@@ -1132,7 +1132,7 @@ export const storage = create<StorageState>()((set, get) => {
             return {
                 ...state,
                 machines: remaining,
-                sessionListViewData: buildSessionListViewData(state.sessions, state.unreadSessionIds)
+                sessionListViewData: buildSessionListViewData(state.sessions, state.currentViewingSessionId)
             };
         }),
         // Artifact methods
@@ -1199,8 +1199,7 @@ export const storage = create<StorageState>()((set, get) => {
             saveSessionLastMessageSentAt(lastMessageSentAt);
 
             // Rebuild sessionListViewData without the deleted session.
-            // Pass unreadSessionIds so the remaining sessions keep their unread badges.
-            const sessionListViewData = buildSessionListViewData(remainingSessions, state.unreadSessionIds);
+            const sessionListViewData = buildSessionListViewData(remainingSessions, state.currentViewingSessionId);
             
             return {
                 ...state,
@@ -1333,39 +1332,36 @@ export const storage = create<StorageState>()((set, get) => {
             feedLoaded: false,  // Reset loading flag
             friendsLoaded: false  // Reset loading flag
         })),
-        markSessionRead: (sessionId: string) => set((state) => {
-            if (!state.unreadSessionIds.has(sessionId)) return state;
-            const next = new Set(state.unreadSessionIds);
-            next.delete(sessionId);
-            return {
-                ...state,
-                unreadSessionIds: next,
-                sessionListViewData: buildSessionListViewData(state.sessions, next),
-            };
-        }),
-        markSessionUnread: (sessionId: string) => set((state) => {
-            if (state.unreadSessionIds.has(sessionId)) return state;
-            const next = new Set(state.unreadSessionIds);
-            next.add(sessionId);
-            return {
-                ...state,
-                unreadSessionIds: next,
-                sessionListViewData: buildSessionListViewData(state.sessions, next),
-            };
-        }),
         setCurrentViewingSession: (sessionId: string | null) => set((state) => {
             if (state.currentViewingSessionId === sessionId) return state;
-            // If switching to a new session, mark it as read
-            const next = sessionId && state.unreadSessionIds.has(sessionId)
-                ? (() => { const s = new Set(state.unreadSessionIds); s.delete(sessionId); return s; })()
-                : state.unreadSessionIds;
+            // The viewing session is excluded from the unread indicator, so both
+            // the old and new session's row can change — rebuild. The read-position
+            // write (metadata.lastReadSeq) is done by the caller via ops.
             return {
                 ...state,
                 currentViewingSessionId: sessionId,
-                unreadSessionIds: next,
-                ...(next !== state.unreadSessionIds ? {
-                    sessionListViewData: buildSessionListViewData(state.sessions, next),
-                } : {}),
+                sessionListViewData: buildSessionListViewData(state.sessions, sessionId),
+            };
+        }),
+        applySessionLastMessageSeq: (sessionId: string, seq: number) => set((state) => {
+            const session = state.sessions[sessionId];
+            if (!session || (session.lastMessageSeq ?? 0) >= seq) return state;
+            const sessions = { ...state.sessions, [sessionId]: { ...session, lastMessageSeq: seq } };
+            return {
+                ...state,
+                sessions,
+                sessionListViewData: buildSessionListViewData(sessions, state.currentViewingSessionId),
+            };
+        }),
+        setSessionLastReadSeqOptimistic: (sessionId: string, seq: number) => set((state) => {
+            const session = state.sessions[sessionId];
+            if (!session?.metadata) return state;
+            const metadata = { ...session.metadata, lastReadSeq: seq };
+            const sessions = { ...state.sessions, [sessionId]: { ...session, metadata } };
+            return {
+                ...state,
+                sessions,
+                sessionListViewData: buildSessionListViewData(sessions, state.currentViewingSessionId),
             };
         }),
     }
@@ -1504,7 +1500,14 @@ export function useLocalSetting<K extends keyof LocalSettings>(name: K): LocalSe
 }
 
 export function useIsSessionUnread(sessionId: string): boolean {
-    return storage((state) => state.unreadSessionIds.has(sessionId));
+    return storage((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) return false;
+        const lastRead = session.metadata?.lastReadSeq;
+        return lastRead != null
+            && (session.lastMessageSeq ?? 0) > lastRead
+            && state.currentViewingSessionId !== sessionId;
+    });
 }
 
 // Artifact hooks
