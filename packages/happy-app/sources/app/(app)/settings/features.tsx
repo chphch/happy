@@ -20,6 +20,14 @@ export default function FeaturesSettingsScreen() {
     const [expImageUpload, setExpImageUpload] = useSettingMutable('expImageUpload');
     const [sortSessionsByActivity, setSortSessionsByActivity] = useSettingMutable('sortSessionsByActivity');
     const [expBashMode, setExpBashMode] = useSettingMutable('expBashMode');
+    const [expForkNesting, setExpForkNesting] = useSettingMutable('expForkNesting');
+    const [expMathRendering, setExpMathRendering] = useSettingMutable('expMathRendering');
+    const [expUnreadBoldTitle, setExpUnreadBoldTitle] = useSettingMutable('expUnreadBoldTitle');
+    const [expImageZoom, setExpImageZoom] = useSettingMutable('expImageZoom');
+    const [expMermaidZoom, setExpMermaidZoom] = useSettingMutable('expMermaidZoom');
+    const [expDirAutocomplete, setExpDirAutocomplete] = useSettingMutable('expDirAutocomplete');
+    const [expCopySessionId, setExpCopySessionId] = useSettingMutable('expCopySessionId');
+    const [expStarConversations, setExpStarConversations] = useSettingMutable('expStarConversations');
 
     return (
         <ItemList style={{ paddingTop: 0 }}>
@@ -141,6 +149,62 @@ export default function FeaturesSettingsScreen() {
                             onValueChange={setExpImageUpload}
                         />
                     }
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.forkNesting')}
+                    subtitle={t('settingsFeatures.forkNestingSubtitle')}
+                    icon={<Ionicons name="git-branch-outline" size={29} color="#5AC8FA" />}
+                    rightElement={<Switch value={expForkNesting} onValueChange={setExpForkNesting} />}
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.mathRendering')}
+                    subtitle={t('settingsFeatures.mathRenderingSubtitle')}
+                    icon={<Ionicons name="calculator-outline" size={29} color="#FF9F0A" />}
+                    rightElement={<Switch value={expMathRendering} onValueChange={setExpMathRendering} />}
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.unreadBoldTitle')}
+                    subtitle={t('settingsFeatures.unreadBoldTitleSubtitle')}
+                    icon={<Ionicons name="ellipse-outline" size={29} color="#007AFF" />}
+                    rightElement={<Switch value={expUnreadBoldTitle} onValueChange={setExpUnreadBoldTitle} />}
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.imageZoom')}
+                    subtitle={t('settingsFeatures.imageZoomSubtitle')}
+                    icon={<Ionicons name="expand-outline" size={29} color="#5AC8FA" />}
+                    rightElement={<Switch value={expImageZoom} onValueChange={setExpImageZoom} />}
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.mermaidZoom')}
+                    subtitle={t('settingsFeatures.mermaidZoomSubtitle')}
+                    icon={<Ionicons name="git-network-outline" size={29} color="#AF52DE" />}
+                    rightElement={<Switch value={expMermaidZoom} onValueChange={setExpMermaidZoom} />}
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.dirAutocomplete')}
+                    subtitle={t('settingsFeatures.dirAutocompleteSubtitle')}
+                    icon={<Ionicons name="folder-outline" size={29} color="#5AC8FA" />}
+                    rightElement={<Switch value={expDirAutocomplete} onValueChange={setExpDirAutocomplete} />}
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.copySessionIds')}
+                    subtitle={t('settingsFeatures.copySessionIdsSubtitle')}
+                    icon={<Ionicons name="copy-outline" size={29} color="#34C759" />}
+                    rightElement={<Switch value={expCopySessionId} onValueChange={setExpCopySessionId} />}
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.starConversations')}
+                    subtitle={t('settingsFeatures.starConversationsSubtitle')}
+                    icon={<Ionicons name="star-outline" size={29} color="#FBBF24" />}
+                    rightElement={<Switch value={expStarConversations} onValueChange={setExpStarConversations} />}
                     showChevron={false}
                 />
             </ItemGroup>
