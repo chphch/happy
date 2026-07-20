@@ -242,8 +242,6 @@ export const ru: TranslationStructure = {
         dirAutocompleteSubtitle: 'Предлагает каталоги при вводе пути новой сессии',
         copySessionIds: 'Копировать ID сессии',
         copySessionIdsSubtitle: 'Добавить действия копирования ID сессии в меню долгого нажатия',
-        starConversations: 'Отмечать беседы звёздочкой',
-        starConversationsSubtitle: 'Отмечайте беседы звёздочкой или закладкой и закрепляйте их вверху списка',
         bashMode: 'Режим команд Bash',
         bashModeSubtitle: 'Начните сообщение с !, чтобы выполнить его как команду оболочки',
         archiveSortByLastSeen: 'Сортировать архивные по последней активности',

@@ -24,7 +24,7 @@ import { LocalSettings, applyLocalSettings } from "./localSettings";
 import { Purchases, customerInfoToPurchases } from "./purchases";
 import { Profile } from "./profile";
 import { UserProfile, RelationshipUpdatedEvent } from "./friendTypes";
-import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts, loadStarredProjects, saveStarredProjects } from "./persistence";
+import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts } from "./persistence";
 import { isAgentModePushPending } from "./agentModesPending";
 import { projectManager } from "./projectManager";
 
@@ -93,7 +93,6 @@ export interface SessionRowData {
     activeAt?: number;
     createdAt?: number;
     hasDraft: boolean;
-    starred: boolean;
     active: boolean;
     machineId: string | null;
     path: string | null;
@@ -133,9 +132,6 @@ function buildSessionRowData(session: Session, currentViewingSessionId: string |
         state,
         ...(!session.active && { activeAt: session.activeAt, createdAt: session.createdAt }),
         hasDraft: !!session.draft,
-        // Gated behind expStarConversations — when off, rows never report as
-        // starred so the indicator and standalone-row handling stay upstream.
-        starred: storage.getState().settings.expStarConversations && !!session.starred,
         active: session.active,
         machineId: session.metadata?.machineId ?? null,
         path: session.metadata?.path ?? null,
@@ -208,7 +204,8 @@ interface StorageState {
     socketLastDisconnectedAt: number | null;
     isDataReady: boolean;
     nativeUpdateStatus: { available: boolean; updateUrl?: string } | null;
-    starredProjects: Set<string>;  // Set of `${machineId}:${path}` keys (custom-only feature, MMKV-persisted, not server-synced)
+    // Starred project keys (`${machineId}:${path}`) live in synced settings
+    // (settings.starredProjects), so they sync across the user's devices.
     toggleProjectStarred: (machineId: string, path: string) => void;
     isProjectStarred: (machineId: string, path: string) => boolean;
     applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[]) => void;
@@ -264,7 +261,6 @@ interface StorageState {
     setCurrentViewingSession: (sessionId: string | null) => void;
     // Optimistic local mirrors for the sync-engine + ops.ts writers.
     applySessionLastMessage: (sessionId: string, seq: number, createdAt?: number) => void;
-    setSessionStarredOptimistic: (sessionId: string, starred: boolean) => void;
     setSessionLastReadSeqOptimistic: (sessionId: string, seq: number) => void;
 }
 
@@ -273,19 +269,12 @@ function buildSessionListViewData(
     sessions: Record<string, Session>,
     currentViewingSessionId: string | null,
 ): SessionListViewItem[] {
-    // Partition: starred sessions go to a dedicated "Starred" section regardless
-    // of active/inactive status so users can find pinned conversations in one place.
-    // Gated behind expStarConversations — when off, starred state is ignored and
-    // sessions partition by active/inactive as upstream.
-    const expStar = storage.getState().settings.expStarConversations;
-    const starredSessions: Session[] = [];
+    // Partition sessions by active/inactive status.
     const activeSessions: Session[] = [];
     const unstarredInactive: Session[] = [];
 
     Object.values(sessions).forEach(session => {
-        if (expStar && session.starred) {
-            starredSessions.push(session);
-        } else if (isSessionActive(session)) {
+        if (isSessionActive(session)) {
             activeSessions.push(session);
         } else {
             unstarredInactive.push(session);
@@ -299,20 +288,11 @@ function buildSessionListViewData(
     const sortKey = storage.getState().settings.sortSessionsByActivity
         ? sessionActivitySortKey
         : (s: Session) => s.createdAt;
-    starredSessions.sort((a, b) => sortKey(b) - sortKey(a));
     activeSessions.sort((a, b) => sortKey(b) - sortKey(a));
     unstarredInactive.sort((a, b) => sortKey(b) - sortKey(a));
 
     // Build unified list view data
     const listData: SessionListViewItem[] = [];
-
-    // Starred section at the very top (lifts all starred — active + inactive)
-    if (starredSessions.length > 0) {
-        listData.push({ type: 'header', title: 'Starred' });
-        buildOrderedSessionRows(starredSessions, currentViewingSessionId).forEach(row => {
-            listData.push({ type: 'session', session: row });
-        });
-    }
 
     // Add remaining active sessions as a single item (if any)
     if (activeSessions.length > 0) {
@@ -426,7 +406,6 @@ export const storage = create<StorageState>()((set, get) => {
         isDataReady: false,
         nativeUpdateStatus: null,
         currentViewingSessionId: null,
-        starredProjects: loadStarredProjects(),
         isMutableToolCall: (sessionId: string, callId: string) => {
             const sessionMessages = get().sessionMessages[sessionId];
             if (!sessionMessages) {
@@ -447,7 +426,7 @@ export const storage = create<StorageState>()((set, get) => {
             return Object.values(state.sessions).filter(s => s.active);
         },
         applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[]) => set((state) => {
-            // Load drafts and starred state if sessions are empty (initial load)
+            // Load drafts if sessions are empty (initial load)
             const isInitialLoad = Object.keys(state.sessions).length === 0;
             const savedDrafts = isInitialLoad ? sessionDrafts : {};
 
@@ -484,12 +463,9 @@ export const storage = create<StorageState>()((set, get) => {
                 const resolvedEffortLevel = resolveModePick('effortLevel');
 
                 const existing = state.sessions[session.id];
-                // Star + read-position sync through metadata like the mode picks:
+                // Read-position syncs through metadata like the mode picks:
                 // metadata wins over the local mirror EXCEPT while an optimistic
                 // push is in flight (inbound events still carry the old value).
-                const resolvedStarred = isAgentModePushPending(session.id, 'starred')
-                    ? (existing?.starred ?? false)
-                    : (session.metadata?.starred ?? existing?.starred ?? false);
                 const resolvedLastReadSeq = isAgentModePushPending(session.id, 'lastReadSeq')
                     ? existing?.metadata?.lastReadSeq
                     : session.metadata?.lastReadSeq;
@@ -499,7 +475,7 @@ export const storage = create<StorageState>()((set, get) => {
                 const resolvedLastMessageSeq = session.lastMessageSeq ?? existing?.lastMessageSeq;
                 const resolvedLastMessageAt = session.lastMessageAt ?? existing?.lastMessageAt;
                 const mergedMetadata = session.metadata
-                    ? { ...session.metadata, starred: resolvedStarred, lastReadSeq: resolvedLastReadSeq }
+                    ? { ...session.metadata, lastReadSeq: resolvedLastReadSeq }
                     : session.metadata;
 
                 mergedSessions[session.id] = {
@@ -510,7 +486,6 @@ export const storage = create<StorageState>()((set, get) => {
                     permissionMode: resolvedPermissionMode,
                     modelMode: resolvedModelMode,
                     effortLevel: resolvedEffortLevel,
-                    starred: resolvedStarred,
                     lastMessageSeq: resolvedLastMessageSeq,
                     lastMessageAt: resolvedLastMessageAt,
                 };
@@ -1045,19 +1020,19 @@ export const storage = create<StorageState>()((set, get) => {
                 ...updates
             };
         }),
-        toggleProjectStarred: (machineId: string, path: string) => set((state) => {
+        toggleProjectStarred: (machineId: string, path: string) => {
+            // Starred projects live in synced settings so they sync across the
+            // user's devices. Update them through the same settings-change path
+            // any other setting uses (sync.applySettings → local apply + push).
             const key = projectKey(machineId, path);
-            const next = new Set(state.starredProjects);
-            if (next.has(key)) {
-                next.delete(key);
-            } else {
-                next.add(key);
-            }
-            saveStarredProjects(next);
-            return { ...state, starredProjects: next };
-        }),
+            const current = get().settings.starredProjects ?? [];
+            const next = current.includes(key)
+                ? current.filter(k => k !== key)
+                : [...current, key];
+            sync.applySettings({ starredProjects: next });
+        },
         isProjectStarred: (machineId: string, path: string) => {
-            return get().starredProjects.has(projectKey(machineId, path));
+            return (get().settings.starredProjects ?? []).includes(projectKey(machineId, path));
         },
         updateSessionDraft: (sessionId: string, draft: string | null) => set((state) => {
             const session = state.sessions[sessionId];
@@ -1387,17 +1362,6 @@ export const storage = create<StorageState>()((set, get) => {
                 sessionListViewData: buildSessionListViewData(sessions, state.currentViewingSessionId),
             };
         }),
-        setSessionStarredOptimistic: (sessionId: string, starred: boolean) => set((state) => {
-            const session = state.sessions[sessionId];
-            if (!session) return state;
-            const metadata = session.metadata ? { ...session.metadata, starred } : session.metadata;
-            const sessions = { ...state.sessions, [sessionId]: { ...session, starred, metadata } };
-            return {
-                ...state,
-                sessions,
-                sessionListViewData: buildSessionListViewData(sessions, state.currentViewingSessionId),
-            };
-        }),
         setSessionLastReadSeqOptimistic: (sessionId: string, seq: number) => set((state) => {
             const session = state.sessions[sessionId];
             if (!session?.metadata) return state;
@@ -1523,13 +1487,15 @@ export function useIsSessionUnread(sessionId: string): boolean {
 }
 
 export function useStarredProjects(): Set<string> {
-    return storage((state) => state.starredProjects);
+    // Derived from synced settings.starredProjects (an array); a fresh Set is
+    // built via useShallow-friendly memoization so callers keep the Set API.
+    return storage(useDeepEqual((state) => new Set(state.settings.starredProjects ?? [])));
 }
 
 export function useIsProjectStarred(machineId: string | undefined | null, path: string | undefined | null): boolean {
     return storage((state) => {
         if (!machineId || !path) return false;
-        return state.starredProjects.has(projectKey(machineId, path));
+        return (state.settings.starredProjects ?? []).includes(projectKey(machineId, path));
     });
 }
 

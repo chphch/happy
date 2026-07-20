@@ -202,24 +202,6 @@ export function clearRegisteredPushToken() {
     mmkv.delete(REGISTERED_PUSH_TOKEN_KEY);
 }
 
-export function loadStarredProjects(): Set<string> {
-    const raw = mmkv.getString('starred-projects-v1');
-    if (raw) {
-        try {
-            const arr = JSON.parse(raw);
-            if (Array.isArray(arr)) return new Set(arr);
-        } catch (e) {
-            console.error('Failed to parse starred projects', e);
-        }
-    }
-    return new Set();
-}
-
-export function saveStarredProjects(keys: Set<string>) {
-    mmkv.set('starred-projects-v1', JSON.stringify(Array.from(keys)));
-}
-
-
 export function loadProfile(): Profile {
     const profile = mmkv.getString('profile');
     if (profile) {

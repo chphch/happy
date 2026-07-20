@@ -187,9 +187,6 @@ const stylesheet = StyleSheet.create((theme) => ({
     draftIconOverlay: {
         color: theme.colors.textSecondary,
     },
-    starIconOverlay: {
-        color: '#FBBF24', // amber-400 — matches the "dontAsk" permission style
-    },
     artifactsSection: {
         paddingHorizontal: 16,
         paddingBottom: 12,
@@ -512,15 +509,6 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                             name="create-outline"
                             size={12}
                             style={styles.draftIconOverlay}
-                        />
-                    </View>
-                )}
-                {session.starred && !session.hasDraft && (
-                    <View style={styles.draftIconContainer}>
-                        <Ionicons
-                            name="star"
-                            size={11}
-                            style={styles.starIconOverlay}
                         />
                     </View>
                 )}

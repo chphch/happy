@@ -256,8 +256,6 @@ export const ca: TranslationStructure = {
         dirAutocompleteSubtitle: 'Suggereix directoris mentre escrius el camí de la nova sessió',
         copySessionIds: 'Copia els ID de sessió',
         copySessionIdsSubtitle: 'Afegeix accions per copiar l\'ID de sessió al menú de pressió llarga',
-        starConversations: 'Destaca converses',
-        starConversationsSubtitle: 'Destaca o marca converses i fixa-les a dalt de la llista',
         bashMode: 'Mode de comandes Bash',
         bashModeSubtitle: 'Comença un missatge amb ! per executar-lo com a comanda de l\'intèrpret d\'ordres',
         archiveSortByLastSeen: 'Ordena arxivats per última activitat',

@@ -255,8 +255,6 @@ export const pt: TranslationStructure = {
         dirAutocompleteSubtitle: 'Sugere diretórios enquanto você digita o caminho da nova sessão',
         copySessionIds: 'Copiar IDs de sessão',
         copySessionIdsSubtitle: 'Adiciona ações para copiar o ID da sessão ao menu de pressão longa',
-        starConversations: 'Marcar conversas com estrela',
-        starConversationsSubtitle: 'Marque conversas com estrela ou favorito e fixe-as no topo da lista',
         bashMode: 'Modo de comando Bash',
         bashModeSubtitle: 'Inicie uma mensagem com ! para executá-la como um comando do shell',
         archiveSortByLastSeen: 'Ordenar arquivados por última atividade',

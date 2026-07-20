@@ -28,7 +28,6 @@ export default function FeaturesSettingsScreen() {
     const [expMermaidZoom, setExpMermaidZoom] = useSettingMutable('expMermaidZoom');
     const [expDirAutocomplete, setExpDirAutocomplete] = useSettingMutable('expDirAutocomplete');
     const [expCopySessionId, setExpCopySessionId] = useSettingMutable('expCopySessionId');
-    const [expStarConversations, setExpStarConversations] = useSettingMutable('expStarConversations');
 
     return (
         <ItemList style={{ paddingTop: 0 }}>
@@ -211,13 +210,6 @@ export default function FeaturesSettingsScreen() {
                     subtitle={t('settingsFeatures.copySessionIdsSubtitle')}
                     icon={<Ionicons name="copy-outline" size={29} color="#34C759" />}
                     rightElement={<Switch value={expCopySessionId} onValueChange={setExpCopySessionId} />}
-                    showChevron={false}
-                />
-                <Item
-                    title={t('settingsFeatures.starConversations')}
-                    subtitle={t('settingsFeatures.starConversationsSubtitle')}
-                    icon={<Ionicons name="star-outline" size={29} color="#FBBF24" />}
-                    rightElement={<Switch value={expStarConversations} onValueChange={setExpStarConversations} />}
                     showChevron={false}
                 />
             </ItemGroup>
