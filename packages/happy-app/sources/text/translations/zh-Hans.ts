@@ -258,8 +258,6 @@ export const zhHans: TranslationStructure = {
         dirAutocompleteSubtitle: '在输入新会话路径时建议目录',
         copySessionIds: '复制会话 ID',
         copySessionIdsSubtitle: '在长按菜单中添加复制会话 ID 的操作',
-        starConversations: '收藏对话',
-        starConversationsSubtitle: '为对话加星标或收藏，并将其置顶',
         bashMode: 'Bash 命令模式',
         bashModeSubtitle: '以 ! 开头的消息将作为 Shell 命令运行',
         archiveSortByLastSeen: '按最近活动排序归档',

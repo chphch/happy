@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { Modal } from '@/modal';
-import { machineResumeSession, sessionArchive, sessionKill, sessionSetAgentModes, sessionSetStarred, sessionMarkUnread, forkAndSpawn, type ForkSource } from '@/sync/ops';
+import { machineResumeSession, sessionArchive, sessionKill, sessionSetAgentModes, sessionMarkUnread, forkAndSpawn, type ForkSource } from '@/sync/ops';
 import { maybeCleanupWorktree } from '@/hooks/useWorktreeCleanup';
 import { storage, useLocalSetting, useMachine, useSetting } from '@/sync/storage';
 import { Machine, Session } from '@/sync/storageTypes';
@@ -124,7 +124,6 @@ export function useSessionQuickActions(
     const devModeEnabled = useLocalSetting('devModeEnabled');
     const expResumeSession = useSetting('expResumeSession');
     const expCopySessionId = useSetting('expCopySessionId');
-    const expStarConversations = useSetting('expStarConversations');
     const resumeAvailability = React.useMemo(
         () => expResumeSession ? getResumeAvailability(session, machine, sessionStatus.isConnected) : { canResume: false, canShowResume: false, subtitle: '', message: '' },
         [machine, session, sessionStatus.isConnected, expResumeSession],
@@ -283,29 +282,14 @@ export function useSessionQuickActions(
 
     const canCopySessionMetadata = __DEV__ || devModeEnabled;
 
-    const toggleStarred = React.useCallback(() => {
-        sessionSetStarred(session.id, !session.starred);
-    }, [session.id, session.starred]);
-
     const markUnread = React.useCallback(() => {
         sessionMarkUnread(session.id);
     }, [session.id]);
 
     const actionItems = React.useMemo<SessionActionItem[]>(() => {
-        const isStarred = !!session.starred;
         const items: SessionActionItem[] = [
             { id: 'details', icon: 'information-circle-outline', label: t('profile.details'), onPress: openDetails },
         ];
-
-        // Star/unstar action — experimental, gated behind expStarConversations.
-        if (expStarConversations) {
-            items.push({
-                id: 'star',
-                icon: isStarred ? 'star' : 'star-outline',
-                label: isStarred ? 'Unstar' : 'Star',
-                onPress: toggleStarred,
-            });
-        }
 
         items.push({
             id: 'mark-unread',
@@ -356,9 +340,6 @@ export function useSessionQuickActions(
         resumeAvailability.canShowResume,
         resumeSession,
         expCopySessionId,
-        expStarConversations,
-        session.starred,
-        toggleStarred,
         markUnread,
     ]);
 
