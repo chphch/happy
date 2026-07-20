@@ -316,6 +316,13 @@ export interface Session {
     // "sort by activity" key so merely viewing a session (which writes read
     // position and bumps updatedAt) does not re-order it to the top.
     lastMessageAt?: number;
+    // Timestamp (ms) of when this session last COMPLETED a turn (task_complete /
+    // turn-end / turn_aborted). Unlike lastMessageAt (which bumps on every
+    // streamed message mid-turn), this bumps ONCE at turn end — so it is the
+    // "sort by activity" key: a session moves to the top only when its turn
+    // finishes, not while it is still working. Live-only (set from turn-end
+    // events), so it falls back to lastMessageAt across a fresh app start.
+    lastTurnCompletedAt?: number;
     // IMPORTANT: latestUsage is extracted from reducerState.latestUsage after message processing.
     // We store it directly on Session to ensure it's available immediately on load.
     // Do NOT store reducerState itself on Session - it's mutable and should only exist in SessionMessages.
