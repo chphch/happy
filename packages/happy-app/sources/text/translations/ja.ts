@@ -258,8 +258,6 @@ export const ja: TranslationStructure = {
         dirAutocompleteSubtitle: '新しいセッションのパスを入力するときにディレクトリを候補表示する',
         copySessionIds: 'セッションIDをコピー',
         copySessionIdsSubtitle: '長押しメニューにセッションIDをコピーする操作を追加',
-        starConversations: '会話にスターを付ける',
-        starConversationsSubtitle: '会話にスターやブックマークを付けて、リストの上部に固定する',
         bashMode: 'Bashコマンドモード',
         bashModeSubtitle: 'メッセージを ! で始めるとシェルコマンドとして実行します',
         archiveSortByLastSeen: 'アーカイブを最終アクティビティ順に並べ替え',

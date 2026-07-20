@@ -257,8 +257,6 @@ export const zhHant: TranslationStructure = {
         dirAutocompleteSubtitle: '在輸入新工作階段路徑時建議目錄',
         copySessionIds: '複製工作階段 ID',
         copySessionIdsSubtitle: '在長按選單中新增複製工作階段 ID 的操作',
-        starConversations: '收藏對話',
-        starConversationsSubtitle: '為對話加星號或收藏，並將其置頂',
         bashMode: 'Bash 命令模式',
         bashModeSubtitle: '以 ! 開頭的訊息會作為 shell 命令執行',
         archiveSortByLastSeen: '依最近活動排序封存',

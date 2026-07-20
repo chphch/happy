@@ -271,8 +271,6 @@ export const en: TranslationStructure = {
         dirAutocompleteSubtitle: 'Suggest directories as you type the new-session path',
         copySessionIds: 'Copy Session IDs',
         copySessionIdsSubtitle: 'Add copy-session-ID actions to the long-press menu',
-        starConversations: 'Star Conversations',
-        starConversationsSubtitle: 'Star/bookmark conversations and pin them to the top',
         bashMode: 'Bash Command Mode',
         bashModeSubtitle: 'Start a message with ! to run it as a shell command',
         archiveSortByLastSeen: 'Sort archived by last seen',
