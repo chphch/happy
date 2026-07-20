@@ -62,26 +62,17 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
 
         const result: SessionListViewItem[] = [];
         const inactiveSessions: SessionRowData[] = [];
-        const starredActiveItems: SessionListViewItem[] = [];
 
-        // First pass: keep the active-sessions block, collect inactive rows,
-        // also surface starred-but-active sessions as standalone rows
-        // (see buildSessionListViewData → Starred section).
+        // First pass: keep the active-sessions block, collect inactive rows.
         for (const item of data) {
             if (item.type === 'active-sessions') {
                 result.push(item);
             } else if (item.type === 'session') {
                 if (!item.session.active) {
                     inactiveSessions.push(item.session);
-                } else if (item.session.starred) {
-                    starredActiveItems.push(item);
                 }
             }
         }
-
-        // Render starred-active sessions as standalone rows immediately after
-        // the active-sessions block, before the archive toggle.
-        result.push(...starredActiveItems);
 
         if (inactiveSessions.length > 0) {
             result.push({ type: 'archive-toggle', hidden: hideInactiveSessions });

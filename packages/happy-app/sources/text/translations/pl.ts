@@ -274,8 +274,6 @@ export const pl: TranslationStructure = {
         dirAutocompleteSubtitle: 'Podpowiada katalogi podczas wpisywania ścieżki nowej sesji',
         copySessionIds: 'Kopiuj ID sesji',
         copySessionIdsSubtitle: 'Dodaj akcje kopiowania ID sesji do menu długiego naciśnięcia',
-        starConversations: 'Oznaczaj rozmowy gwiazdką',
-        starConversationsSubtitle: 'Oznaczaj rozmowy gwiazdką lub zakładką i przypinaj je na górze listy',
         bashMode: 'Tryb poleceń Bash',
         bashModeSubtitle: 'Rozpocznij wiadomość od !, aby uruchomić ją jako polecenie powłoki',
         archiveSortByLastSeen: 'Sortuj zarchiwizowane wg ostatniej aktywności',

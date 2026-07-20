@@ -745,33 +745,6 @@ async function sessionPatchMetadata(
 }
 
 /**
- * Toggle/set a session's star. Updates local state immediately (snappy UI) and
- * pushes `starred` into synced metadata so every device receives it through the
- * update-session broadcast. Never throws — a failed push leaves the optimistic
- * local value and the next inbound metadata update reconciles it.
- */
-export function sessionSetStarred(sessionId: string, starred: boolean): void {
-    const state = storage.getState();
-    const session = state.sessions[sessionId];
-    if (!session) {
-        return;
-    }
-    const current = session.metadata?.starred ?? false;
-    if (current === starred && (session.starred ?? false) === starred) {
-        return;
-    }
-    state.setSessionStarredOptimistic(sessionId, starred);
-    markAgentModePushPending(sessionId, ['starred']);
-    sessionPatchMetadata(sessionId, { starred })
-        .catch((error) => {
-            console.error(`Failed to sync star for session ${sessionId}`, error);
-        })
-        .finally(() => {
-            clearAgentModePushPending(sessionId, ['starred']);
-        });
-}
-
-/**
  * Set a session's read position (highest read message seq). Optimistic local
  * update + synced metadata push, so reading on one device clears the unread
  * flag everywhere. `seq` must be monotonic per session.
