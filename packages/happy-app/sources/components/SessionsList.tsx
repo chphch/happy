@@ -19,7 +19,7 @@ import { UpdateBanner } from './UpdateBanner';
 import { layout } from './layout';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
-import { useSettingMutable, useSetting } from '@/sync/storage';
+import { useSettingMutable, useSetting, useStarredProjects } from '@/sync/storage';
 import { t } from '@/text';
 import { SessionShortcutHintBadge } from './ShortcutHints';
 import { ProviderIcon } from './ProviderIcon';
@@ -261,6 +261,13 @@ export function SessionsList({
     const styles = stylesheet;
     const safeArea = useSafeAreaInsets();
     const sourceData = useVisibleSessionListViewData();
+    // Folder-star ordering happens inside ActiveSessionsGroupCompact at render
+    // time, so the list data doesn't change reference when a project is
+    // (un)starred. Subscribe here and thread it through FlatList's extraData so
+    // the native list actually repaints the reordered rows (web re-renders
+    // eagerly; native FlatList memoizes cells and would otherwise show stale
+    // order until a nav).
+    const starredProjects = useStarredProjects();
     const pathname = usePathname();
     const isTablet = useIsTablet();
     const [hideInactiveSessions, setHideInactiveSessions] = useSettingMutable('hideInactiveSessions');
@@ -279,6 +286,13 @@ export function SessionsList({
         if (!pathname.startsWith('/session/')) return undefined;
         return pathname.split('/')[2];
     }, [isTablet, pathname]);
+
+    // Changes identity only when the selection or the starred-project set
+    // changes, so FlatList repaints rows (incl. the reordered active group).
+    const listExtraData = React.useMemo(
+        () => ({ selectedSessionId, starredProjects }),
+        [selectedSessionId, starredProjects],
+    );
 
     // Request review
     React.useEffect(() => {
@@ -460,7 +474,7 @@ export function SessionsList({
                     data={data}
                     renderItem={renderItem}
                     keyExtractor={keyExtractor}
-                    extraData={selectedSessionId}
+                    extraData={listExtraData}
                     contentContainerStyle={{
                         paddingTop: topContentInset,
                         paddingBottom: safeArea.bottom + bottomContentInset,
