@@ -474,6 +474,9 @@ export const storage = create<StorageState>()((set, get) => {
                 // them, so preserve the mirrors.
                 const resolvedLastMessageSeq = session.lastMessageSeq ?? existing?.lastMessageSeq;
                 const resolvedLastMessageAt = session.lastMessageAt ?? existing?.lastMessageAt;
+                // lastTurnCompletedAt is set live from turn-end events; inbound
+                // session payloads don't carry it, so preserve the mirror.
+                const resolvedLastTurnCompletedAt = session.lastTurnCompletedAt ?? existing?.lastTurnCompletedAt;
                 const mergedMetadata = session.metadata
                     ? { ...session.metadata, lastReadSeq: resolvedLastReadSeq }
                     : session.metadata;
@@ -488,6 +491,7 @@ export const storage = create<StorageState>()((set, get) => {
                     effortLevel: resolvedEffortLevel,
                     lastMessageSeq: resolvedLastMessageSeq,
                     lastMessageAt: resolvedLastMessageAt,
+                    lastTurnCompletedAt: resolvedLastTurnCompletedAt,
                 };
             });
 

@@ -2420,7 +2420,9 @@ class Sync {
                             updatedAt: updateData.createdAt,
                             seq: updateData.seq,
                             // Update thinking state based on task lifecycle events
-                            ...(isTaskComplete ? { thinking: false } : {}),
+                            // Stamp turn-completion time so the activity sort lifts
+                            // the session only when its turn ENDS, not mid-turn.
+                            ...(isTaskComplete ? { thinking: false, lastTurnCompletedAt: updateData.createdAt } : {}),
                             ...(isTaskStarted ? { thinking: true } : {})
                         }])
                     } else {
