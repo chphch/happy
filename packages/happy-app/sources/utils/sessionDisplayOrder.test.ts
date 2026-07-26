@@ -37,6 +37,8 @@ function session(
         projectName: null,
         workspaceId: null,
         workspaceName: null,
+        parentSessionId: null,
+        forkDepth: 0,
     };
 }
 
