@@ -32,6 +32,8 @@ function session(
         completedTodosCount: 0,
         totalTodosCount: 0,
         hasUnread: false,
+        parentSessionId: null,
+        forkDepth: 0,
     };
 }
 

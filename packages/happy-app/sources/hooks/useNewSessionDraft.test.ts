@@ -10,6 +10,7 @@ type Draft = {
     effortLevel: string | null;
     sessionType: 'simple' | 'worktree';
     worktreeKey: string | null;
+    attachments?: unknown[];
     updatedAt: number;
 };
 
@@ -80,7 +81,11 @@ describe('useNewSessionDraft', () => {
         expect(mockPersistence.saved.at(-1)).toMatchObject({ effortLevel: 'high' });
     });
 
-    it('keeps temporary image attachments in memory without persisting their file URIs', async () => {
+    // Fork behavior: unlike upstream (attachments in memory only), the
+    // self-host build persists staged attachments so they survive leaving the
+    // new-session screen. Restore is defensive — parsePersistedAttachments
+    // drops anything that is not a well-formed AttachmentPreview.
+    it('persists staged image attachments alongside the rest of the draft', async () => {
         const { useNewSessionDraft } = await import('./useNewSessionDraft');
         const attachment = {
             id: 'photo-1',
@@ -95,6 +100,6 @@ describe('useNewSessionDraft', () => {
         useNewSessionDraft.getState().setAttachments([attachment]);
 
         expect(useNewSessionDraft.getState().attachments).toEqual([attachment]);
-        expect(mockPersistence.saved).toHaveLength(0);
+        expect(mockPersistence.saved.at(-1)).toMatchObject({ attachments: [attachment] });
     });
 });
