@@ -2046,10 +2046,15 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             name="arrow-up"
                                             size={16}
                                             color={canPressSendButton ? activeSendIconColor : theme.colors.textSecondary}
-                                            style={[
-                                                styles.sendButtonIcon,
-                                                { marginTop: Platform.OS === 'web' ? 2 : 0 },
-                                            ]}
+                                            // No styles.sendButtonIcon here: it hardcodes the
+                                            // primary tint (white), and @expo/vector-icons applies
+                                            // `style` AFTER the `color` prop — on the glass
+                                            // composer that repainted the arrow white on a
+                                            // near-white surface, i.e. an invisible send button.
+                                            style={{
+                                                color: canPressSendButton ? activeSendIconColor : theme.colors.textSecondary,
+                                                marginTop: Platform.OS === 'web' ? 2 : 0,
+                                            }}
                                         />
                                     )}
                                 </BubblePressable>
