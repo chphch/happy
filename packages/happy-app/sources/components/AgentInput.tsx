@@ -401,7 +401,11 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     sendButtonGlass: {
         backgroundColor: Platform.select({
             ios: 'transparent',
-            android: theme.colors.glass.backgroundStrong,
+            // The composer panel itself is painted glass.backgroundStrong, so
+            // reusing that token here gave the button the exact same color as
+            // its parent — the send affordance vanished into the panel. iOS
+            // stays transparent because the real glass material renders there.
+            android: theme.colors.surfaceHighest,
             default: 'transparent',
         }),
         borderWidth: StyleSheet.hairlineWidth,
@@ -2043,10 +2047,15 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             name="arrow-up"
                                             size={16}
                                             color={activeSendIconColor}
-                                            style={[
-                                                styles.sendButtonIcon,
-                                                { marginTop: Platform.OS === 'web' ? 2 : 0 },
-                                            ]}
+                                            // No styles.sendButtonIcon here: it hardcodes the
+                                            // primary tint (white), and @expo/vector-icons applies
+                                            // `style` AFTER the `color` prop — on the glass
+                                            // composer that repainted the arrow white on a
+                                            // near-white surface, i.e. an invisible send button.
+                                            style={{
+                                                color: activeSendIconColor,
+                                                marginTop: Platform.OS === 'web' ? 2 : 0,
+                                            }}
                                         />
                                     )}
                                 </BubblePressable>

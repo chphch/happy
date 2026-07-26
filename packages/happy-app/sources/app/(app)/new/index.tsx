@@ -1911,10 +1911,15 @@ function NewSessionScreen() {
                         name="arrow-up"
                         size={isNativeMobile ? 18 : 16}
                         color={sendButtonIconColor}
-                        style={[
-                            styles.sendButtonIcon,
-                            { marginTop: Platform.OS === 'web' ? 2 : 0 },
-                        ]}
+                        // No styles.sendButtonIcon here: it hardcodes the primary
+                        // tint (white), and @expo/vector-icons applies `style` AFTER
+                        // the `color` prop — on the mobile glass composer that
+                        // repainted the arrow white on a near-white surface, i.e. an
+                        // invisible send button.
+                        style={{
+                            color: sendButtonIconColor,
+                            marginTop: Platform.OS === 'web' ? 2 : 0,
+                        }}
                     />
                 )}
             </Pressable>
@@ -2661,7 +2666,11 @@ const styles = StyleSheet.create((theme) => ({
         marginLeft: 0,
         backgroundColor: Platform.select({
             ios: 'transparent',
-            android: theme.colors.glass.backgroundStrong,
+            // mobileInputBox (the composer panel behind this button) is painted
+            // glass.backgroundStrong, so reusing that token here gave the button
+            // the exact same color as its parent — the send affordance vanished
+            // into the panel. iOS stays transparent for the real glass material.
+            android: theme.colors.surfaceHighest,
             default: 'transparent',
         }),
         borderWidth: StyleSheet.hairlineWidth,
@@ -2682,9 +2691,6 @@ const styles = StyleSheet.create((theme) => ({
     },
     sendButtonInnerPressed: {
         opacity: 0.7,
-    },
-    sendButtonIcon: {
-        color: theme.colors.button.primary.tint,
     },
     offlineHelp: {
         flexDirection: 'row',
