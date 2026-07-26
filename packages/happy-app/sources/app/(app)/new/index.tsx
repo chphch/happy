@@ -1928,7 +1928,30 @@ function NewSessionScreen() {
 
     // Attach-image button (expImageUpload). Shared by the desktop action row
     // and the native-mobile left controls so both composers can stage files.
-    const attachButtonNode = expImageUpload ? (
+    // On native mobile it mirrors the session composer's "+" bubble (see
+    // AgentInput's compact mobile row) so the attach affordance is identical
+    // before and after the first message; desktop keeps the outline glyph that
+    // matches the rest of its own action row.
+    const attachButtonNode = !expImageUpload ? null : isNativeMobile ? (
+        <BubblePressable
+            onPress={pickImages}
+            hitSlop={6}
+            style={(pressedState) => [
+                styles.composerActionButton,
+                pressedState.pressed && styles.configRowPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Attach image"
+        >
+            <Ionicons
+                name="add"
+                size={24}
+                color={selectedImages.length > 0
+                    ? theme.colors.radio.active
+                    : theme.colors.textSecondary}
+            />
+        </BubblePressable>
+    ) : (
         <Pressable
             onPress={pickImages}
             hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
@@ -1953,7 +1976,7 @@ function NewSessionScreen() {
                     : theme.colors.button.secondary.tint}
             />
         </Pressable>
-    ) : null;
+    );
 
     const composerNode = (
         <MobileGlassSurface
