@@ -17,11 +17,11 @@ import { getSessionForkSource } from '@/utils/sessionFork';
 import { useRouter } from 'expo-router';
 import { useSession } from '@/sync/storage';
 import { DuplicateSheet } from '@/components/DuplicateSheet';
-import type { SessionActionShortcutId } from '@/keyboard/shortcuts';
+import type { SessionActionId } from '@/keyboard/shortcuts';
 import { isRigMetadata } from '@/sync/rig';
 
 export interface SessionActionItem {
-    id: SessionActionShortcutId;
+    id: SessionActionId;
     label: string;
     icon: string;
     onPress: () => void;
