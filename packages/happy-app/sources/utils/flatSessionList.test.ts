@@ -17,6 +17,7 @@ function row(overrides: Partial<SessionRowData> & { id: string }): SessionRowDat
         gitCountsExact: true,
         gitDeletions: null,
         gitInsertions: null,
+        backgroundCount: 0,
         state: 'waiting',
         createdAt: 0,
         lastActivityAt: 0,
