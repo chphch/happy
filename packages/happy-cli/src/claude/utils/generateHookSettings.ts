@@ -27,22 +27,31 @@ export function generateHookSettingsFile(port: number): string {
 
     // Path to the hook forwarder script
     const forwarderScript = resolve(projectPath(), 'scripts', 'session_hook_forwarder.cjs');
-    const hookCommand = `node "${forwarderScript}" ${port}`;
+    const hookEntry = (path: string) => [
+        {
+            matcher: "*",
+            hooks: [
+                {
+                    type: "command",
+                    command: `node "${forwarderScript}" ${port} ${path}`
+                }
+            ]
+        }
+    ];
 
+    // Stop carries `background_tasks` — the background work (shells, subagents,
+    // workflows) still in flight when the turn ends. It is what distinguishes
+    // "the turn ended and the session is idle" from "the turn ended but a build
+    // is still running", and it arrives in both launch modes because the
+    // `claude` binary runs its hooks whether it is driven through the PTY or
+    // through the SDK. SessionEnd clears the counts, so a session that exits
+    // mid-build leaves no stale activity behind.
     const settings = {
         ultracode: true,
         hooks: {
-            SessionStart: [
-                {
-                    matcher: "*",
-                    hooks: [
-                        {
-                            type: "command",
-                            command: hookCommand
-                        }
-                    ]
-                }
-            ]
+            SessionStart: hookEntry('/hook/session-start'),
+            Stop: hookEntry('/hook/stop'),
+            SessionEnd: hookEntry('/hook/session-end')
         }
     };
 
@@ -54,7 +63,7 @@ export function generateHookSettingsFile(port: number): string {
 
 /**
  * Toggle the `ultracode` flag inside an already-generated hook settings file,
- * preserving the SessionStart hook. Called per query from claudeRemote so that
+ * leaving every registered hook intact. Called per query from claudeRemote so that
  * the 'ultracode' effort (and only that effort) enables Claude Code's ultracode
  * mode — any lower effort turns it off.
  *
