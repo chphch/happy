@@ -36,7 +36,7 @@ import { getCurrentRealtimeSessionId, getVoiceSession } from '@/realtime/Realtim
 import { isMutableTool } from "@/components/tools/knownTools";
 import { DecryptedArtifact } from "./artifactTypes";
 import { FeedItem } from "./feedTypes";
-import { getRigActivityIndicators, getRigComposerState, getRigGitSummary, getRigIdentity, isRigMetadata, isRigMetadataV1, rigSendsMessageReceipts } from './rig';
+import { backgroundWorkCount, getRigActivityIndicators, getRigComposerState, getRigGitSummary, getRigIdentity, hasBackgroundActivity, isRigMetadata, isRigMetadataV1, rigSendsMessageReceipts } from './rig';
 import { rigComposerFlushAheadSessions, rigComposerFlushPending } from './rigComposer';
 import { indexSessionsById } from './sessionIdentity';
 import { t } from '@/text';
@@ -155,6 +155,8 @@ export interface SessionRowData {
     // The branch the agent last reported for its checkout. Names a project's
     // own checkout, which has no worktree name of its own.
     gitBranch?: string | null;
+    /** In-flight background items, for the "N running in background" status line. */
+    backgroundCount: number;
     state: SessionState;
     // Only present on inactive sessions — active sessions never show "last seen"
     // and activeAt updates on every heartbeat, causing needless deep-equal diffs
@@ -213,6 +215,7 @@ function buildSessionRowData(
         agentState: session.agentState,
         thinking: session.thinking,
         isOnline,
+        metadata: session.metadata,
     });
 
     const rigIdentity = getRigIdentity(session.metadata);
@@ -246,6 +249,7 @@ function buildSessionRowData(
         gitDeletions: rigGit?.deletions ?? null,
         gitInsertions: rigGit?.insertions ?? null,
         gitBranch: typeof metadataBranch === 'string' ? metadataBranch : null,
+        backgroundCount: backgroundWorkCount(session.metadata),
         state,
         createdAt: session.createdAt,
         lastActivityAt: getSessionActivityAt(session),
