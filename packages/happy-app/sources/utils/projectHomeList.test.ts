@@ -38,6 +38,7 @@ function row(overrides: Partial<SessionRowData> & { id: string }): SessionRowDat
         // them, and they are required, so the literal needs values for them.
         parentSessionId: null,
         forkDepth: 0,
+        backgroundCount: 0,
         ...overrides,
     };
 }
