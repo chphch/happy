@@ -86,6 +86,7 @@ export const en = {
         activeNow: 'Active now',
         unknown: 'unknown',
         unread: 'new results',
+        backgroundWork: ({ count }: { count: number }) => `${count} running in background`,
     },
 
     time: {
