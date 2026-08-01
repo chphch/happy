@@ -4,6 +4,11 @@ import { useUnistyles } from 'react-native-unistyles';
 import TextareaAutosize from 'react-textarea-autosize';
 import { Typography } from '@/constants/Typography';
 import { installJamoRepair } from '@/utils/hangulJamoRepair';
+import { installImeDebugIfRequested } from '@/utils/imeDebug';
+
+// Module scope so the ?imeDebug query is still in location.search — by the
+// time a composer mounts, client-side routing has already stripped it.
+installImeDebugIfRequested();
 
 export type SupportedKey = 'Enter' | 'Escape' | 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' | 'Tab';
 
@@ -69,6 +74,7 @@ export const MultiTextInput = React.forwardRef<MultiTextInputHandle, MultiTextIn
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
     React.useEffect(() => {
+        installImeDebugIfRequested();
         const el = textareaRef.current;
         if (!el) return;
         return installJamoRepair(el);
