@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useUnistyles } from 'react-native-unistyles';
 import TextareaAutosize from 'react-textarea-autosize';
 import { Typography } from '@/constants/Typography';
+import { installImeDebugIfRequested } from '@/utils/imeDebug';
 
 export type SupportedKey = 'Enter' | 'Escape' | 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' | 'Tab';
 
@@ -66,6 +67,10 @@ export const MultiTextInput = React.forwardRef<MultiTextInputHandle, MultiTextIn
     const isControlled = value !== undefined;
     const { theme } = useUnistyles();
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+    React.useEffect(() => {
+        installImeDebugIfRequested();
+    }, []);
 
     const maxRows = Math.floor(maxHeight / lineHeight);
 
