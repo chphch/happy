@@ -1,52 +1,67 @@
 /**
- * Temporary web-only IME diagnostics for the Korean jamo-decomposition report.
- * Dormant unless the page URL contains `imeDebug` in its query string; once
- * seen, the request is persisted to sessionStorage so it survives client-side
- * routing stripping the query (and page reloads within the same window).
+ * Web-only IME diagnostics for the recurring Korean jamo-decomposition
+ * breakage. Capture is ALWAYS ON (self-host diagnostic build): the breakage
+ * appears at unpredictable moments and the transition — the events at the
+ * instant composition dies — is the diagnostic part, so an opt-in overlay
+ * activated after the fact would miss it.
  *
- * When active it captures, at the document level, everything that can explain
- * a broken IME composition — key events (incl. keyCode 229), composition
- * events, beforeinput/input, focus moves, plus stack-traced patches on the
- * APIs that can abort a composition (programmatic value writes,
- * setSelectionRange, focus/blur, preventDefault on input-path events) — and
- * renders them in an on-screen overlay while relaying batches to a local
- * collector at http://127.0.0.1:8899/log (a debugging machine exposes its
- * collector there via an SSH reverse tunnel; for everyone else the fetch
- * fails silently).
+ * Captures, at the document level, everything that can explain a broken IME
+ * composition — key events (incl. keyCode 229), composition events,
+ * beforeinput/input, focus moves, plus stack-traced patches on the APIs that
+ * can abort a composition (programmatic value writes, setSelectionRange,
+ * focus/blur, preventDefault on input-path events) — into a capped ring
+ * buffer, relayed in batches to a local collector at
+ * http://127.0.0.1:8899/log (a debugging machine exposes its collector there
+ * via an SSH reverse tunnel; everywhere else the fetch fails silently).
+ * `window.__imeDump()` returns the buffer for manual console retrieval.
+ *
+ * The on-screen overlay stays opt-in: `?imeDebug` in the URL (persisted to
+ * sessionStorage so it survives client-side routing and reloads).
  */
+
+const MAX_LINES = 4000;
 
 let installed = false;
 
-export function installImeDebugIfRequested(): void {
+export function installImeDebug(): void {
     if (installed) return;
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    let requested = window.location.search.includes('imeDebug');
-    try {
-        if (requested) {
-            window.sessionStorage.setItem('imeDebug', '1');
-        } else {
-            requested = window.sessionStorage.getItem('imeDebug') === '1';
-        }
-    } catch { /* sessionStorage unavailable — query-only gate */ }
-    if (!requested) return;
     installed = true;
+
+    let overlayRequested = false;
+    try {
+        if (window.location.search.includes('imeDebug')) {
+            window.sessionStorage.setItem('imeDebug', '1');
+        }
+        overlayRequested = window.sessionStorage.getItem('imeDebug') === '1';
+    } catch { /* sessionStorage unavailable — capture still runs, overlay off */ }
 
     const lines: string[] = [];
     let sendCursor = 0;
 
-    const overlay = document.createElement('div');
-    overlay.style.cssText = [
-        'position:fixed', 'top:0', 'right:0', 'z-index:2147483647',
-        'background:rgba(0,0,0,.82)', 'color:#0f0', 'font:10px/1.35 monospace',
-        'padding:6px', 'max-height:45vh', 'max-width:44vw', 'overflow:hidden',
-        'white-space:pre-wrap', 'word-break:break-all', 'pointer-events:none',
-    ].join(';');
-    document.body.appendChild(overlay);
+    let overlay: HTMLDivElement | null = null;
+    if (overlayRequested) {
+        overlay = document.createElement('div');
+        overlay.style.cssText = [
+            'position:fixed', 'top:0', 'right:0', 'z-index:2147483647',
+            'background:rgba(0,0,0,.82)', 'color:#0f0', 'font:10px/1.35 monospace',
+            'padding:6px', 'max-height:45vh', 'max-width:44vw', 'overflow:hidden',
+            'white-space:pre-wrap', 'word-break:break-all', 'pointer-events:none',
+        ].join(';');
+        document.body.appendChild(overlay);
+    }
 
     const push = (s: string) => {
         lines.push(`${(performance.now() / 1000).toFixed(3)} ${s}`);
-        overlay.textContent = lines.slice(-40).join('\n');
+        if (lines.length > MAX_LINES) {
+            const excess = lines.length - MAX_LINES;
+            lines.splice(0, excess);
+            sendCursor = Math.max(0, sendCursor - excess);
+        }
+        if (overlay) overlay.textContent = lines.slice(-40).join('\n');
     };
+
+    (window as any).__imeDump = () => lines.join('\n');
 
     push(`IMEDEBUG start ua=${navigator.userAgent}`);
     push(`IMEDEBUG url=${window.location.pathname}`);
@@ -56,7 +71,7 @@ export function installImeDebugIfRequested(): void {
         const batch = lines.slice(sendCursor);
         sendCursor = lines.length;
         fetch('http://127.0.0.1:8899/log', { method: 'POST', mode: 'no-cors', body: batch.join('\n') + '\n' })
-            .catch(() => { /* collector absent — on-screen overlay still works */ });
+            .catch(() => { /* collector absent — buffer + overlay still work */ });
     }, 1500);
 
     const isTextControl = (t: EventTarget | null): t is HTMLTextAreaElement | HTMLInputElement =>
