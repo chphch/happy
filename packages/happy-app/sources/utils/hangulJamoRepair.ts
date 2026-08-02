@@ -9,8 +9,8 @@
  * On that signature we re-run the 두벌식 automaton (hangul-js) over the jamo
  * run at the cursor — including at most one preceding composed syllable so
  * batchim attachment and rollover work (이+ㄹ→일, 일+ㅓ→이러) — and replace it
- * in place. Identity runs (ㅋㅋㅋ, ㅠㅠ) are untouched, and the repair never
- * runs while a real composition is active.
+ * in place. Identity runs (ㅋㅋㅋ, ㅠㅠ) are untouched, and a real composition
+ * never triggers it (composition input arrives as insertCompositionText).
  */
 import * as Hangul from 'hangul-js';
 
@@ -41,15 +41,15 @@ export function repairJamoRun(text: string, cursor: number): { text: string; cur
 }
 
 export function installJamoRepair(el: HTMLTextAreaElement): () => void {
-    let composing = false;
     let announced = false;
 
-    const onCompositionStart = () => { composing = true; };
-    const onCompositionEnd = () => { composing = false; };
-
     const onInput = (e: Event) => {
-        if (composing) return;
         const ie = e as InputEvent;
+        // The signature alone gates the repair: a live composition delivers
+        // text only via insertCompositionText, never a plain insertText.
+        // Deliberately NOT gated on a compositionstart/end flag — if the IME
+        // dies mid-composition, compositionend never fires and such a flag
+        // sticks true, disabling the repair for the rest of the session.
         if (ie.inputType !== 'insertText' || !ie.data || !isJamo(ie.data)) return;
         const cursor = el.selectionStart ?? el.value.length;
         const repair = repairJamoRun(el.value, cursor);
@@ -67,12 +67,8 @@ export function installJamoRepair(el: HTMLTextAreaElement): () => void {
         el.dispatchEvent(new Event('input', { bubbles: true }));
     };
 
-    el.addEventListener('compositionstart', onCompositionStart);
-    el.addEventListener('compositionend', onCompositionEnd);
     el.addEventListener('input', onInput);
     return () => {
-        el.removeEventListener('compositionstart', onCompositionStart);
-        el.removeEventListener('compositionend', onCompositionEnd);
         el.removeEventListener('input', onInput);
     };
 }
