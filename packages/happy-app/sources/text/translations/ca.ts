@@ -37,6 +37,8 @@ export const ca: TranslationStructure = {
     },
 
     common: {
+        star: 'Destaca',
+        unstar: 'Treu el destacat',
         // Simple string constants
         cancel: 'Cancel·la',
         authenticate: 'Autentica',
@@ -241,6 +243,8 @@ export const ca: TranslationStructure = {
         groupToolCallsSubtitle: 'Replega les crides consecutives a eines en un sol contenidor',
         imageUpload: 'Pujada d\'imatges',
         imageUploadSubtitle: 'Adjunta imatges als missatges perquè els agents compatibles les analitzin',
+        starProjects: 'Destaca projectes',
+        starProjectsSubtitle: 'Fixa els projectes destacats a la part superior de la llista de sessions',
         forkNesting: 'Aniuar sessions bifurcades',
         forkNestingSubtitle: 'Sagna les sessions bifurcades sota la sessió de la qual s\'han ramificat',
         mathRendering: 'Renderització de matemàtiques',

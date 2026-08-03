@@ -16,6 +16,7 @@ export default function FeaturesSettingsScreen() {
     const [fileDiffsSidebar, setFileDiffsSidebar] = useSettingMutable('fileDiffsSidebar');
     const [groupToolCalls, setGroupToolCalls] = useSettingMutable('groupToolCalls');
     const [expImageUpload, setExpImageUpload] = useSettingMutable('expImageUpload');
+    const [expStarProjects, setExpStarProjects] = useSettingMutable('expStarProjects');
     const [expBashMode, setExpBashMode] = useSettingMutable('expBashMode');
     const [expForkNesting, setExpForkNesting] = useSettingMutable('expForkNesting');
     const [expMathRendering, setExpMathRendering] = useSettingMutable('expMathRendering');
@@ -119,6 +120,18 @@ export default function FeaturesSettingsScreen() {
                         <Switch
                             value={expImageUpload}
                             onValueChange={setExpImageUpload}
+                        />
+                    }
+                    showChevron={false}
+                />
+                <Item
+                    title={t('settingsFeatures.starProjects')}
+                    subtitle={t('settingsFeatures.starProjectsSubtitle')}
+                    icon={<Ionicons name="star-outline" size={29} color="#FFCC00" />}
+                    rightElement={
+                        <Switch
+                            value={expStarProjects}
+                            onValueChange={setExpStarProjects}
                         />
                     }
                     showChevron={false}

@@ -40,6 +40,8 @@ export const ja: TranslationStructure = {
     },
 
     common: {
+        star: 'スターを付ける',
+        unstar: 'スターを外す',
         // Simple string constants
         cancel: 'キャンセル',
         authenticate: '認証',
@@ -242,6 +244,8 @@ export const ja: TranslationStructure = {
         groupToolCallsSubtitle: '連続するツール呼び出しを1つのコンテナにまとめる',
         imageUpload: '画像アップロード',
         imageUploadSubtitle: '対応エージェントに分析させるため、メッセージに画像を添付する',
+        starProjects: 'プロジェクトにスター',
+        starProjectsSubtitle: 'スターを付けたプロジェクトをセッション一覧の先頭に固定します',
         forkNesting: 'フォークしたセッションをネスト',
         forkNestingSubtitle: 'フォークしたセッションを分岐元のセッションの下にインデント表示する',
         mathRendering: '数式レンダリング',

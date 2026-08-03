@@ -37,6 +37,8 @@ export const it: TranslationStructure = {
     },
 
     common: {
+        star: 'Aggiungi ai preferiti',
+        unstar: 'Rimuovi dai preferiti',
         // Simple string constants
         cancel: 'Annulla',
         authenticate: 'Autentica',
@@ -239,6 +241,8 @@ export const it: TranslationStructure = {
         groupToolCallsSubtitle: 'Comprimi le chiamate consecutive agli strumenti in un unico contenitore',
         imageUpload: 'Caricamento immagini',
         imageUploadSubtitle: 'Allega immagini ai messaggi per farle analizzare dagli agenti supportati',
+        starProjects: 'Progetti preferiti',
+        starProjectsSubtitle: 'Fissa i progetti preferiti in cima all\'elenco delle sessioni',
         forkNesting: 'Annida sessioni biforcate',
         forkNestingSubtitle: 'Indenta le sessioni biforcate sotto la sessione da cui si sono ramificate',
         mathRendering: 'Rendering matematico',

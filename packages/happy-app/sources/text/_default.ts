@@ -37,6 +37,8 @@ export const en = {
     },
 
     common: {
+        star: 'Star',
+        unstar: 'Unstar',
         // Simple string constants
         cancel: 'Cancel',
         authenticate: 'Authenticate',
@@ -239,6 +241,8 @@ export const en = {
         groupToolCallsSubtitle: 'Collapse consecutive tool calls into one container',
         imageUpload: 'Image Upload',
         imageUploadSubtitle: 'Attach images to messages for supported agents to analyze',
+        starProjects: 'Star Projects',
+        starProjectsSubtitle: 'Pin starred projects to the top of the session list',
         forkNesting: 'Nest Forked Sessions',
         forkNestingSubtitle: 'Indent forked sessions under the session they branched from',
         mathRendering: 'Math Rendering',
