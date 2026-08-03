@@ -30,6 +30,8 @@ export const pt: TranslationStructure = {
     },
 
     common: {
+        star: 'Marcar com estrela',
+        unstar: 'Remover estrela',
         // Simple string constants
         cancel: 'Cancelar',
         authenticate: 'Autenticar',
@@ -238,6 +240,8 @@ export const pt: TranslationStructure = {
         groupToolCallsSubtitle: 'Recolher chamadas consecutivas de ferramentas em um único contêiner',
         imageUpload: 'Upload de imagens',
         imageUploadSubtitle: 'Anexe imagens às mensagens para que agentes compatíveis as analisem',
+        starProjects: 'Destacar projetos',
+        starProjectsSubtitle: 'Fixa os projetos destacados no topo da lista de sessões',
         forkNesting: 'Aninhar sessões bifurcadas',
         forkNestingSubtitle: 'Recua as sessões bifurcadas sob a sessão de onde se ramificaram',
         mathRendering: 'Renderização de matemática',

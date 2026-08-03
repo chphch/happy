@@ -32,6 +32,8 @@ export const zhHant: TranslationStructure = {
     },
 
     common: {
+        star: '加星號',
+        unstar: '取消星號',
         // Simple string constants
         cancel: '取消',
         authenticate: '驗證',
@@ -239,6 +241,8 @@ export const zhHant: TranslationStructure = {
         groupToolCallsSubtitle: '將連續的工具呼叫摺疊到單一容器中',
         imageUpload: '圖片上傳',
         imageUploadSubtitle: '將圖片附加到訊息中，讓支援的代理分析',
+        starProjects: '星號專案',
+        starProjectsSubtitle: '將星號專案固定在工作階段列表頂端',
         forkNesting: '巢狀顯示分叉工作階段',
         forkNestingSubtitle: '將分叉工作階段縮排顯示在其分支來源的工作階段下方',
         mathRendering: '數學公式渲染',
