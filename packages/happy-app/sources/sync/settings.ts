@@ -46,6 +46,8 @@ export const SettingsSchema = z.object({
     expArchiveSortByLastSeen: z.boolean().describe('Enable experimental sort-archived-by-last-seen toggle'),
     expForkNesting: z.boolean().describe('Nest forked sessions under their parent in the session list (experimental)'),
     expMathRendering: z.boolean().describe('Render LaTeX math ($…$, $$…$$) in markdown via KaTeX (experimental)'),
+    expStarProjects: z.boolean().describe('Enable experimental starring of projects in the session list'),
+    starredProjects: z.array(z.string()).describe('Starred project keys (`${machineId}:${path}`), pinned to the top of the compact session groups; synced across the user\'s devices'),
     expUnreadBoldTitle: z.boolean().describe('Show unread sessions as a bold title instead of a blue status dot (experimental)'),
     expImageZoom: z.boolean().describe('Tap an image to open it fullscreen with pinch-to-zoom (experimental)'),
     expMermaidZoom: z.boolean().describe('Tap a Mermaid diagram to open it fullscreen with pinch-to-zoom (experimental)'),
@@ -134,6 +136,9 @@ export const settingsDefaults: Settings = {
     // Self-host keeps these features ON by default; the toggles let users turn them off.
     expForkNesting: true,
     expMathRendering: true,
+    // Upstream ships this off; self-host defaults every experimental toggle on.
+    expStarProjects: true,
+    starredProjects: [],
     expUnreadBoldTitle: true,
     expImageZoom: true,
     expMermaidZoom: true,

@@ -28,6 +28,7 @@ import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadP
 import { isAgentModePushPending } from "./agentModesPending";
 import { loadSessionLastMessageSentAt, saveSessionLastMessageSentAt } from "./persistence";
 import { projectManager } from "./projectManager";
+import { projectKey } from '@/utils/projectPath';
 import type { PermissionModeKey } from '@/components/PermissionModeSelector';
 import type { CustomerInfo } from './revenueCat/types';
 import React from "react";
@@ -275,6 +276,10 @@ interface StorageState {
     // Optimistic local mirrors for the sync-engine + ops.ts writers.
     applySessionLastMessage: (sessionId: string, seq: number, createdAt?: number) => void;
     setSessionLastReadSeqOptimistic: (sessionId: string, seq: number) => void;
+    // Starred project keys live in synced settings (settings.starredProjects),
+    // so a project starred on one device is starred on all of them.
+    toggleProjectStarred: (machineId: string, path: string) => void;
+    isProjectStarred: (machineId: string, path: string) => boolean;
 }
 
 // Helper function to build unified list view data from sessions and machines
@@ -1052,6 +1057,20 @@ export const storage = create<StorageState>()((set, get) => {
                 ...updates
             };
         }),
+        toggleProjectStarred: (machineId: string, path: string) => {
+            // Update through the same settings-change path any other setting
+            // uses (sync.applySettings → local apply + push), so the starred set
+            // reaches every device.
+            const key = projectKey(machineId, path);
+            const current = get().settings.starredProjects ?? [];
+            const next = current.includes(key)
+                ? current.filter(k => k !== key)
+                : [...current, key];
+            sync.applySettings({ starredProjects: next });
+        },
+        isProjectStarred: (machineId: string, path: string) => {
+            return (get().settings.starredProjects ?? []).includes(projectKey(machineId, path));
+        },
         updateSessionDraft: (sessionId: string, draft: string | null) => set((state) => {
             const session = state.sessions[sessionId];
             if (!session) return state;
@@ -1134,7 +1153,7 @@ export const storage = create<StorageState>()((set, get) => {
             return {
                 ...state,
                 sessions: updatedSessions,
-                sessionListViewData: buildSessionListViewData(updatedSessions, state.unreadSessionIds)
+                sessionListViewData: buildSessionListViewData(updatedSessions, state.currentViewingSessionId)
             };
         }),
         getSessionPathKey: (sessionId: string): string | null => {
@@ -1563,6 +1582,23 @@ export function useIsSessionUnread(sessionId: string): boolean {
         return lastRead != null
             && (session.lastMessageSeq ?? 0) > lastRead
             && state.currentViewingSessionId !== sessionId;
+    });
+}
+
+export function useStarredProjects(): Set<string> {
+    // The Set is derived outside the store selector on purpose: fast-deep-equal's
+    // default build has no Set support and falls through to comparing
+    // `Object.keys()`, which is always `[]` for a Set — so under `useDeepEqual`
+    // every Set compares equal, the subscription never fires, and star toggles
+    // would not reorder the list until the subscriber remounted.
+    const starredKeys = storage(useShallow((state) => state.settings.starredProjects ?? []));
+    return React.useMemo(() => new Set(starredKeys), [starredKeys]);
+}
+
+export function useIsProjectStarred(machineId: string | undefined | null, path: string | undefined | null): boolean {
+    return storage((state) => {
+        if (!machineId || !path) return false;
+        return (state.settings.starredProjects ?? []).includes(projectKey(machineId, path));
     });
 }
 

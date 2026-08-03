@@ -19,7 +19,7 @@ import { UpdateBanner } from './UpdateBanner';
 import { layout } from './layout';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
-import { useSettingMutable, useSetting } from '@/sync/storage';
+import { useSettingMutable, useSetting, useStarredProjects } from '@/sync/storage';
 import { t } from '@/text';
 import { SessionShortcutHintBadge } from './ShortcutHints';
 import { ProviderIcon } from './ProviderIcon';
@@ -280,6 +280,17 @@ export function SessionsList({
         return pathname.split('/')[2];
     }, [isTablet, pathname]);
 
+    // Starred-project ordering happens inside ActiveSessionsGroupCompact at
+    // render time, so the list data keeps its identity when a project is
+    // (un)starred. Subscribe here and thread it through extraData: web
+    // re-renders eagerly, but native FlatList memoizes cells and would keep
+    // showing the old order until something else forced a repaint.
+    const starredProjects = useStarredProjects();
+    const listExtraData = React.useMemo(
+        () => ({ selectedSessionId, starredProjects }),
+        [selectedSessionId, starredProjects],
+    );
+
     // Request review
     React.useEffect(() => {
         if (sourceData && sourceData.length > 0) {
@@ -460,7 +471,7 @@ export function SessionsList({
                     data={data}
                     renderItem={renderItem}
                     keyExtractor={keyExtractor}
-                    extraData={selectedSessionId}
+                    extraData={listExtraData}
                     contentContainerStyle={{
                         paddingTop: topContentInset,
                         paddingBottom: safeArea.bottom + bottomContentInset,
