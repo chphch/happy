@@ -41,6 +41,8 @@ export const pl: TranslationStructure = {
     },
 
     common: {
+        star: 'Oznacz gwiazdką',
+        unstar: 'Usuń gwiazdkę',
         // Simple string constants
         cancel: 'Anuluj',
         authenticate: 'Uwierzytelnij',
@@ -261,6 +263,8 @@ export const pl: TranslationStructure = {
         analyticsEnabled: 'Anonimowa analityka użytkowania aktywna',
         imageUpload: 'Przesyłanie obrazów',
         imageUploadSubtitle: 'Dołączaj obrazy do wiadomości, aby obsługiwani agenci mogli je analizować',
+        starProjects: 'Projekty z gwiazdką',
+        starProjectsSubtitle: 'Przypnij oznaczone projekty na górze listy sesji',
         forkNesting: 'Zagnieżdżaj rozgałęzione sesje',
         forkNestingSubtitle: 'Wcina rozgałęzione sesje pod sesją, z której się rozgałęziły',
         mathRendering: 'Renderowanie matematyki',
