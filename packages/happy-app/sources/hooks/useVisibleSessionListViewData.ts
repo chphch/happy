@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { SessionListViewItem, useSessionListViewData, useSetting } from '@/sync/storage';
+import { SessionListViewItem, SessionRowData, useSessionListViewData, useSetting } from '@/sync/storage';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -61,19 +61,20 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
         }
 
         const result: SessionListViewItem[] = [];
-        let hasInactive = false;
+        const inactiveSessions: SessionRowData[] = [];
 
-        // First pass: add active sessions group and check if inactive sessions exist
+        // First pass: keep the active-sessions block, collect inactive rows.
         for (const item of data) {
             if (item.type === 'active-sessions') {
                 result.push(item);
-            } else if (item.type === 'session' && !item.session.active) {
-                hasInactive = true;
+            } else if (item.type === 'session') {
+                if (!item.session.active) {
+                    inactiveSessions.push(item.session);
+                }
             }
         }
 
-        // Insert archive toggle if there are inactive sessions
-        if (hasInactive) {
+        if (inactiveSessions.length > 0) {
             result.push({ type: 'archive-toggle', hidden: hideInactiveSessions });
         }
 
