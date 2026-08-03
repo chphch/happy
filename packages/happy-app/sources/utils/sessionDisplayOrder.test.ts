@@ -107,6 +107,7 @@ describe('session display order', () => {
                     id: 'rig-project',
                     name: 'rig',
                     machineId: 'machine-a',
+                    path: null,
                     activeCount: 1,
                     sessionCount: 1,
                     workspaces: [{
@@ -124,6 +125,7 @@ describe('session display order', () => {
                     id: 'happy-project',
                     name: 'happy',
                     machineId: 'machine-a',
+                    path: null,
                     activeCount: 1,
                     sessionCount: 1,
                     workspaces: [{
@@ -213,6 +215,7 @@ describe('session display order', () => {
                     id: 'happy-project',
                     name: 'happy',
                     machineId: 'machine-a',
+                    path: '/happy',
                     activeCount: 0,
                     sessionCount: 3,
                     workspaces: [{
