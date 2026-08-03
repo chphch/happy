@@ -8,7 +8,7 @@ import { type SessionState, formatPathRelativeToHome, vibingMessages, formatLast
 import { Avatar } from './Avatar';
 import { Typography } from '@/constants/Typography';
 import { StatusDot } from './StatusDot';
-import { useAllMachines, useSessionGitStatus, useSetting } from '@/sync/storage';
+import { useAllMachines, useSessionGitStatus, useSetting, storage } from '@/sync/storage';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
@@ -55,6 +55,7 @@ function useSectionGitInfo(sessionId: string) {
         };
     }, [gitStatus]);
 }
+
 
 // Section header: avatar | path + branch + tree icon + line changes | + button
 const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRowData; displayPath: string }) => {
