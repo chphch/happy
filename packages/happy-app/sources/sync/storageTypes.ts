@@ -177,15 +177,13 @@ export const MetadataSchema = z.object({
     modelMode: z.string().nullish(),
     effortLevel: z.string().nullish(),
     /**
-     * Cross-client star + read state, synced through session metadata (same
-     * mechanism as the mode picks above). `starred` bookmarks the session and
-     * pins it to a "Starred" list section. `lastReadSeq` is the highest message
-     * seq the user has read on any device; unread = latest message seq >
-     * lastReadSeq. Absent lastReadSeq means "read" (no unread) — this matches
-     * the previous in-memory behavior where unread cleared on app restart, and
-     * avoids flagging all history unread on first run.
+     * Cross-client read state, synced through session metadata (same mechanism
+     * as the mode picks above). `lastReadSeq` is the highest message seq the
+     * user has read on any device; unread = latest message seq > lastReadSeq.
+     * Absent lastReadSeq means "read" (no unread) — this matches the previous
+     * in-memory behavior where unread cleared on app restart, and avoids
+     * flagging all history unread on first run.
      */
-    starred: z.boolean().optional(),
     lastReadSeq: z.number().optional(),
     // Passthrough so read-modify-write metadata updates from this app never
     // drop fields written by newer CLI or app versions.
