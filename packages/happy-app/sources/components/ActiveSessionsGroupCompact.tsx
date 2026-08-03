@@ -8,7 +8,7 @@ import { type SessionState, formatPathRelativeToHome, vibingMessages, formatLast
 import { Avatar } from './Avatar';
 import { Typography } from '@/constants/Typography';
 import { StatusDot } from './StatusDot';
-import { useAllMachines, useSessionGitStatus, useSetting } from '@/sync/storage';
+import { useAllMachines, useSessionGitStatus, useIsProjectStarred, useStarredProjects, useSetting, storage } from '@/sync/storage';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
@@ -18,6 +18,7 @@ import { HappyError } from '@/utils/errors';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
 import { sessionKill } from '@/sync/ops';
 import { isWorktreePath, getRepoPath, getWorktreeName } from '@/utils/worktree';
+import { compareProjectsByStar } from '@/utils/projectPath';
 import { useNewSessionDraft } from '@/hooks/useNewSessionDraft';
 import { useRouter } from 'expo-router';
 import { SessionShortcutHintBadge } from './ShortcutHints';
@@ -56,6 +57,8 @@ function useSectionGitInfo(sessionId: string) {
     }, [gitStatus]);
 }
 
+const EMPTY_STARRED: ReadonlySet<string> = new Set();
+
 // Section header: avatar | path + branch + tree icon + line changes | + button
 const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRowData; displayPath: string }) => {
     const styles = stylesheet;
@@ -87,6 +90,14 @@ const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRo
         draft.setWorktreeKey(isWorktree ? sessionPath : null);
         router.navigate('/new');
     }, [session.machineId, session.homeDir, repoPath, isWorktree, sessionPath, draft, router]);
+
+    const expStarProjects = useSetting('expStarProjects');
+    // Star the repo, not the worktree: every worktree of a repo shares its star.
+    const isStarred = useIsProjectStarred(session.machineId, repoPath);
+    const handleToggleStar = React.useCallback(() => {
+        if (!session.machineId) return;
+        storage.getState().toggleProjectStarred(session.machineId, repoPath);
+    }, [session.machineId, repoPath]);
 
     const [isHovered, setIsHovered] = React.useState(false);
 
@@ -131,6 +142,24 @@ const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRo
                 )}
             </View>
 
+            {expStarProjects && (
+                <Pressable
+                    onPress={handleToggleStar}
+                    hitSlop={{ top: 15, bottom: 15, left: 8, right: 8 }}
+                    style={styles.starButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={isStarred ? t('common.unstar') : t('common.star')}
+                >
+                    <Ionicons
+                        name={isStarred ? 'star' : 'star-outline'}
+                        size={14}
+                        // Not theme.colors.warning — that is #8E8E93 (grey), which
+                        // makes a starred project indistinguishable by colour.
+                        color={isStarred ? '#f5a623' : theme.colors.textSecondary}
+                    />
+                </Pressable>
+            )}
+
             {/* + button — vertically centered, large hit area; desktop: hover-only */}
             <Pressable
                 onPress={handleAdd}
@@ -168,6 +197,8 @@ const MachineSeparator = React.memo(({ machineName, machineId }: { machineName: 
 export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: ActiveSessionsGroupProps) {
     const styles = stylesheet;
     const machines = useAllMachines();
+    const expStarProjects = useSetting('expStarProjects');
+    const starredProjects = useStarredProjects();
     const expForkNesting = useSetting('expForkNesting');
 
     const machineGroups = React.useMemo(() => buildActiveSessionDisplayGroups(
@@ -182,7 +213,14 @@ export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: Acti
         <View style={styles.container}>
             {machineGroups.map(machineGroup => {
                 const sortedProjects = Array.from(machineGroup.projects.entries()).sort(
-                    ([, a], [, b]) => a.displayPath.localeCompare(b.displayPath)
+                    ([pathA, a], [pathB, b]) => compareProjectsByStar(
+                        { path: pathA, displayPath: a.displayPath },
+                        { path: pathB, displayPath: b.displayPath },
+                        machineGroup.machineId,
+                        // An empty set means "no star ordering", which is exactly
+                        // what the feature being off should do.
+                        expStarProjects ? starredProjects : EMPTY_STARRED,
+                    )
                 );
 
                 return (
@@ -470,6 +508,10 @@ const stylesheet = StyleSheet.create((theme) => ({
         marginLeft: 3,
     },
     addButton: {
+        marginLeft: 4,
+        padding: 8,
+    },
+    starButton: {
         marginLeft: 4,
         padding: 8,
     },
