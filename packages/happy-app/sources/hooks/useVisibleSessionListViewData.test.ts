@@ -4,6 +4,7 @@ import type { SessionListViewItem, SessionRowData } from '@/sync/storage';
 const mocks = vi.hoisted(() => ({
     data: null as SessionListViewItem[] | null,
     hideArchivedSessions: false,
+    starredProjects: new Set<string>(),
 }));
 
 // The hook only ever reads `React.useMemo`, and storage.ts pulls in React
@@ -15,14 +16,13 @@ vi.mock('react', () => ({
 vi.mock('@/sync/storage', () => ({
     useSessionListViewData: () => mocks.data,
     useSetting: (key: string) => {
-        if (key !== 'hideInactiveSessions') {
-            throw new Error(`Unexpected setting read: ${key}`);
-        }
-        return mocks.hideArchivedSessions;
+        if (key === 'hideInactiveSessions') return mocks.hideArchivedSessions;
+        throw new Error(`Unexpected setting read: ${key}`);
     },
+    useStarredProjects: () => mocks.starredProjects,
 }));
 
-import { useVisibleSessionListViewData } from './useVisibleSessionListViewData';
+import { useSessionListStarredProjects, useVisibleSessionListViewData } from './useVisibleSessionListViewData';
 
 // Only the fields the visibility filter reads; the real rows are built in
 // storage.ts.
@@ -35,14 +35,20 @@ function row(id: string, options: { active?: boolean; archived?: boolean } = {})
     } as SessionRowData;
 }
 
-function project(id: string, sessions: SessionRowData[]): SessionListViewItem {
+function project(
+    id: string,
+    sessions: SessionRowData[],
+    path: string | null = null,
+    source: 'rig' | 'happy' = 'rig',
+): SessionListViewItem {
     return {
         type: 'project',
-        source: 'rig',
+        source,
         project: {
             id,
             name: id,
             machineId: 'machine-1',
+            path,
             sessionCount: sessions.length,
             activeCount: sessions.filter((session) => session.active).length,
             workspaces: [{ id: '', name: null, sessions }],
@@ -63,6 +69,7 @@ function flatSessionIds(items: SessionListViewItem[]): string[] {
 beforeEach(() => {
     mocks.data = null;
     mocks.hideArchivedSessions = false;
+    mocks.starredProjects = new Set<string>();
 });
 
 describe('useVisibleSessionListViewData', () => {
@@ -160,5 +167,15 @@ describe('useVisibleSessionListViewData', () => {
         mocks.hideArchivedSessions = true;
 
         expect(useVisibleSessionListViewData()).toEqual(mocks.data);
+    });
+
+    describe('useSessionListStarredProjects', () => {
+        // The ordering itself is buildSessionProjectDisplayGroups' job (see
+        // sessionDisplayOrder.test.ts); this hook only decides which set it gets.
+        it('hands out the starred set while the feature is on', () => {
+            mocks.starredProjects = new Set(['machine-1:/projects/delta']);
+
+            expect([...useSessionListStarredProjects()]).toEqual(['machine-1:/projects/delta']);
+        });
     });
 });
