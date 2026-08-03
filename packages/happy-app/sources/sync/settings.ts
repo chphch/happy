@@ -55,6 +55,7 @@ export const SettingsSchema = z.object({
     groupToolCalls: z.boolean().describe('Collapse consecutive tool calls into grouped containers in chat'),
     compactToolCalls: z.boolean().describe('Render non-interactive tool calls as compact one-line rows'),
     expImageUpload: z.boolean().describe('Enable experimental image upload in chat'),
+    starredProjects: z.array(z.string()).describe('Starred project keys (`${machineId}:${path}`), pinned to the top of the compact session groups; synced across the user\'s devices'),
     reviewPromptAnswered: z.boolean().describe('Whether the review prompt has been answered'),
     reviewPromptLikedApp: z.boolean().nullish().describe('Whether user liked the app when asked'),
     voiceAssistantLanguage: z.string().nullable().describe('Preferred language for voice assistant (null for auto-detect)'),
@@ -134,6 +135,7 @@ export const settingsDefaults: Settings = {
     // Full tool views by default: edit diffs render inline in the chat.
     compactToolCalls: false,
     expImageUpload: true,
+    starredProjects: [],
     reviewPromptAnswered: false,
     reviewPromptLikedApp: null,
     voiceAssistantLanguage: null,
