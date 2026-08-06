@@ -22,6 +22,7 @@ import { openExternalUrl } from '@/utils/openExternalUrl';
 import { isSvgImageUrl } from './svgImageSource';
 import { SvgChatImage } from './SvgChatImage';
 import { type SvgIntrinsicSize } from './svgIntrinsicSize';
+import { useImageIntrinsicSize } from '@/hooks/useImageIntrinsicSize';
 
 // Option type for callback
 export type Option = {
@@ -240,12 +241,28 @@ function RenderCodeBlock(props: { content: string, language: string | null, firs
 // so the block does not start at zero height and then snap open.
 const DEFAULT_SVG_ASPECT_RATIO = 4 / 3;
 
+// Ratio used to reserve space before an image's real dimensions are known, so
+// the block does not start at zero height and then snap open.
+const DEFAULT_IMAGE_ASPECT_RATIO = 4 / 3;
+
 function RenderImageBlock(props: { url: string, alt: string, first: boolean, last: boolean }) {
     const accessibleLabel = props.alt || 'Markdown image';
     // RN's <Image> only decodes raster formats, so an SVG (data URI or .svg)
     // renders blank on native. Route SVG through SvgChatImage instead, which
     // owns the platform split. Non-SVG images keep using <Image> unchanged.
     const isSvg = React.useMemo(() => isSvgImageUrl(props.url), [props.url]);
+    // Raster only: an SVG has no raster dimensions to fetch, and RenderSvgImage
+    // sizes it from its own markup instead.
+    const intrinsicSize = useImageIntrinsicSize(isSvg ? null : props.url);
+    // Size the image from its own aspect ratio rather than a fixed height: with
+    // a fixed height, `contain` makes height the binding constraint for any
+    // image taller than it is wide, so a portrait image is shrunk to a fraction
+    // of the message width. `maxWidth` caps the image at its source resolution
+    // so a small one is never upscaled to full bleed.
+    const sizing = React.useMemo(() => ({
+        aspectRatio: intrinsicSize ? intrinsicSize.width / intrinsicSize.height : DEFAULT_IMAGE_ASPECT_RATIO,
+        maxWidth: intrinsicSize?.width,
+    }), [intrinsicSize]);
 
     const openViewer = React.useCallback(() => {
         Modal.show({ component: ImageViewer, props: { uri: props.url } } as any);
@@ -261,7 +278,7 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
                 <Pressable onPress={openViewer} accessibilityRole="imagebutton">
                     <Image
                         source={{ uri: props.url }}
-                        style={style.image}
+                        style={[style.image, sizing]}
                         accessibilityLabel={accessibleLabel}
                         resizeMode="contain"
                     />
@@ -617,8 +634,6 @@ const style = StyleSheet.create((theme) => ({
     },
     image: {
         width: '100%',
-        minHeight: 160,
-        height: 240,
         borderRadius: 12,
         backgroundColor: theme.colors.surfaceHighest,
     },
