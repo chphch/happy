@@ -23,10 +23,14 @@ export const MessageView = React.memo((props: {
   getMessageById?: (id: string) => Message | null;
 }) => {
   return (
-    <View
-      style={styles.messageContainer}
-      renderToHardwareTextureAndroid={Platform.OS !== 'web'}
-    >
+    // No renderToHardwareTextureAndroid here: it promotes the message to an
+    // offscreen hardware layer sized at layout time, and a message can now grow
+    // after that. A markdown image's intrinsic size arrives asynchronously, so
+    // the block lays out at the 4:3 placeholder ratio and then jumps to the real
+    // one — content past the original bounds is never drawn, which reads as the
+    // image simply ending mid-picture. A layer whose size is proportional to a
+    // now-unbounded cell is the wrong trade for a virtualized list anyway.
+    <View style={styles.messageContainer}>
       <View style={styles.messageContent}>
         <RenderBlock
           message={props.message}
