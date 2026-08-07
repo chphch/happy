@@ -26,6 +26,7 @@ import { NativeSegmentedControl } from './NativeSegmentedControl';
 import { BotFacePicker } from './BotFacePicker';
 import { BOT_NAME_MAX_LENGTH, isValidBotName, sanitizeBotName } from '@/utils/botName';
 import { AgentInputAttachmentStrip } from './AgentInputAttachmentStrip';
+import { ProjectPathPrompt } from './ProjectPathPrompt';
 import { Typography } from '@/constants/Typography';
 import { layout } from './layout';
 import { t } from '@/text';
@@ -1432,15 +1433,17 @@ export const HomeDock = React.memo(({
         // picker wrapper, so presenting another delayed task here creates a
         // stale prompt race when HomeDock unmounts.
         void (async () => {
-            const path = await Modal.prompt(
-                t('machineLauncher.enterCustomPath'),
-                undefined,
-                {
-                    placeholder: '~/path/to/project',
-                    defaultValue: selectedPath ?? '~',
-                    confirmText: t('common.ok'),
-                },
-            );
+            const path = await new Promise<string | null>((resolve) => {
+                Modal.show({
+                    component: ProjectPathPrompt,
+                    props: {
+                        defaultValue: selectedPath ?? '~',
+                        machineId: selectedMachineId,
+                        homeDir: selectedHomeDir,
+                        onSubmit: resolve,
+                    },
+                });
+            });
             const selectedCustomPath = resolveCustomProjectPathSelection(path, mountedRef.current);
             if (selectedCustomPath) setPath(selectedCustomPath);
         })();
