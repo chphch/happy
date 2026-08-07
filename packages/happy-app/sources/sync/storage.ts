@@ -335,7 +335,7 @@ function buildSessionListViewData(
     sortProjectSessions(happySessions);
 
     const listData: SessionListViewItem[] = [];
-    const toRow = (session: Session) => buildSessionRowData(session, unreadSessionIds);
+    const toRow = (session: Session) => buildSessionRowData(session, currentViewingSessionId);
 
     const rigProjects = [
         ...buildProjectGroups(rigProjectSessions, toRow, isSessionActive),
