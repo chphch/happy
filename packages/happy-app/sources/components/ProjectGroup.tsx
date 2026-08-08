@@ -4,9 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Text } from '@/components/StyledText';
 import { Typography } from '@/constants/Typography';
+import { useRouter } from 'expo-router';
 import { ProjectGroupData, ProjectWorkspaceGroup, useAllMachines, useLocalSettingMutable, useIsProjectStarred, useSetting, storage } from '@/sync/storage';
 import { t } from '@/text';
 import { getRepoPath } from '@/utils/projectPath';
+import { seedNewSessionDraftFrom } from '@/utils/newSessionFromProject';
 import { orderSessionRowsByForkLineage } from '@/utils/forkLineage';
 import { CompactSessionRow } from './ActiveSessionsGroupCompact';
 
@@ -52,6 +54,20 @@ export const ProjectGroup = React.memo(({ project, selectedSessionId }: ProjectG
         storage.getState().toggleProjectStarred(project.machineId, starPath);
     }, [project.machineId, starPath]);
 
+    // Seed a new session from one of the card's own sessions rather than from
+    // project.path: that covers Rig cards too, which carry no single path, and
+    // it keeps the worktree handling in one place.
+    const seedSession = React.useMemo(
+        () => project.workspaces.flatMap(w => w.sessions).find(s => s.path) ?? null,
+        [project.workspaces],
+    );
+    const router = useRouter();
+    const handleNewSession = React.useCallback(() => {
+        if (!seedSession) return;
+        seedNewSessionDraftFrom(seedSession);
+        router.navigate('/new');
+    }, [router, seedSession]);
+
     return (
         <View style={styles.container}>
             <Pressable style={styles.header} onPress={toggleCollapsed} hitSlop={8}>
@@ -86,6 +102,17 @@ export const ProjectGroup = React.memo(({ project, selectedSessionId }: ProjectG
                             // makes a starred project indistinguishable by colour.
                             color={isStarred ? '#f5a623' : theme.colors.textSecondary}
                         />
+                    </Pressable>
+                )}
+                {seedSession && (
+                    <Pressable
+                        onPress={handleNewSession}
+                        hitSlop={{ top: 15, bottom: 15, left: 8, right: 8 }}
+                        style={styles.addButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('sidebar.newSession')}
+                    >
+                        <Ionicons name="add" size={16} color={theme.colors.textSecondary} />
                     </Pressable>
                 )}
                 <Text style={styles.count}>
@@ -184,6 +211,11 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
     starButton: {
         padding: 4,
+    },
+    addButton: {
+        paddingHorizontal: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     count: {
         fontSize: 12,
