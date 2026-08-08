@@ -18,7 +18,7 @@ import { HappyError } from '@/utils/errors';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
 import { sessionKill } from '@/sync/ops';
 import { isWorktreePath, getRepoPath, getWorktreeName } from '@/utils/worktree';
-import { useNewSessionDraft } from '@/hooks/useNewSessionDraft';
+import { seedNewSessionDraftFrom } from '@/utils/newSessionFromProject';
 import { useRouter } from 'expo-router';
 import { SessionShortcutHintBadge } from './ShortcutHints';
 import { buildActiveSessionDisplayGroups } from '@/utils/sessionDisplayOrder';
@@ -62,7 +62,6 @@ const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRo
     const styles = stylesheet;
     const { theme } = useUnistyles();
     const router = useRouter();
-    const draft = useNewSessionDraft();
 
     const sessionPath = session.path || '';
     const isWorktree = isWorktreePath(sessionPath);
@@ -78,16 +77,9 @@ const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRo
     const hasBranch = !!branchName;
 
     const handleAdd = React.useCallback(() => {
-        const machineId = session.machineId;
-        if (machineId) {
-            draft.setMachineId(machineId);
-        }
-        const pathToSet = formatPathRelativeToHome(repoPath, session.homeDir ?? undefined);
-        draft.setPath(pathToSet);
-        draft.setSessionType(isWorktree ? 'worktree' : 'simple');
-        draft.setWorktreeKey(isWorktree ? sessionPath : null);
+        seedNewSessionDraftFrom(session);
         router.navigate('/new');
-    }, [session.machineId, session.homeDir, repoPath, isWorktree, sessionPath, draft, router]);
+    }, [router, session]);
 
     const [isHovered, setIsHovered] = React.useState(false);
 
