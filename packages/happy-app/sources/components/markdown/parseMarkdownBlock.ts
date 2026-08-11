@@ -148,6 +148,11 @@ export function parseMarkdownBlock(markdown: string, enableMath: boolean = true)
             // Detect mermaid diagram language and route to appropriate block type
             if (language === 'mermaid') {
                 blocks.push({ type: 'mermaid', content: contentString });
+            } else if (language === 'artifact') {
+                // Deliberately its own tag rather than `html`: a plain ```html
+                // fence is how anyone shows HTML source, and turning those into
+                // live frames would be both surprising and unsafe.
+                blocks.push({ type: 'artifact', content: contentString });
             } else {
                 blocks.push({ type: 'code-block', language, content: contentString });
             }
