@@ -16,6 +16,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { MermaidRenderer } from './MermaidRenderer';
 import { ImageViewer } from '@/components/ImageViewer';
 import { MathBlock, InlineMathRun, MathInline } from './MathView';
+import { ArtifactRenderer } from './ArtifactRenderer';
 import { t } from '@/text';
 import { isHttpMarkdownLink } from './linkUtils';
 import { openExternalUrl } from '@/utils/openExternalUrl';
@@ -84,6 +85,8 @@ export const MarkdownView = React.memo((props: {
                         return <MermaidRenderer content={block.content} key={index} />;
                     } else if (block.type === 'math') {
                         return <MathBlock content={block.content} key={index} />;
+                    } else if (block.type === 'artifact') {
+                        return <ArtifactRenderer content={block.content} key={index} />;
                     } else if (block.type === 'options') {
                         return <RenderOptionsBlock items={block.items} key={index} first={index === 0} last={index === blocks.length - 1} selectable={selectable} onOptionPress={props.onOptionPress} />;
                     } else if (block.type === 'table') {
