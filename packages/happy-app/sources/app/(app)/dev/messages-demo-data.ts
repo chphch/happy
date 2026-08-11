@@ -165,6 +165,51 @@ Inline code now renders as \`happy render\` without a background highlight.
 
 ![Markdown renderable image](${MARKDOWN_RENDERER_TEST_IMAGE})`
     },
+
+    {
+        id: 'agent-artifact-verification',
+        localId: null,
+        createdAt: Date.now() - 182400,
+        kind: 'agent-text',
+        text: `Artifact renderer verification:
+
+\`\`\`artifact
+<style>
+  .card { font: 15px/1.5 system-ui, sans-serif; padding: 20px; border-radius: 12px; background: #f4f4f5; color: #18181b; }
+  :root[data-theme="dark"] .card { background: #1c1c1e; color: #fafafa; }
+  .card button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid currentColor; background: none; color: inherit; }
+  .card table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  .card th, .card td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(128,128,128,0.35); }
+</style>
+<div class="card">
+  <h2>Artifact block</h2>
+  <p>Sandboxed frame, sized to the full height the page reports — tall enough here to prove nothing is cropped.</p>
+  <table>
+    <tr><th>Row</th><th>Purpose</th></tr>
+    <tr><td>1</td><td>styles apply</td></tr>
+    <tr><td>2</td><td>scripts run</td></tr>
+    <tr><td>3</td><td>theme reaches the frame</td></tr>
+    <tr><td>4</td><td>height is reported back</td></tr>
+    <tr><td>5</td><td>no external requests</td></tr>
+    <tr><td>6</td><td>expand opens the full viewer</td></tr>
+    <tr><td>7</td><td>rows below here exist so the fixture is unambiguously</td></tr>
+    <tr><td>8</td><td>taller than any height cap the renderer might</td></tr>
+    <tr><td>9</td><td>reintroduce — a frame that stops short of the</td></tr>
+    <tr><td>10</td><td>last row is cropping, and the mismatch between</td></tr>
+    <tr><td>11</td><td>frame height and content height says so by more</td></tr>
+    <tr><td>12</td><td>than a rounding error</td></tr>
+    <tr><td>13</td><td>keep this table long</td></tr>
+    <tr><td>14</td><td>last row</td></tr>
+  </table>
+  <button id="tally">clicked 0 times</button>
+</div>
+<script>
+  var n = 0;
+  var tally = document.getElementById('tally');
+  tally.onclick = function () { n++; tally.textContent = 'clicked ' + n + ' times'; };
+</script>
+\`\`\``
+    },
     createSectionTitle('missing-tool-call-title', 'What happens when a tool call Message has zero tools? If the empty tools array would render anything, it would show up between these two messages\nvvvvvvvvvvvvvvvvvvvv'),
     
     // Note: This message type is no longer valid - a tool-call message must have a tool
