@@ -25,6 +25,10 @@ export type MarkdownBlock = {
     type: 'math',
     content: string
 } | {
+    // Self-contained HTML rendered in a sandboxed frame inside the chat
+    type: 'artifact',
+    content: string
+} | {
     type: 'horizontal-rule'
 } | {
     type: 'options',
