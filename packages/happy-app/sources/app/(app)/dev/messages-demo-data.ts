@@ -165,6 +165,32 @@ Inline code now renders as \`happy render\` without a background highlight.
 
 ![Markdown renderable image](${MARKDOWN_RENDERER_TEST_IMAGE})`
     },
+
+    {
+        id: 'agent-artifact-verification',
+        localId: null,
+        createdAt: Date.now() - 182400,
+        kind: 'agent-text',
+        text: `Artifact renderer verification:
+
+\`\`\`artifact
+<style>
+  .card { font: 15px/1.5 system-ui, sans-serif; padding: 20px; border-radius: 12px; background: #f4f4f5; color: #18181b; }
+  :root[data-theme="dark"] .card { background: #1c1c1e; color: #fafafa; }
+  .card button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid currentColor; background: none; color: inherit; }
+</style>
+<div class="card">
+  <h2>Artifact block</h2>
+  <p>Sandboxed frame, sized by the height the page reports.</p>
+  <button id="tally">clicked 0 times</button>
+</div>
+<script>
+  var n = 0;
+  var tally = document.getElementById('tally');
+  tally.onclick = function () { n++; tally.textContent = 'clicked ' + n + ' times'; };
+</script>
+\`\`\``
+    },
     createSectionTitle('missing-tool-call-title', 'What happens when a tool call Message has zero tools? If the empty tools array would render anything, it would show up between these two messages\nvvvvvvvvvvvvvvvvvvvv'),
     
     // Note: This message type is no longer valid - a tool-call message must have a tool
