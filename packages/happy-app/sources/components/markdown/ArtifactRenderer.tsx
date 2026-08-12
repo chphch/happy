@@ -1,10 +1,10 @@
 /**
  * Inline renderer for an ```artifact block (native: iOS / Android).
  *
- * Renders the block's HTML in a WebView sized by the height the content reports
- * over the bridge, capped so a long page cannot take over the chat. Inline
- * scrolling stays off because the chat list swallows that gesture on Android —
- * the expand button opens the full-height viewer instead.
+ * Renders the block's HTML in a WebView sized to the full height the content
+ * reports over the bridge, so nothing is cropped and the chat scrolls the page
+ * as one. Inline scrolling stays off because the chat list swallows that gesture
+ * on Android — with the frame at full height there is nothing to scroll anyway.
  *
  * Web has a separate implementation in `ArtifactRenderer.web.tsx`.
  */
@@ -18,7 +18,10 @@ import { buildArtifactDocument, isSandboxedNavigation, parseArtifactHeight } fro
 import { ArtifactViewer } from './ArtifactViewer';
 
 const MIN_HEIGHT = 120;
-const MAX_INLINE_HEIGHT = 480;
+// Runaway guard on the reported height, NOT a design cap. An earlier 480 cap
+// silently cropped every taller page — the same mistake MermaidRenderer made and
+// undid. Keep a ceiling only so a bad measurement cannot produce an absurd box.
+const MAX_REPORTED_HEIGHT = 8000;
 
 export const ArtifactRenderer = React.memo((props: { content: string }) => {
     const { theme, rt } = useUnistyles();
@@ -37,7 +40,7 @@ export const ArtifactRenderer = React.memo((props: { content: string }) => {
     const onMessage = React.useCallback((event: { nativeEvent: { data: string } }) => {
         const reported = parseArtifactHeight(event.nativeEvent.data);
         if (reported !== null) {
-            setHeight(Math.min(Math.max(reported, MIN_HEIGHT), MAX_INLINE_HEIGHT));
+            setHeight(Math.min(Math.max(reported, MIN_HEIGHT), MAX_REPORTED_HEIGHT));
         }
     }, []);
 
