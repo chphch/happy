@@ -14,7 +14,8 @@ import { buildArtifactDocument, parseArtifactHeight } from './artifactDocument';
 import { ArtifactViewer } from './ArtifactViewer';
 
 const MIN_HEIGHT = 120;
-const MAX_INLINE_HEIGHT = 480;
+// Runaway guard on the reported height, NOT a design cap — see ArtifactRenderer.tsx.
+const MAX_REPORTED_HEIGHT = 8000;
 
 export const ArtifactRenderer = React.memo((props: { content: string }) => {
     const { theme, rt } = useUnistyles();
@@ -34,7 +35,7 @@ export const ArtifactRenderer = React.memo((props: { content: string }) => {
             if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
             const reported = parseArtifactHeight(event.data);
             if (reported !== null) {
-                setHeight(Math.min(Math.max(reported, MIN_HEIGHT), MAX_INLINE_HEIGHT));
+                setHeight(Math.min(Math.max(reported, MIN_HEIGHT), MAX_REPORTED_HEIGHT));
             }
         };
         window.addEventListener('message', onMessage);
