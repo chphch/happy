@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { View, Text, ScrollView, Pressable, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { useRouter } from 'expo-router';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { useSession } from '@/sync/storage';
@@ -45,7 +44,6 @@ type RewindPoint = {
 export const DuplicateSheet = React.memo(function DuplicateSheet(props: DuplicateSheetProps) {
     const { sessionId, initialClaudeUuid, initialRewindPointId, initialMessageText, initialForkedFromMessageId, onClose } = props;
     const session = useSession(sessionId);
-    const router = useRouter();
     const { theme } = useUnistyles();
     const windowSize = useWindowDimensions();
     const sheetFrame = React.useMemo(
@@ -153,11 +151,11 @@ export const DuplicateSheet = React.memo(function DuplicateSheet(props: Duplicat
             });
 
         if (result.type === 'success') {
+            // No navigation on purpose: spawn only *starts* the agent, so
+            // jumping there lands on a session still booting, with nothing
+            // actionable on screen. The new row shows up in the list; the user
+            // opens it if they want it.
             onClose?.();
-            // Use push (not replace) so the source screen stays on the back
-            // stack — replace leaves an empty stack, so on Android hardware-back
-            // exits the app instead of returning to where the fork started.
-            router.push(`/session/${encodeURIComponent(result.sessionId)}`);
             return;
         }
 
