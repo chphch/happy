@@ -265,7 +265,10 @@ export function useSessionQuickActions(
         if (result.type !== 'success') {
             throw new HappyError(result.type === 'error' ? result.errorMessage : t('session.forkErrorGeneric'), false);
         }
-        navigateToSession(result.sessionId);
+        // No navigation on purpose: spawn only *starts* the agent, so jumping
+        // there lands on a session still booting, with nothing actionable on
+        // screen. The new row shows up in the list; the user opens it if they
+        // want it.
     });
 
     const forkSession = React.useCallback(() => {
