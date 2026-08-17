@@ -167,8 +167,8 @@ function RenderListBlock(props: { items: { depth: number, spans: MarkdownSpan[] 
                 <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', paddingLeft: item.depth * 16 }}>
                     <Text selectable={false} style={[listStyle, { marginRight: 8, marginTop: 1 }]}>{BULLETS[Math.min(item.depth, BULLETS.length - 1)]}</Text>
                     {useInlineMathRun(item.spans)
-                        ? <View style={{ flex: 1 }}><InlineMathRun spans={item.spans} textStyle={{ fontSize: 16, lineHeight: 24 }} compact onLinkPress={props.onLinkPress} /></View>
-                        : <Text selectable={props.selectable} style={[listStyle, { flex: 1 }]}><RenderSpans spans={item.spans} baseStyle={listStyle} selectable={props.selectable} onLinkPress={props.onLinkPress} /></Text>}
+                        ? <View style={{ flexShrink: 1 }}><InlineMathRun spans={item.spans} textStyle={{ fontSize: 16, lineHeight: 24 }} compact onLinkPress={props.onLinkPress} /></View>
+                        : <Text selectable={props.selectable} style={[listStyle, { flexShrink: 1 }]}><RenderSpans spans={item.spans} baseStyle={listStyle} selectable={props.selectable} onLinkPress={props.onLinkPress} /></Text>}
                 </View>
             ))}
         </View>
@@ -183,8 +183,8 @@ function RenderNumberedListBlock(props: { items: { number: number, depth: number
                 <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', paddingLeft: item.depth * 16 }}>
                     <Text selectable={false} style={[listStyle, { marginRight: 8, marginTop: 1 }]}>{item.number}.</Text>
                     {useInlineMathRun(item.spans)
-                        ? <View style={{ flex: 1 }}><InlineMathRun spans={item.spans} textStyle={{ fontSize: 16, lineHeight: 24 }} compact onLinkPress={props.onLinkPress} /></View>
-                        : <Text selectable={props.selectable} style={[listStyle, { flex: 1 }]}><RenderSpans spans={item.spans} baseStyle={listStyle} selectable={props.selectable} onLinkPress={props.onLinkPress} /></Text>}
+                        ? <View style={{ flexShrink: 1 }}><InlineMathRun spans={item.spans} textStyle={{ fontSize: 16, lineHeight: 24 }} compact onLinkPress={props.onLinkPress} /></View>
+                        : <Text selectable={props.selectable} style={[listStyle, { flexShrink: 1 }]}><RenderSpans spans={item.spans} baseStyle={listStyle} selectable={props.selectable} onLinkPress={props.onLinkPress} /></Text>}
                 </View>
             ))}
         </View>
