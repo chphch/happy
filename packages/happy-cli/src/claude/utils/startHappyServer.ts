@@ -1,8 +1,8 @@
 /**
  * Happy MCP server
  * Provides Happy CLI specific tools: chat title management plus session control
- * (open a new session, archive another session, self-archive) so a running
- * agent can do programmatically what the mobile/web client UI does.
+ * (open a new session, archive another session, self-archive, re-parent a session)
+ * so a running agent can do programmatically what the mobile/web client UI does.
  *
  * Uses stateless StreamableHTTP: each request gets a fresh McpServer + transport.
  * This is required by MCP SDK >=1.27 which rejects reuse of an already-connected transport.
@@ -15,6 +15,7 @@ import { AddressInfo } from "node:net";
 import { z } from "zod";
 import { logger } from "@/ui/logger";
 import { ApiSessionClient } from "@/api/apiSession";
+import { setSessionParent } from "@/api/sessionParent";
 import { ApiClient } from "@/api/api";
 import { spawnDaemonSession, stopDaemonSession } from "@/daemon/controlClient";
 import { createWorktree } from "@/utils/createWorktree";
@@ -156,6 +157,49 @@ function createMcpServer(client: ApiSessionClient, deps: HappyServerDeps): McpSe
         return toolResult('Archiving this session and exiting now. It stays resumable.');
     });
 
+    mcp.registerTool('set_parent', {
+        description: [
+            "Change which session a Happy session is forked from, after it was created.",
+            "The parent link used to be fixed at spawn time; this moves an existing session",
+            "under a different parent, or promotes it to top level by passing a null parent.",
+            "The link is metadata only \u2014 it drives the app's fork-lineage view and the session",
+            "info screen; no conversation history is copied or removed.",
+            "Defaults to the CALLING session; pass sessionId to re-parent a different session of",
+            "the same account (that session's encryption key must be readable on this machine,",
+            "which is true for sessions started here).",
+            "Refuses a change that would make a session its own ancestor, and refuses when the",
+            "ancestor chain cannot be fully read \u2014 pass allowUnverifiedLineage to override that."
+        ].join(' '),
+        title: 'Set Session Parent',
+        inputSchema: {
+            parentSessionId: z.string().nullable().describe('The Happy session id to become the parent. Pass null to remove the parent link and make this a top-level session.'),
+            sessionId: z.string().optional().describe('Session to re-parent. Defaults to the current session.'),
+            allowUnverifiedLineage: z.boolean().optional().describe('Apply the change even when the ancestor chain could not be fully read (default false). Only set this after considering that an unreadable chain is where an undetected cycle would hide.'),
+        },
+    }, async (args) => {
+        logger.debug(`[happyMCP] set_parent session=${args.sessionId ?? 'self'} parent=${args.parentSessionId}`);
+        try {
+            const result = await setSessionParent(client, {
+                sessionId: args.sessionId,
+                parentSessionId: args.parentSessionId,
+                allowUnverifiedLineage: args.allowUnverifiedLineage,
+            });
+            if (!result.ok) {
+                return toolResult(`Failed to set parent (${result.code}): ${result.error}`, true);
+            }
+            const target = result.parentSessionId === null
+                ? 'top level (no parent)'
+                : result.parentSessionId;
+            const from = result.previousParent === null ? 'top level' : result.previousParent;
+            const caveat = result.lineage.status === 'unverified'
+                ? ` Lineage was NOT fully verified: ${result.lineage.reason}.`
+                : '';
+            return toolResult(`Session ${result.sessionId} re-parented from ${from} to ${target}.${caveat}`);
+        } catch (error) {
+            return toolResult(`Failed to set parent: ${error instanceof Error ? error.message : String(error)}`, true);
+        }
+    });
+
     return mcp;
 }
 
@@ -194,7 +238,7 @@ export async function startHappyServer(client: ApiSessionClient, deps: HappyServ
 
     return {
         url: baseUrl.toString(),
-        toolNames: ['change_title', 'open_session', 'archive_session', 'archive_self'],
+        toolNames: ['change_title', 'open_session', 'archive_session', 'archive_self', 'set_parent'],
         stop: () => {
             logger.debug(`[happyMCP] server:stop sessionId=${client.sessionId}`);
             server.close();
