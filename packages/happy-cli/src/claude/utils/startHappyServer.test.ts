@@ -33,13 +33,13 @@ describe('startHappyServer MCP tools', () => {
         return c;
     }
 
-    it('registers change_title, open_session, archive_session, archive_self', async () => {
+    it('registers change_title, open_session, archive_session, archive_self, set_parent', async () => {
         server = await startHappyServer(fakeSession([]));
-        expect(server.toolNames).toEqual(['change_title', 'open_session', 'archive_session', 'archive_self']);
+        expect(server.toolNames).toEqual(['change_title', 'open_session', 'archive_session', 'archive_self', 'set_parent']);
 
         client = await connect(server.url);
         const { tools } = await client.listTools();
-        expect(tools.map(t => t.name).sort()).toEqual(['archive_self', 'archive_session', 'change_title', 'open_session']);
+        expect(tools.map(t => t.name).sort()).toEqual(['archive_self', 'archive_session', 'change_title', 'open_session', 'set_parent']);
     });
 
     it('change_title still works after the refactor', async () => {
