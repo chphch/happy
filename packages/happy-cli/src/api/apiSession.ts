@@ -942,6 +942,60 @@ export class ApiSessionClient extends EventEmitter {
     }
 
     /**
+     * Awaitable twin of {@link updateMetadata}, for callers that must REPORT whether the
+     * write landed (a tool call, an RPC) rather than fire it and move on.
+     *
+     * It deliberately does not reuse `backoff`: that helper retries forever, so a caller
+     * awaiting it would hang instead of failing. Attempts are bounded here and the last
+     * failure is thrown. The shared `metadataLock` keeps this from interleaving with the
+     * fire-and-forget path above.
+     */
+    async updateMetadataAndWait(handler: (metadata: Metadata) => Metadata, maxAttempts: number = 5): Promise<Metadata> {
+        return await this.metadataLock.inLock(async () => {
+            let lastFailure = 'unknown';
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                const updated = handler(this.metadata!);
+                const answer = await this.socket.emitWithAck('update-metadata', { sid: this.sessionId, expectedVersion: this.metadataVersion, metadata: encodeBase64(encrypt(this.encryptionKey, this.encryptionVariant, updated)) });
+                if (answer.result === 'success') {
+                    this.metadata = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(answer.metadata));
+                    this.metadataVersion = answer.version;
+                    return this.metadata!;
+                }
+                if (answer.result === 'version-mismatch') {
+                    // Adopt the server's copy so the next attempt re-derives from what is
+                    // actually stored, not from the value we just lost the race to.
+                    if (answer.version > this.metadataVersion) {
+                        this.metadataVersion = answer.version;
+                        this.metadata = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(answer.metadata));
+                    }
+                    lastFailure = `version mismatch (server at ${answer.version})`;
+                    continue;
+                }
+                throw new Error('Server rejected the metadata update');
+            }
+            throw new Error(`Metadata update gave up after ${maxAttempts} attempts: ${lastFailure}`);
+        });
+    }
+
+    /**
+     * Compare-and-swap the metadata of ANY session on this account, over THIS session's
+     * socket.
+     *
+     * The server's `update-metadata` handler scopes by account, not by connection — it
+     * resolves the row as `{ id: sid, accountId: userId }` — so a session-scoped socket
+     * may legitimately name a sibling session. The caller supplies already-encrypted
+     * metadata because each session carries its own data key, which this client does not
+     * hold for anyone but itself.
+     */
+    async casSessionMetadata(sid: string, expectedVersion: number, encryptedMetadata: string): Promise<
+        | { result: 'error' }
+        | { result: 'version-mismatch'; version: number; metadata: string }
+        | { result: 'success'; version: number; metadata: string }
+    > {
+        return await this.socket.emitWithAck('update-metadata', { sid, expectedVersion, metadata: encryptedMetadata });
+    }
+
+    /**
      * Update session agent state
      * @param handler - Handler function that returns the updated agent state
      */
