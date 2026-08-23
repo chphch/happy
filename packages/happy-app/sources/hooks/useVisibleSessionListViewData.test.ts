@@ -24,7 +24,7 @@ vi.mock('@/sync/storage', () => ({
     useStarredProjects: () => mocks.starredProjects,
 }));
 
-import { useVisibleSessionListViewData } from './useVisibleSessionListViewData';
+import { useSessionListStarredProjects, useVisibleSessionListViewData } from './useVisibleSessionListViewData';
 
 // Only the fields the visibility filter reads; the real rows are built in
 // storage.ts.
@@ -172,77 +172,20 @@ describe('useVisibleSessionListViewData', () => {
         expect(useVisibleSessionListViewData()).toEqual(mocks.data);
     });
 
-    describe('star ordering', () => {
-        // Two sections, so ordering can be checked against section boundaries.
-        function twoSections(): SessionListViewItem[] {
-            return [
-                { type: 'projects-header', source: 'rig' },
-                project('rig-a', [row('r1')], '/projects/alpha'),
-                project('rig-b', [row('r2')], '/projects/beta'),
-                { type: 'projects-header', source: 'happy' },
-                project('happy-a', [row('h1')], '/projects/gamma', 'happy'),
-                project('happy-b', [row('h2')], '/projects/delta', 'happy'),
-            ];
-        }
-
-        function projectIds(items: SessionListViewItem[]): string[] {
-            return items.map((item) => (item.type === 'project' ? item.project.id : `#${item.type}`));
-        }
-
-        it('leaves the order alone when nothing is starred', () => {
-            mocks.data = twoSections();
-
-            expect(projectIds(useVisibleSessionListViewData()!))
-                .toEqual(['#projects-header', 'rig-a', 'rig-b', '#projects-header', 'happy-a', 'happy-b']);
-        });
-
-        it('lifts a starred project to the top of its own section only', () => {
-            mocks.data = twoSections();
+    describe('useSessionListStarredProjects', () => {
+        // The ordering itself is buildSessionProjectDisplayGroups' job (see
+        // sessionDisplayOrder.test.ts); this hook only decides which set it gets.
+        it('hands out the starred set while the feature is on', () => {
             mocks.starredProjects = new Set(['machine-1:/projects/delta']);
 
-            expect(projectIds(useVisibleSessionListViewData()!))
-                .toEqual(['#projects-header', 'rig-a', 'rig-b', '#projects-header', 'happy-b', 'happy-a']);
+            expect([...useSessionListStarredProjects()]).toEqual(['machine-1:/projects/delta']);
         });
 
-        it('keeps the incoming order among projects that share a starred state', () => {
-            mocks.data = twoSections();
-            mocks.starredProjects = new Set(['machine-1:/projects/beta', 'machine-1:/projects/alpha']);
-
-            expect(projectIds(useVisibleSessionListViewData()!))
-                .toEqual(['#projects-header', 'rig-a', 'rig-b', '#projects-header', 'happy-a', 'happy-b']);
-        });
-
-        it('stars the repo, so a worktree card rises with it', () => {
-            mocks.data = [
-                { type: 'projects-header', source: 'happy' },
-                project('plain', [row('p')], '/projects/plain', 'happy'),
-                project('worktree', [row('w')], '/projects/repo/.dev/worktree/feature', 'happy'),
-            ];
-            mocks.starredProjects = new Set(['machine-1:/projects/repo']);
-
-            expect(projectIds(useVisibleSessionListViewData()!))
-                .toEqual(['#projects-header', 'worktree', 'plain']);
-        });
-
-        it('ignores stars while the feature is switched off', () => {
-            mocks.data = twoSections();
+        it('hands out nothing while the feature is switched off', () => {
             mocks.starredProjects = new Set(['machine-1:/projects/delta']);
             mocks.starProjectsEnabled = false;
 
-            expect(projectIds(useVisibleSessionListViewData()!))
-                .toEqual(['#projects-header', 'rig-a', 'rig-b', '#projects-header', 'happy-a', 'happy-b']);
-        });
-
-        it('cannot star a card that has no path (Rig projects)', () => {
-            mocks.data = [
-                { type: 'projects-header', source: 'rig' },
-                project('no-path-a', [row('a')]),
-                project('no-path-b', [row('b')]),
-            ];
-            mocks.starredProjects = new Set(['machine-1:/projects/anything']);
-
-            expect(projectIds(useVisibleSessionListViewData()!))
-                .toEqual(['#projects-header', 'no-path-a', 'no-path-b']);
+            expect(useSessionListStarredProjects().size).toBe(0);
         });
     });
 });

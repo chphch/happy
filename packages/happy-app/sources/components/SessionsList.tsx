@@ -11,7 +11,7 @@ import { ProjectGroup } from './ProjectGroup';
 import { FlatSessionRow, flatListBackgroundColor } from './FlatSessionRow';
 import { buildFlatSessionRows, toFlatSessionRow, type FlatSessionRowData } from '@/utils/flatSessionList';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHasArchivedSessions, useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
+import { useHasArchivedSessions, useSessionListStarredProjects, useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
 import { Typography } from '@/constants/Typography';
 import { StatusDot } from './StatusDot';
 import { ForkLineageConnector, forkIndentPadding } from './ForkLineageConnector';
@@ -24,7 +24,7 @@ import { layout } from './layout';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { SessionActionsAnchor, SessionActionsPopover } from './SessionActionsPopover';
 import { useSessionActionAlert } from '@/hooks/useSessionQuickActions';
-import { useSetting, useStarredProjects } from '@/sync/storage';
+import { useSetting } from '@/sync/storage';
 import { t } from '@/text';
 import { SessionShortcutHintBadge } from './ShortcutHints';
 import { ProviderIcon } from './ProviderIcon';
@@ -353,12 +353,12 @@ export function SessionsList({
         return pathname.split('/')[2];
     }, [isTablet, pathname]);
 
-    // Starred-project ordering happens inside ActiveSessionsGroupCompact at
-    // render time, so the list data keeps its identity when a project is
-    // (un)starred. Subscribe here and thread it through extraData: web
-    // re-renders eagerly, but native FlatList memoizes cells and would keep
-    // showing the old order until something else forced a repaint.
-    const starredProjects = useStarredProjects();
+    // Starring writes a synced setting, which does not rebuild the cached list
+    // data — so the star that reorders the cards has to be read here, where a
+    // settings change re-runs the grouping below. It also rides along in
+    // extraData: web re-renders eagerly, but native FlatList memoizes cells and
+    // would keep showing the old order until something else forced a repaint.
+    const starredProjects = useSessionListStarredProjects();
     const listExtraData = React.useMemo(
         () => ({ selectedSessionId, starredProjects }),
         [selectedSessionId, starredProjects],
@@ -424,6 +424,7 @@ export function SessionsList({
             groupedRows,
             machines,
             t('status.unknown'),
+            starredProjects,
         );
         if (machineGroups.length === 0) {
             return [...groupedRows, ...archiveToggle, ...archivedRows];
@@ -441,7 +442,7 @@ export function SessionsList({
             item.type !== 'project' && item.type !== 'projects-header'
         ));
         return [...hierarchy, ...legacyItems, ...archiveToggle, ...archivedRows];
-    }, [flatSessionList, hasArchivedSessions, hideArchivedSessions, machines, sourceData]);
+    }, [flatSessionList, hasArchivedSessions, hideArchivedSessions, machines, sourceData, starredProjects]);
 
     const keyExtractor = React.useCallback((item: SessionListDisplayItem, index: number) => {
         switch (item.type) {
