@@ -6,7 +6,8 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Text } from '@/components/StyledText';
 import { Typography } from '@/constants/Typography';
 import { t } from '@/text';
-import { ProjectGroupData, ProjectWorkspaceGroup, useIsProjectStarred, useSetting, storage } from '@/sync/storage';
+import { ProjectGroupData, ProjectWorkspaceGroup, useIsProjectStarred, useLocalSettingMutable, useSetting, storage } from '@/sync/storage';
+import { projectWorkspaceCollapseKey } from '@/sync/projectGroups';
 import { orderSessionRowsByForkLineage } from '@/utils/forkLineage';
 import { CompactSessionRow } from './ActiveSessionsGroupCompact';
 import { Avatar } from './Avatar';
@@ -76,6 +77,16 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, sh
     // nothing. Only a real worktree earns the second line.
     const worktreeName = workspace.name ?? (workspace.id || null);
 
+    // Collapsing follows the header, and the header is per checkout: a project
+    // with three worktrees renders four of these sections, so one toggle folds
+    // exactly the card it sits on rather than every checkout of the project.
+    const collapseKey = projectWorkspaceCollapseKey(project.id, workspace.id);
+    const [collapsedProjects, setCollapsedProjects] = useLocalSettingMutable('collapsedProjects');
+    const collapsed = !!collapsedProjects[collapseKey];
+    const toggleCollapsed = React.useCallback(() => {
+        setCollapsedProjects({ ...collapsedProjects, [collapseKey]: !collapsed });
+    }, [collapsed, collapsedProjects, collapseKey, setCollapsedProjects]);
+
     // Point the draft at this exact checkout before opening the composer, so
     // the dock's machine, project and worktree rows already read correctly.
     // `setMachineId` clears the path and worktree, so the order matters.
@@ -114,26 +125,45 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, sh
     return (
         <View style={styles.section}>
             <View style={styles.header}>
-                {firstSession && (
-                    <Avatar id={firstSession.avatarId} size={24} flavor={null} />
-                )}
-                <View style={styles.headerText}>
-                    <Text style={styles.title} numberOfLines={1}>
-                        {project.name}
-                    </Text>
-                    {worktreeName && (
-                        <View style={styles.worktreeRow}>
-                            <Text style={styles.worktreeTitle} numberOfLines={1}>
-                                {worktreeName}
-                            </Text>
-                            <MaterialCommunityIcons
-                                name="source-branch"
-                                size={11}
-                                color={theme.colors.textSecondary}
-                            />
-                        </View>
+                <Pressable
+                    onPress={toggleCollapsed}
+                    hitSlop={{ top: 8, bottom: 8 }}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: !collapsed }}
+                    accessibilityLabel={worktreeName ? `${project.name} / ${worktreeName}` : project.name}
+                    style={styles.headerPress}
+                >
+                    <Ionicons
+                        name={collapsed ? 'chevron-forward' : 'chevron-down'}
+                        size={14}
+                        color={theme.colors.textSecondary}
+                    />
+                    {firstSession && (
+                        <Avatar id={firstSession.avatarId} size={24} flavor={null} />
                     )}
-                </View>
+                    <View style={styles.headerText}>
+                        <Text style={styles.title} numberOfLines={1}>
+                            {project.name}
+                        </Text>
+                        {worktreeName && (
+                            <View style={styles.worktreeRow}>
+                                <Text style={styles.worktreeTitle} numberOfLines={1}>
+                                    {worktreeName}
+                                </Text>
+                                <MaterialCommunityIcons
+                                    name="source-branch"
+                                    size={11}
+                                    color={theme.colors.textSecondary}
+                                />
+                            </View>
+                        )}
+                    </View>
+                    {collapsed && (
+                        <Text style={styles.count}>
+                            {workspace.sessions.length}
+                        </Text>
+                    )}
+                </Pressable>
                 {showStar && (
                     <Pressable
                         onPress={onToggleStar}
@@ -162,16 +192,18 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, sh
                 </Pressable>
             </View>
 
-            <View style={styles.workspaceCard}>
-                {sessions.map((session, index) => (
-                    <CompactSessionRow
-                        key={session.id}
-                        session={session}
-                        selected={session.id === selectedSessionId}
-                        showBorder={index < workspace.sessions.length - 1}
-                    />
-                ))}
-            </View>
+            {!collapsed && (
+                <View style={styles.workspaceCard}>
+                    {sessions.map((session, index) => (
+                        <CompactSessionRow
+                            key={session.id}
+                            session={session}
+                            selected={session.id === selectedSessionId}
+                            showBorder={index < workspace.sessions.length - 1}
+                        />
+                    ))}
+                </View>
+            )}
         </View>
     );
 });
@@ -192,9 +224,22 @@ const stylesheet = StyleSheet.create((theme) => ({
         paddingHorizontal: Platform.select({ ios: 32, default: 24 }),
         gap: 8,
     },
+    headerPress: {
+        flex: 1,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
     headerText: {
         flex: 1,
         minWidth: 0,
+    },
+    count: {
+        fontSize: 12,
+        lineHeight: 16,
+        color: theme.colors.textSecondary,
+        ...Typography.default('regular'),
     },
     title: {
         color: theme.colors.groupped.sectionTitle,
