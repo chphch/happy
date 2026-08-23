@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { SessionListViewItem, useSessionListViewData, useSetting, useStarredProjects } from '@/sync/storage';
-import { filterProjectGroupSessions, projectGroupStarKey } from '@/sync/projectGroups';
+import { filterProjectGroupSessions } from '@/sync/projectGroups';
 
 /**
  * Applies the persistent archive-visibility preference to the session list.
@@ -22,11 +22,6 @@ import { filterProjectGroupSessions, projectGroupStarKey } from '@/sync/projectG
 export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
     const data = useSessionListViewData();
     const hideArchivedSessions = useSetting('hideInactiveSessions');
-    // Star ordering belongs here rather than in buildSessionListViewData:
-    // starring writes a synced setting, which does not rebuild the cached list
-    // data, so ordering there would not move a card until something unrelated
-    // happened to rebuild it. A hook re-runs the moment the setting changes.
-    const starred = useStarredProjects();
 
     return React.useMemo(() => {
         if (!data) {
@@ -46,43 +41,25 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
             }
         });
 
+        // Order is left exactly as the list data arrived in. Starred cards rise
+        // in `buildSessionProjectDisplayGroups` instead — that pass sorts the
+        // project cards by name as the last step before they render, so any
+        // order applied here would simply be overwritten.
         const result: SessionListViewItem[] = [];
-        // Cards buffer until their section ends so starred ones can rise within
-        // it. Array.sort is stable, so everything else keeps the order the list
-        // data arrived in.
-        let section: SessionListViewItem[] = [];
-        const flushSection = () => {
-            if (section.length === 0) return;
-            if (starred.size > 0) {
-                section.sort((a, b) => {
-                    const keyA = a.type === 'project' ? projectGroupStarKey(a.project) : null;
-                    const keyB = b.type === 'project' ? projectGroupStarKey(b.project) : null;
-                    const starredA = !!keyA && starred.has(keyA);
-                    const starredB = !!keyB && starred.has(keyB);
-                    if (starredA === starredB) return 0;
-                    return starredA ? -1 : 1;
-                });
-            }
-            result.push(...section);
-            section = [];
-        };
         data.forEach((item, index) => {
             if (item.type === 'projects-header') {
-                flushSection();
                 if (visibleProjectSources.has(item.source)) result.push(item);
                 return;
             }
             if (item.type === 'project') {
                 const project = visibleProjects.get(index);
-                if (project) section.push(project);
+                if (project) result.push(project);
                 return;
             }
             if (item.type === 'active-sessions') {
-                flushSection();
                 result.push(item);
             }
         });
-        flushSection();
 
         // Flat, date-grouped rows trail the project cards. A date header is
         // held back until a row underneath it survives the filter, so hiding
@@ -103,7 +80,18 @@ export function useVisibleSessionListViewData(): SessionListViewItem[] | null {
         }
 
         return result;
-    }, [data, hideArchivedSessions, starred]);
+    }, [data, hideArchivedSessions]);
+}
+
+/**
+ * The starred project keys the home list orders by.
+ *
+ * Lives beside the visibility hook so the list and its keyboard shortcuts read
+ * one set; the ordering itself happens where the cards are finally sorted, in
+ * `buildSessionProjectDisplayGroups`.
+ */
+export function useSessionListStarredProjects(): ReadonlySet<string> {
+    return useStarredProjects();
 }
 
 /**
