@@ -1231,7 +1231,7 @@ export const HomeDock = React.memo(({
                     props: {
                         defaultValue: selectedPath ?? '~',
                         machineId: selectedMachineId,
-                        homeDir: selectedMachine?.metadata?.homeDir,
+                        homeDir: selectedHomeDir,
                         onSubmit: resolve,
                     },
                 });
