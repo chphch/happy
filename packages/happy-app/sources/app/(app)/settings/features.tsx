@@ -14,6 +14,7 @@ export default function FeaturesSettingsScreen() {
     const [markdownCopyV2, setMarkdownCopyV2] = useLocalSettingMutable('markdownCopyV2');
     const [hideInactiveSessions, setHideInactiveSessions] = useSettingMutable('hideInactiveSessions');
     const [fileDiffsSidebar, setFileDiffsSidebar] = useSettingMutable('fileDiffsSidebar');
+    const [sessionListGrouping, setSessionListGrouping] = useSettingMutable('sessionListGrouping');
     const [groupToolCalls, setGroupToolCalls] = useSettingMutable('groupToolCalls');
     const [expImageUpload, setExpImageUpload] = useSettingMutable('expImageUpload');
     const [expStarProjects, setExpStarProjects] = useSettingMutable('expStarProjects');
@@ -33,6 +34,18 @@ export default function FeaturesSettingsScreen() {
                 title="Interface"
                 footer="Optional panels and layout elements."
             >
+                <Item
+                    title="Group by Project"
+                    subtitle="Home list shows project cards per checkout instead of one activity list"
+                    icon={<Ionicons name="folder-outline" size={29} color="#FF9500" />}
+                    rightElement={
+                        <Switch
+                            value={sessionListGrouping === 'project'}
+                            onValueChange={(on) => setSessionListGrouping(on ? 'project' : 'flat')}
+                        />
+                    }
+                    showChevron={false}
+                />
                 <Item
                     title="File Diffs Sidebar"
                     subtitle="Show git changes next to the chat on desktop"
