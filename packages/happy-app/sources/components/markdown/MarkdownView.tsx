@@ -15,6 +15,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as WebBrowser from 'expo-web-browser';
 import { MermaidRenderer } from './MermaidRenderer';
 import { ImageViewer } from '@/components/ImageViewer';
+import { SvgViewer } from './SvgViewer';
 import { MathBlock, InlineMathRun, MathInline } from './MathView';
 import { ArtifactRenderer } from './ArtifactRenderer';
 import { t } from '@/text';
@@ -264,20 +265,32 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
         maxWidth: intrinsicSize?.width,
     }), [intrinsicSize]);
 
+    // An SVG gets the WebView-backed viewer: the browser re-rasterises the
+    // vector as the zoom changes, so a diagram's labels stay legible all the
+    // way in, which is the whole point of enlarging one.
     const openViewer = React.useCallback(() => {
-        Modal.show({ component: ImageViewer, props: { uri: props.url } } as any);
-    }, [props.url]);
+        Modal.show({
+            component: svg ? SvgViewer : ImageViewer,
+            props: { uri: props.url },
+        } as any);
+    }, [props.url, svg]);
 
     return (
         <View style={[style.imageBlock, props.first && style.first, props.last && style.last]}>
             {svg ? (
-                <View style={style.svgImage} accessible accessibilityLabel={accessibleLabel}>
-                    {svg.kind === 'xml' ? (
-                        <SvgXml xml={svg.xml} width="100%" height="100%" />
-                    ) : (
-                        <SvgUri uri={svg.uri} width="100%" height="100%" />
-                    )}
-                </View>
+                // Tappable for the same reason a raster image is: the inline box
+                // is small and fixed, and a diagram's labels are only legible
+                // once it fills the screen. The viewer re-renders the SVG at the
+                // zoomed size, so it stays sharp all the way in.
+                <Pressable onPress={openViewer} accessibilityRole="imagebutton">
+                    <View style={style.svgImage} accessible accessibilityLabel={accessibleLabel}>
+                        {svg.kind === 'xml' ? (
+                            <SvgXml xml={svg.xml} width="100%" height="100%" />
+                        ) : (
+                            <SvgUri uri={svg.uri} width="100%" height="100%" />
+                        )}
+                    </View>
+                </Pressable>
             ) : (
                 <Pressable onPress={openViewer} accessibilityRole="imagebutton">
                     <Image
