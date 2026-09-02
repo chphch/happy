@@ -11,17 +11,48 @@
  * a path that has never had one.
  */
 import * as React from 'react';
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 import { SvgUri, SvgXml } from 'react-native-svg';
 import { parseSvgImageSource } from './svgImageSource';
+import { parseSvgIntrinsicSize, type SvgIntrinsicSize } from './svgIntrinsicSize';
 
 interface SvgChatImageProps {
     uri: string;
     accessibilityLabel: string;
+    /** Reports the SVG's own proportions, so the caller can size the box the
+     *  way it sizes a raster image. */
+    onIntrinsicSize?: (size: SvgIntrinsicSize) => void;
 }
 
-export function SvgChatImage({ uri, accessibilityLabel }: SvgChatImageProps) {
+export function SvgChatImage({ uri, accessibilityLabel, onIntrinsicSize }: SvgChatImageProps) {
     const source = React.useMemo(() => parseSvgImageSource(uri), [uri]);
+
+    // Inline markup can be read directly; a remote file is left to the browser
+    // (see the note above), so its size comes from `Image.getSize`, which on
+    // web loads the SVG in a DOM <img> and reports the size the browser
+    // computed. That is measured pixels, not user units — hence fromViewBox
+    // false — and it needs no CORS headers.
+    React.useEffect(() => {
+        if (!source || !onIntrinsicSize) return;
+        if (source.kind === 'xml') {
+            const size = parseSvgIntrinsicSize(source.xml);
+            if (size) onIntrinsicSize(size);
+            return;
+        }
+        let cancelled = false;
+        Image.getSize(
+            source.uri,
+            (width, height) => {
+                if (cancelled || !width || !height) return;
+                onIntrinsicSize({ width, height, fromViewBox: false });
+            },
+            () => {
+                // Unreachable image: the caller keeps its placeholder ratio.
+            },
+        );
+        return () => { cancelled = true; };
+    }, [source, onIntrinsicSize]);
+
     if (!source) {
         return <View accessible accessibilityLabel={accessibilityLabel} />;
     }
