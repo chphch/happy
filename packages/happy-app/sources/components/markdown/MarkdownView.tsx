@@ -23,6 +23,7 @@ import { isHttpMarkdownLink } from './linkUtils';
 import { openExternalUrl } from '@/utils/openExternalUrl';
 import { parseSvgImageSource } from './svgImageSource';
 import { SvgChatImage } from './SvgChatImage';
+import { type SvgIntrinsicSize } from './svgIntrinsicSize';
 import { useImageIntrinsicSize } from '@/hooks/useImageIntrinsicSize';
 
 // Option type for callback
@@ -252,19 +253,25 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
     // of it reaches react-native-svg's native parser. Non-SVG images keep using
     // <Image> unchanged.
     const svg = React.useMemo(() => parseSvgImageSource(props.url), [props.url]);
-    // Raster only: an SVG has no raster dimensions to fetch, and its container
-    // keeps the old fixed box (style.svgImage) because the SVG sizes itself
-    // against it at height="100%".
-    const intrinsicSize = useImageIntrinsicSize(svg ? null : props.url);
+    // Raster only: `Image.getSize` cannot measure an SVG on native, so an SVG
+    // reports its own size instead — read out of the markup that SvgChatImage
+    // already holds (`onIntrinsicSize` below).
+    const rasterSize = useImageIntrinsicSize(svg ? null : props.url);
+    const [svgSize, setSvgSize] = React.useState<SvgIntrinsicSize | null>(null);
+    React.useEffect(() => { setSvgSize(null); }, [props.url]);
     // Size the image from its own aspect ratio rather than a fixed height: with
     // a fixed height, `contain` makes height the binding constraint for any
     // image taller than it is wide, so a portrait image is shrunk to a fraction
     // of the message width. `maxWidth` caps the image at its source resolution
     // so a small one is never upscaled to full bleed.
+    const intrinsicSize = svg ? svgSize : rasterSize;
     const sizing = React.useMemo(() => ({
         aspectRatio: intrinsicSize ? intrinsicSize.width / intrinsicSize.height : DEFAULT_IMAGE_ASPECT_RATIO,
-        maxWidth: intrinsicSize?.width,
-    }), [intrinsicSize]);
+        // A viewBox states proportions in user units, not pixels, so it says
+        // nothing about how large the picture wants to be — capping on it would
+        // shrink a diagram whose viewBox happens to be small.
+        maxWidth: intrinsicSize && !(svg && svgSize?.fromViewBox) ? intrinsicSize.width : undefined,
+    }), [intrinsicSize, svg, svgSize]);
 
     // An SVG gets the WebView-backed viewer: the browser re-rasterises the
     // vector as the zoom changes, so a diagram's labels stay legible all the
@@ -284,8 +291,12 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
                 // once it fills the screen. The viewer re-renders the SVG at the
                 // zoomed size, so it stays sharp all the way in.
                 <Pressable onPress={openViewer} accessibilityRole="imagebutton">
-                    <View style={style.svgImage}>
-                        <SvgChatImage uri={props.url} accessibilityLabel={accessibleLabel} />
+                    <View style={[style.svgImage, sizing]}>
+                        <SvgChatImage
+                            uri={props.url}
+                            accessibilityLabel={accessibleLabel}
+                            onIntrinsicSize={setSvgSize}
+                        />
                     </View>
                 </Pressable>
             ) : (
@@ -628,12 +639,11 @@ const style = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surfaceHighest,
     },
     svgImage: {
-        // The SVG sizes itself at height="100%", so this container must
-        // carry a definite height of its own — it cannot share the raster
-        // `image` style, which is now driven by the source's aspect ratio.
+        // The SVG sizes itself at height="100%", so this container must carry a
+        // definite height. `aspectRatio` from the source supplies one — a fixed
+        // height instead squashed every diagram into the same letterbox
+        // regardless of its shape.
         width: '100%',
-        minHeight: 160,
-        height: 240,
         borderRadius: 12,
         backgroundColor: theme.colors.surfaceHighest,
         // Clip the rendered SVG to the rounded image frame.
