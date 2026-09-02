@@ -27,6 +27,23 @@ interface SvgViewerProps {
     onClose: () => void;
 }
 
+/**
+ * A JS string literal safe to interpolate into an inline `<script>`.
+ *
+ * `JSON.stringify` alone is not: it does not escape `/`, so a URL containing
+ * `</script>` closes the block and everything after it is parsed as markup.
+ * The URL comes from chat, so that is a sender-controlled script injection —
+ * `![x](https://h/a</script><script>…</script>b.svg)` passes the markdown image
+ * pattern and `parseSvgImageSource`'s `.svg` check. Escaping `<` closes it, and
+ * the two line separators are escaped because they terminate a JS string even
+ * though JSON leaves them raw.
+ */
+function jsLiteral(value: string): string {
+    return JSON.stringify(value)
+        .replace(/</g, '\\u003c')
+        .replace(/[\u2028\u2029]/g, (c) => (c === '\u2028' ? '\\u2028' : '\\u2029'));
+}
+
 export function SvgViewer({ uri, onClose }: SvgViewerProps) {
     const { width, height } = useWindowDimensions();
     const insets = useSafeAreaInsets();
@@ -41,7 +58,7 @@ export function SvgViewer({ uri, onClose }: SvgViewerProps) {
         return zoomableSvgHtml({
             head: '',
             populate: `    var im=document.createElement('img');
-    im.src=${JSON.stringify(src)};
+    im.src=${jsLiteral(src)};
     im.onerror=function(){ stage.innerHTML='<div class="error">Could not load image</div>'; };
     stage.appendChild(im);`,
         });
