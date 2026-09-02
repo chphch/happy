@@ -271,13 +271,19 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
     return (
         <View style={[style.imageBlock, props.first && style.first, props.last && style.last]}>
             {svg ? (
-                <View style={style.svgImage} accessible accessibilityLabel={accessibleLabel}>
-                    {svg.kind === 'xml' ? (
-                        <SvgXml xml={svg.xml} width="100%" height="100%" />
-                    ) : (
-                        <SvgUri uri={svg.uri} width="100%" height="100%" />
-                    )}
-                </View>
+                // Tappable for the same reason a raster image is: the inline box
+                // is small and fixed, and a diagram's labels are only legible
+                // once it fills the screen. The viewer re-renders the SVG at the
+                // zoomed size, so it stays sharp all the way in.
+                <Pressable onPress={openViewer} accessibilityRole="imagebutton">
+                    <View style={style.svgImage} accessible accessibilityLabel={accessibleLabel}>
+                        {svg.kind === 'xml' ? (
+                            <SvgXml xml={svg.xml} width="100%" height="100%" />
+                        ) : (
+                            <SvgUri uri={svg.uri} width="100%" height="100%" />
+                        )}
+                    </View>
+                </Pressable>
             ) : (
                 <Pressable onPress={openViewer} accessibilityRole="imagebutton">
                     <Image
