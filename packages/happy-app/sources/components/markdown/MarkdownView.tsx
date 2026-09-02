@@ -21,8 +21,8 @@ import { ArtifactRenderer } from './ArtifactRenderer';
 import { t } from '@/text';
 import { isHttpMarkdownLink } from './linkUtils';
 import { openExternalUrl } from '@/utils/openExternalUrl';
-import { SvgUri, SvgXml } from 'react-native-svg';
 import { parseSvgImageSource } from './svgImageSource';
+import { SvgChatImage } from './SvgChatImage';
 import { useImageIntrinsicSize } from '@/hooks/useImageIntrinsicSize';
 
 // Option type for callback
@@ -247,13 +247,14 @@ const DEFAULT_IMAGE_ASPECT_RATIO = 4 / 3;
 function RenderImageBlock(props: { url: string, alt: string, first: boolean, last: boolean }) {
     const accessibleLabel = props.alt || 'Markdown image';
     // RN's <Image> only decodes raster formats, so an SVG (data URI or .svg)
-    // renders blank on native. Route SVG through react-native-svg instead:
-    // SvgXml for inline markup decoded from a data URI, SvgUri for a remote
-    // .svg. Non-SVG images keep using <Image> unchanged.
+    // renders blank on native. Route SVG through SvgChatImage instead, which
+    // owns the platform split and — on native — sanitizes the markup before any
+    // of it reaches react-native-svg's native parser. Non-SVG images keep using
+    // <Image> unchanged.
     const svg = React.useMemo(() => parseSvgImageSource(props.url), [props.url]);
     // Raster only: an SVG has no raster dimensions to fetch, and its container
-    // keeps the old fixed box (style.svgImage) because SvgXml/SvgUri size
-    // themselves against it at height="100%".
+    // keeps the old fixed box (style.svgImage) because the SVG sizes itself
+    // against it at height="100%".
     const intrinsicSize = useImageIntrinsicSize(svg ? null : props.url);
     // Size the image from its own aspect ratio rather than a fixed height: with
     // a fixed height, `contain` makes height the binding constraint for any
@@ -283,12 +284,8 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
                 // once it fills the screen. The viewer re-renders the SVG at the
                 // zoomed size, so it stays sharp all the way in.
                 <Pressable onPress={openViewer} accessibilityRole="imagebutton">
-                    <View style={style.svgImage} accessible accessibilityLabel={accessibleLabel}>
-                        {svg.kind === 'xml' ? (
-                            <SvgXml xml={svg.xml} width="100%" height="100%" />
-                        ) : (
-                            <SvgUri uri={svg.uri} width="100%" height="100%" />
-                        )}
+                    <View style={style.svgImage}>
+                        <SvgChatImage uri={props.url} accessibilityLabel={accessibleLabel} />
                     </View>
                 </Pressable>
             ) : (
@@ -631,7 +628,7 @@ const style = StyleSheet.create((theme) => ({
         backgroundColor: theme.colors.surfaceHighest,
     },
     svgImage: {
-        // SvgXml/SvgUri size themselves at height="100%", so this container must
+        // The SVG sizes itself at height="100%", so this container must
         // carry a definite height of its own — it cannot share the raster
         // `image` style, which is now driven by the source's aspect ratio.
         width: '100%',
