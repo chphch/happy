@@ -26,6 +26,7 @@ import { View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { parseSvgImageSource } from './svgImageSource';
 import { sanitizeSvgMarkup } from './sanitizeSvgMarkup';
+import { parseSvgIntrinsicSize, type SvgIntrinsicSize } from './svgIntrinsicSize';
 
 /**
  * Remote SVGs are fetched once per URL and kept, so scrolling a long chat back
@@ -55,9 +56,12 @@ const MAX_BYTES = 2 * 1024 * 1024;
 interface SvgChatImageProps {
     uri: string;
     accessibilityLabel: string;
+    /** Reports the SVG's own proportions once the markup is in hand, so the
+     *  caller can size the box the way it sizes a raster image. */
+    onIntrinsicSize?: (size: SvgIntrinsicSize) => void;
 }
 
-export function SvgChatImage({ uri, accessibilityLabel }: SvgChatImageProps) {
+export function SvgChatImage({ uri, accessibilityLabel, onIntrinsicSize }: SvgChatImageProps) {
     const source = React.useMemo(() => parseSvgImageSource(uri), [uri]);
 
     // Inline markup needs no fetch — sanitize it and we are done, on the first
@@ -108,6 +112,16 @@ export function SvgChatImage({ uri, accessibilityLabel }: SvgChatImageProps) {
     }, [source]);
 
     const xml = inlineXml ?? fetchedXml;
+
+    // The markup is already here, so the size costs a parse rather than a
+    // second load. Reported in an effect, not during render, because it moves
+    // the parent's layout.
+    React.useEffect(() => {
+        if (!xml || !onIntrinsicSize) return;
+        const size = parseSvgIntrinsicSize(xml);
+        if (size) onIntrinsicSize(size);
+    }, [xml, onIntrinsicSize]);
+
     if (!xml) {
         return <View accessible accessibilityLabel={accessibilityLabel} />;
     }
