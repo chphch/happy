@@ -11,9 +11,11 @@
 import * as React from 'react';
 import { StyleSheet, useWindowDimensions, Pressable, Platform } from 'react-native';
 import { Image } from 'expo-image';
+import { SvgUri, SvgXml } from 'react-native-svg';
+import { parseSvgImageSource } from './markdown/svgImageSource';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const MAX_SCALE = 6;
@@ -27,6 +29,10 @@ interface ImageViewerProps {
 export function ImageViewer({ uri, onClose }: ImageViewerProps) {
     const { width, height } = useWindowDimensions();
     const insets = useSafeAreaInsets();
+    // expo-image decodes raster formats only, so an SVG goes through
+    // react-native-svg instead.
+    const svg = React.useMemo(() => parseSvgImageSource(uri), [uri]);
+    const isSvg = svg !== null;
 
     const scale = useSharedValue(1);
     const savedScale = useSharedValue(1);
@@ -34,6 +40,33 @@ export function ImageViewer({ uri, onClose }: ImageViewerProps) {
     const ty = useSharedValue(0);
     const savedTx = useSharedValue(0);
     const savedTy = useSharedValue(0);
+
+    // Transform alone does not re-draw an SVG: the renderer rasterises its
+    // paths once at the layout size and the gesture then magnifies that
+    // raster, so it blurs exactly like a bitmap (measured at 4x: 3.0 px edge
+    // spread, identical to the PNG of the same picture). So once a gesture
+    // settles we COMMIT — the SVG is re-rendered at the zoomed size and the
+    // transform drops back to 1, the same trick MermaidViewer uses.
+    // `committedSv` mirrors the state for the worklet, which cannot read
+    // React state.
+    const committedSv = useSharedValue(1);
+    const [committed, setCommitted] = React.useState(1);
+    // react-native-svg draws into an offscreen bitmap (SvgView.onDraw ->
+    // drawBitmap), so the committed size is bounded by Android's 100 MB canvas
+    // limit: bytes grow with the square of the multiplier, and 4x of a
+    // 1080x2340 screen is 143 MB — a hard RuntimeException, measured. Cap the
+    // bake with headroom and let the transform cover any zoom past it (blurry
+    // beyond the cap, but never a crash).
+    const maxCommit = React.useMemo(() => {
+        const bytesAt1x = width * height * 4;
+        const budget = 60 * 1024 * 1024;
+        return Math.max(1, Math.min(MAX_SCALE, Math.sqrt(budget / bytesAt1x)));
+    }, [width, height]);
+    const commit = React.useCallback((next: number) => {
+        const capped = Math.min(next, maxCommit);
+        committedSv.value = capped;
+        setCommitted(capped);
+    }, [committedSv, maxCommit]);
 
     // Keep the image from being panned entirely off-screen: at scale S the
     // image overflows the viewport by (S-1) on each axis, so allow half of
@@ -56,12 +89,18 @@ export function ImageViewer({ uri, onClose }: ImageViewerProps) {
                 savedScale.value = 1;
                 savedTx.value = 0;
                 savedTy.value = 0;
+                if (isSvg) {
+                    runOnJS(commit)(1);
+                }
             } else {
                 savedScale.value = scale.value;
                 tx.value = clamp(tx.value, scale.value, width);
                 ty.value = clamp(ty.value, scale.value, height);
                 savedTx.value = tx.value;
                 savedTy.value = ty.value;
+                if (isSvg) {
+                    runOnJS(commit)(scale.value);
+                }
             }
         });
 
@@ -86,9 +125,15 @@ export function ImageViewer({ uri, onClose }: ImageViewerProps) {
                 savedScale.value = 1;
                 savedTx.value = 0;
                 savedTy.value = 0;
+                if (isSvg) {
+                    runOnJS(commit)(1);
+                }
             } else {
                 scale.value = withTiming(DOUBLE_TAP_SCALE);
                 savedScale.value = DOUBLE_TAP_SCALE;
+                if (isSvg) {
+                    runOnJS(commit)(DOUBLE_TAP_SCALE);
+                }
             }
         });
 
@@ -100,7 +145,9 @@ export function ImageViewer({ uri, onClose }: ImageViewerProps) {
         transform: [
             { translateX: tx.value },
             { translateY: ty.value },
-            { scale: scale.value },
+            // The committed part of an SVG's zoom already lives in its own
+            // width/height, so the transform carries only the remainder.
+            { scale: scale.value / committedSv.value },
         ],
     }));
 
@@ -108,12 +155,20 @@ export function ImageViewer({ uri, onClose }: ImageViewerProps) {
         <GestureHandlerRootView style={[styles.root, { width, height }]}>
             <GestureDetector gesture={gesture}>
                 <Animated.View style={[styles.imageWrap, animatedStyle, { width, height }]}>
-                    <Image
-                        source={{ uri }}
-                        style={{ width, height }}
-                        contentFit="contain"
-                        transition={Platform.OS === 'android' ? 0 : 120}
-                    />
+                    {svg ? (
+                        svg.kind === 'xml' ? (
+                            <SvgXml xml={svg.xml} width={width * committed} height={height * committed} />
+                        ) : (
+                            <SvgUri uri={svg.uri} width={width * committed} height={height * committed} />
+                        )
+                    ) : (
+                        <Image
+                            source={{ uri }}
+                            style={{ width, height }}
+                            contentFit="contain"
+                            transition={Platform.OS === 'android' ? 0 : 120}
+                        />
+                    )}
                 </Animated.View>
             </GestureDetector>
             <Pressable
