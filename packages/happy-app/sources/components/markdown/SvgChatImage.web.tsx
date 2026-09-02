@@ -1,18 +1,28 @@
 /**
- * Inline SVG chat image on web — unchanged from what this always did.
+ * Inline SVG chat image on web.
  *
  * The native file next to this one fetches and rewrites the markup because
  * react-native-svg parses it in Java/ObjC and throws there on anything it does
  * not implement, killing the process. On web there is no such parser: the
- * markup reaches the browser's own SVG engine, which implements the whole
- * spec and renders an unsupported-by-native construct correctly. So web keeps
- * the direct path — and keeps letting the browser fetch a remote `.svg`, which
- * avoids putting a cross-origin `fetch` (and the CORS headers it would need) on
- * a path that has never had one.
+ * markup reaches the browser's own SVG engine, which implements the whole spec
+ * and renders an unsupported-by-native construct correctly.
+ *
+ * A remote `.svg` is loaded as an ORDINARY IMAGE rather than through `SvgUri`.
+ * `SvgUri` fetches the file to inline it (`react-native-svg/src/xml.tsx`), and
+ * a cross-origin `fetch` needs the server to send `Access-Control-Allow-Origin`
+ * — which the file host does not. Measured: every remote diagram was an empty
+ * box on the webapp, "blocked by CORS policy" in the console, and rendered as
+ * soon as the header was added to a test server. Fixing it by adding the header
+ * would only rescue images from OUR host; loading them the way the browser
+ * loads any image needs no header from anyone, so an SVG posted from any origin
+ * renders too.
+ *
+ * A data URI keeps the inline path: there is nothing to fetch, and the user's
+ * browser blocks `data:` images, so it must not become an `<img src="data:">`.
  */
 import * as React from 'react';
 import { Image, View } from 'react-native';
-import { SvgUri, SvgXml } from 'react-native-svg';
+import { SvgXml } from 'react-native-svg';
 import { parseSvgImageSource } from './svgImageSource';
 import { parseSvgIntrinsicSize, type SvgIntrinsicSize } from './svgIntrinsicSize';
 
@@ -61,7 +71,11 @@ export function SvgChatImage({ uri, accessibilityLabel, onIntrinsicSize }: SvgCh
             {source.kind === 'xml' ? (
                 <SvgXml xml={source.xml} width="100%" height="100%" />
             ) : (
-                <SvgUri uri={source.uri} width="100%" height="100%" />
+                <Image
+                    source={{ uri: source.uri }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="contain"
+                />
             )}
         </View>
     );
