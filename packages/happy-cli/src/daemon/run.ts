@@ -15,7 +15,6 @@ import packageJson from '../../package.json';
 import { getEnvironmentInfo } from '@/ui/doctor';
 import { spawnHappyCLI } from '@/utils/spawnHappyCLI';
 import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readPersistedSessions, persistSession, markSessionStopped } from '@/persistence';
-import type { PersistedSession } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
 import { startDaemonControlServer } from './controlServer';
@@ -179,28 +178,6 @@ export async function startDaemon(): Promise<void> {
     const stoppingPids = new Set<number>();
     const registeringPids = new Set<number>();
 
-    // Liveness probe. `process.kill(pid, 0)` doesn't signal the target — it just
-    // checks whether the PID currently exists for us.
-    const isPidAlive = (pid: number | undefined): boolean => {
-      if (!pid) return false;
-      try {
-        process.kill(pid, 0);
-        return true;
-      } catch {
-        return false;
-      }
-    };
-
-    // A process recorded before the machine's current boot is definitely gone:
-    // a reboot resets the PID space, so a raw `isPidAlive(hostPid)` can give a
-    // false positive once an unrelated process reuses that PID. Gate the probe on
-    // "this record was saved during the current boot". `savedAt` is stamped when
-    // the session reports itself (its process was alive then), so
-    // `savedAt < bootTime` ⇒ the process can only have died since ⇒ treat as dead.
-    const bootTimeMs = Date.now() - os.uptime() * 1000;
-    const isPersistedHostAlive = (s: PersistedSession): boolean =>
-      s.savedAt >= bootTimeMs && isPidAlive(s.metadata?.hostPid);
-
     // Retain session data after process exits so resume can still find it.
     // Pre-populate from disk so sessions survive daemon restarts. Sessions whose
     // host process is still alive (daemon-only restart / upgrade — children are
@@ -227,7 +204,7 @@ export async function startDaemon(): Promise<void> {
       sessionIdToFinishedSession.set(id, tracked);
 
       const hostPid = s.metadata?.hostPid;
-      if (hostPid && isPersistedHostAlive(s)) {
+      if (hostPid && hasPersistedProcessConflict(s, bootTimeMs)) {
         // Re-track the still-running session under its real PID. There is no
         // childProcess handle (we didn't spawn it this boot), so stopSession
         // falls back to process.kill(pid) and the heartbeat prunes it once the
@@ -795,6 +772,11 @@ export async function startDaemon(): Promise<void> {
           onChildExited(pid);
           continue;
         }
+        // Adopted at boot from a persisted record, not spawned by this daemon:
+        // the PID may have been reused, so this is visibility (list/stop/
+        // revive-dedup), never proof of ownership. Fall through to the
+        // persisted-conflict check below, which refuses rather than adopts.
+        if (session.startedBy === 'persisted') continue;
         if (stoppingPids.has(pid)) {
           return { type: 'error', errorMessage: `Session ${happySessionId} is still stopping. Try again after its process exits.` };
         }
@@ -1022,8 +1004,8 @@ export async function startDaemon(): Promise<void> {
     // Bulk-revive: scan persisted sessions, attempt resume for each
     // daemon-spawned session whose hostPid is dead AND no currently-tracked
     // session shares the same cwd. Idempotent: a second call only resumes
-    // sessions still missing. (isPidAlive / isPersistedHostAlive are defined
-    // near the top of startDaemon, alongside the startup rehydration.)
+    // sessions still missing. Liveness uses hasPersistedProcessConflict, the
+    // same predicate the startup rehydration and the resume path use.
     const reviveOrphans = async (options?: { maxAgeMs?: number }): Promise<{ attempted: { happySessionId: string; path: string; result: SpawnSessionResult }[] }> => {
       // `maxAgeMs` is an optional ceiling on `lifecycleStateSince` for callers who
       // want to constrain the scan; by default we revive every unarchived
@@ -1110,7 +1092,7 @@ export async function startDaemon(): Promise<void> {
         const since = (sm.lifecycleStateSince ?? 0) as number;
         if (cutoffMs !== undefined && since < cutoffMs) continue;
         if (aliveSessionIds.has(id)) continue;   // this exact session is already up
-        if (isPersistedHostAlive(s)) continue;    // its host process is still running
+        if (hasPersistedProcessConflict(s, bootTimeMs)) continue;  // its host process is still running
         candidates.push({ happySessionId: id, path: md.path, lifecycleStateSince: since, hostPid: md.hostPid });
       }
 
