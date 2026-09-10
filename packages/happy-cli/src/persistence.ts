@@ -456,7 +456,7 @@ function lastAliveAt(session: PersistedSession): number {
  * Records from before the boot are therefore reported as not running — which is
  * true, since nothing survives a reboot.
  */
-function isSessionProcessRunning(session: PersistedSession): boolean {
+export function isSessionProcessRunning(session: PersistedSession): boolean {
   const pid = session.metadata?.hostPid;
   if (!pid) return false;
   if (session.savedAt < Date.now() - os.uptime() * 1000) return false;
