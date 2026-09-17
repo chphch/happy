@@ -112,6 +112,32 @@ export const en: TranslationStructure = {
         backgroundWork: ({ count }: { count: number }) => `${count} running in background`,
     },
 
+    backgroundActivity: {
+        title: 'Background work',
+        empty: 'Nothing is running in the background.',
+        unsupported: 'This agent does not report what it is running. Update the CLI on that machine to see the detail.',
+        refreshUnavailable: 'Showing the last snapshot — the session cannot be reached to refresh it.',
+        listedAgo: ({ ago }: { ago: string }) => `Task list is ${ago} old`,
+        agentsDone: ({ done, total }: { done: number; total: number }) => `${done} of ${total} agents finished`,
+        turns: ({ count }: { count: number }) => `${count} turn${count !== 1 ? 's' : ''} so far`,
+        lastMoved: ({ ago }: { ago: string }) => `moved ${ago} ago`,
+        stalled: 'No movement for a while — it may be stuck.',
+        queued: 'queued',
+        showMore: 'Show more',
+        showLess: 'Show less',
+        kinds: {
+            shell: 'shell',
+            subagent: 'agent',
+            workflow: 'workflow',
+            other: 'task',
+        },
+        notes: {
+            shellOutputUnavailable: 'A background shell keeps its output inside Claude Code, so only its command is visible here.',
+            workflowUnnamed: 'This workflow did not report a name, so its journal could not be found.',
+            workflowJournalMissing: 'The workflow has not written its journal yet.',
+            subagentNoTranscript: 'This agent has not written anything yet.',
+        },
+    },
     time: {
         justNow: 'just now',
         minutesAgo: ({ count }: { count: number }) => `${count} minute${count !== 1 ? 's' : ''} ago`,

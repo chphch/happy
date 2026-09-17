@@ -96,6 +96,32 @@ export const it: TranslationStructure = {
         backgroundWork: ({ count }: { count: number }) => `${count} in background`,
     },
 
+    backgroundActivity: {
+        title: 'Lavoro in background',
+        empty: "Non c'è nulla in esecuzione in background.",
+        unsupported: 'Questo agente non riporta cosa sta eseguendo. Aggiorna la CLI su quella macchina per vedere il dettaglio.',
+        refreshUnavailable: "Mostro l'ultima istantanea: la sessione non è raggiungibile per aggiornarla.",
+        listedAgo: ({ ago }: { ago: string }) => `L'elenco delle attività risale a ${ago} fa`,
+        agentsDone: ({ done, total }: { done: number; total: number }) => `${done} di ${total} agenti completati`,
+        turns: ({ count }: { count: number }) => `${count} turn${count !== 1 ? 'i' : 'o'} finora`,
+        lastMoved: ({ ago }: { ago: string }) => `si è mosso ${ago} fa`,
+        stalled: 'Nessun movimento da un po: potrebbe essere bloccato.',
+        queued: 'in coda',
+        showMore: 'Mostra altro',
+        showLess: 'Mostra meno',
+        kinds: {
+            shell: 'shell',
+            subagent: 'agente',
+            workflow: 'flusso',
+            other: 'attività',
+        },
+        notes: {
+            shellOutputUnavailable: 'Una shell in background tiene il suo output dentro Claude Code, quindi qui si vede solo il comando.',
+            workflowUnnamed: 'Questo flusso non ha riportato un nome, quindi non è stato possibile trovare il suo registro.',
+            workflowJournalMissing: 'Il flusso non ha ancora scritto il suo registro.',
+            subagentNoTranscript: 'Questo agente non ha ancora scritto nulla.',
+        },
+    },
     time: {
         justNow: 'proprio ora',
         minutesAgo: ({ count }: { count: number }) => `${count} ${count === 1 ? 'minuto' : 'minuti'} fa`,

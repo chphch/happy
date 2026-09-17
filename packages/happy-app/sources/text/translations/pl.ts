@@ -108,6 +108,32 @@ export const pl: TranslationStructure = {
         backgroundWork: ({ count }: { count: number }) => `${count} w tle`,
     },
 
+    backgroundActivity: {
+        title: 'Praca w tle',
+        empty: 'Nic nie działa w tle.',
+        unsupported: 'Ten agent nie raportuje, co uruchamia. Zaktualizuj CLI na tej maszynie, aby zobaczyć szczegóły.',
+        refreshUnavailable: 'Pokazuję ostatni zrzut: sesja jest nieosiągalna, więc nie można go odświeżyć.',
+        listedAgo: ({ ago }: { ago: string }) => `Lista zadań ma ${ago}`,
+        agentsDone: ({ done, total }: { done: number; total: number }) => `Ukończono ${done} z ${total} agentów`,
+        turns: ({ count }: { count: number }) => `${count} tur dotychczas`,
+        lastMoved: ({ ago }: { ago: string }) => `ruch ${ago} temu`,
+        stalled: 'Od dłuższego czasu bez ruchu — może być zablokowane.',
+        queued: 'w kolejce',
+        showMore: 'Pokaż więcej',
+        showLess: 'Pokaż mniej',
+        kinds: {
+            shell: 'powłoka',
+            subagent: 'agent',
+            workflow: 'przepływ',
+            other: 'zadanie',
+        },
+        notes: {
+            shellOutputUnavailable: 'Powłoka w tle trzyma swoje wyjście wewnątrz Claude Code, więc tutaj widać tylko polecenie.',
+            workflowUnnamed: 'Ten przepływ nie podał nazwy, więc nie udało się znaleźć jego dziennika.',
+            workflowJournalMissing: 'Przepływ nie zapisał jeszcze swojego dziennika.',
+            subagentNoTranscript: 'Ten agent jeszcze nic nie zapisał.',
+        },
+    },
     time: {
         justNow: 'teraz',
         minutesAgo: ({ count }: { count: number }) => `${count} ${plural({ count, one: 'minuta', few: 'minuty', many: 'minut' })} temu`,

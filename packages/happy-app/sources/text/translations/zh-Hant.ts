@@ -98,6 +98,32 @@ export const zhHant: TranslationStructure = {
         backgroundWork: ({ count }: { count: number }) => `背景執行 ${count} 項`,
     },
 
+    backgroundActivity: {
+        title: '背景工作',
+        empty: '背景沒有正在執行的工作。',
+        unsupported: '此代理不會回報正在執行的內容。請更新那台機器上的 CLI 以檢視詳細資訊。',
+        refreshUnavailable: '顯示的是最後一次快照：無法連線至工作階段以重新整理。',
+        listedAgo: ({ ago }: { ago: string }) => `工作清單已過 ${ago}`,
+        agentsDone: ({ done, total }: { done: number; total: number }) => `${total} 個代理中已完成 ${done} 個`,
+        turns: ({ count }: { count: number }) => `目前 ${count} 輪`,
+        lastMoved: ({ ago }: { ago: string }) => `${ago} 前有更新`,
+        stalled: '已有一段時間沒有進展，可能已卡住。',
+        queued: '排隊中',
+        showMore: '顯示更多',
+        showLess: '收合',
+        kinds: {
+            shell: 'shell',
+            subagent: '代理',
+            workflow: '工作流程',
+            other: '工作',
+        },
+        notes: {
+            shellOutputUnavailable: '背景 shell 的輸出保存在 Claude Code 內部，因此這裡只能看到它的指令。',
+            workflowUnnamed: '此工作流程沒有回報名稱，因此找不到它的日誌。',
+            workflowJournalMissing: '此工作流程尚未寫入日誌。',
+            subagentNoTranscript: '此代理尚未寫入任何內容。',
+        },
+    },
     time: {
         justNow: '剛剛',
         minutesAgo: ({ count }: { count: number }) => `${count} 分鐘前`,

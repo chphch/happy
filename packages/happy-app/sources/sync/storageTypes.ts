@@ -114,6 +114,27 @@ export const MetadataSchema = z.object({
             completed: z.number(),
             total: z.number(),
         }).passthrough(),
+        /**
+         * Per-task detail behind the counts, so the activity indicator can be
+         * tapped to answer "which N things". `kind` is a plain string rather
+         * than an enum on purpose: a task type added by a newer agent must
+         * still parse, and is normalized to a generic row at render time.
+         */
+        items: z.array(z.object({
+            id: z.string(),
+            kind: z.string(),
+            status: z.string(),
+            title: z.string(),
+            detail: z.string().optional(),
+            startedAt: z.number().optional(),
+            progress: z.object({
+                done: z.number(),
+                total: z.number().optional(),
+                phase: z.string().optional(),
+                latest: z.string().optional(),
+                updatedAt: z.number().optional(),
+            }).passthrough().optional(),
+        }).passthrough()).optional(),
     }).passthrough().optional(),
     path: z.string(),
     host: z.string(),

@@ -1134,7 +1134,7 @@ export function SessionViewLoaded({
                 </CenteredInputWidth>
             </AnimatedFade>
             <AnimatedFade visible={showBottomDockDetails}>
-                <RigActivityBar metadata={session.metadata} />
+                <RigActivityBar metadata={session.metadata} sessionId={sessionId} />
             </AnimatedFade>
             {composer}
         </>
