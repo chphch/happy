@@ -100,6 +100,32 @@ export const zhHans: TranslationStructure = {
         backgroundWork: ({ count }: { count: number }) => `后台运行 ${count} 项`,
     },
 
+    backgroundActivity: {
+        title: '后台任务',
+        empty: '后台没有正在运行的任务。',
+        unsupported: '该代理不会报告正在运行的内容。请更新那台机器上的 CLI 以查看详情。',
+        refreshUnavailable: '显示的是最后一次快照：无法连接会话进行刷新。',
+        listedAgo: ({ ago }: { ago: string }) => `任务列表已过去 ${ago}`,
+        agentsDone: ({ done, total }: { done: number; total: number }) => `${total} 个代理中已完成 ${done} 个`,
+        turns: ({ count }: { count: number }) => `目前 ${count} 轮`,
+        lastMoved: ({ ago }: { ago: string }) => `${ago} 前有更新`,
+        stalled: '已有一段时间没有进展，可能已卡住。',
+        queued: '排队中',
+        showMore: '显示更多',
+        showLess: '收起',
+        kinds: {
+            shell: 'shell',
+            subagent: '代理',
+            workflow: '工作流',
+            other: '任务',
+        },
+        notes: {
+            shellOutputUnavailable: '后台 shell 的输出保存在 Claude Code 内部，因此这里只能看到它的命令。',
+            workflowUnnamed: '该工作流没有报告名称，因此找不到它的日志。',
+            workflowJournalMissing: '该工作流尚未写入日志。',
+            subagentNoTranscript: '该代理尚未写入任何内容。',
+        },
+    },
     time: {
         justNow: '刚刚',
         minutesAgo: ({ count }: { count: number }) => `${count} 分钟前`,

@@ -442,6 +442,32 @@ export const ru: TranslationStructure = {
         backgroundWork: ({ count }: { count: number }) => `${count} в фоне`,
     },
 
+    backgroundActivity: {
+        title: 'Фоновая работа',
+        empty: 'В фоне ничего не выполняется.',
+        unsupported: 'Этот агент не сообщает, что он выполняет. Обновите CLI на той машине, чтобы увидеть подробности.',
+        refreshUnavailable: 'Показан последний снимок: сессия недоступна для обновления.',
+        listedAgo: ({ ago }: { ago: string }) => `Списку задач ${ago}`,
+        agentsDone: ({ done, total }: { done: number; total: number }) => `Завершено ${done} из ${total} агентов`,
+        turns: ({ count }: { count: number }) => `Ходов пока: ${count}`,
+        lastMoved: ({ ago }: { ago: string }) => `изменение ${ago} назад`,
+        stalled: 'Давно без движения — возможно, зависло.',
+        queued: 'в очереди',
+        showMore: 'Показать больше',
+        showLess: 'Показать меньше',
+        kinds: {
+            shell: 'оболочка',
+            subagent: 'агент',
+            workflow: 'процесс',
+            other: 'задача',
+        },
+        notes: {
+            shellOutputUnavailable: 'Фоновая оболочка хранит свой вывод внутри Claude Code, поэтому здесь видна только команда.',
+            workflowUnnamed: 'Этот процесс не сообщил имя, поэтому его журнал не найден.',
+            workflowJournalMissing: 'Процесс ещё не записал свой журнал.',
+            subagentNoTranscript: 'Этот агент пока ничего не записал.',
+        },
+    },
     time: {
         justNow: 'только что',
         minutesAgo: ({ count }: { count: number }) => `${count} ${plural({ count, one: 'минуту', few: 'минуты', many: 'минут' })} назад`,

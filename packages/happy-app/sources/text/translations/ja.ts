@@ -100,6 +100,32 @@ export const ja: TranslationStructure = {
         backgroundWork: ({ count }: { count: number }) => `バックグラウンドで${count}件実行中`,
     },
 
+    backgroundActivity: {
+        title: 'バックグラウンドの処理',
+        empty: 'バックグラウンドで実行中のものはありません。',
+        unsupported: 'このエージェントは実行中の内容を報告しません。詳細を見るにはそのマシンの CLI を更新してください。',
+        refreshUnavailable: '最後のスナップショットを表示しています。セッションに接続できないため更新できません。',
+        listedAgo: ({ ago }: { ago: string }) => `タスク一覧は ${ago} 前のものです`,
+        agentsDone: ({ done, total }: { done: number; total: number }) => `${total} 個中 ${done} 個のエージェントが完了`,
+        turns: ({ count }: { count: number }) => `これまで ${count} ターン`,
+        lastMoved: ({ ago }: { ago: string }) => `${ago} 前に更新`,
+        stalled: 'しばらく動きがありません。停止している可能性があります。',
+        queued: '待機中',
+        showMore: 'もっと見る',
+        showLess: '折りたたむ',
+        kinds: {
+            shell: 'シェル',
+            subagent: 'エージェント',
+            workflow: 'ワークフロー',
+            other: 'タスク',
+        },
+        notes: {
+            shellOutputUnavailable: 'バックグラウンドのシェルは出力を Claude Code の中に保持するため、ここではコマンドのみ表示されます。',
+            workflowUnnamed: 'このワークフローは名前を報告しなかったため、ジャーナルを見つけられませんでした。',
+            workflowJournalMissing: 'ワークフローはまだジャーナルを書き出していません。',
+            subagentNoTranscript: 'このエージェントはまだ何も書き出していません。',
+        },
+    },
     time: {
         justNow: 'たった今',
         minutesAgo: ({ count }: { count: number }) => `${count}分前`,
