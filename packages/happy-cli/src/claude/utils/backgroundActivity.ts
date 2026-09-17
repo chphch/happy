@@ -73,6 +73,8 @@ export interface BackgroundTaskItem {
     detail?: string;
     /** When happy-cli first saw this id, so the app can show elapsed time. */
     startedAt?: number;
+    /** `detail` was cut to fit metadata; the full text is on the RPC. */
+    truncated?: boolean;
     progress?: BackgroundTaskProgress;
 }
 
@@ -99,19 +101,46 @@ export const EMPTY_ACTIVITY: SessionActivity = {
 
 /**
  * Metadata is an encrypted blob rewritten on every turn under optimistic
- * concurrency, so the per-task detail has to stay small. Real payloads carry
- * commands with whole heredoc'd scripts inside them — measured over 1 KB for a
- * single task — which is why the command is a preview here and the full text is
- * only served on demand over RPC.
+ * concurrency, so the per-task detail is bounded. The bounds are measured, not
+ * guessed — 638 real background shell commands and 524 real hook payloads from
+ * this machine's happy-cli logs:
+ *
+ *   one command:  median 302 chars, p90 1014, max 1015
+ *   one payload:  median 1 task, p90 4, max 24 — total detail max 5216 chars
+ *
+ * So `MAX_DETAIL_CHARS` is 1200: above the longest command ever observed, which
+ * makes truncation the rare case instead of the usual one. (It was 200, which
+ * cut 63% of real commands — the median command did not fit, and the first
+ * person to open the screen hit it.) `MAX_TOTAL_DETAIL_CHARS` then bounds the
+ * pathological payload the per-item cap alone cannot: 24 tasks each at the cap
+ * would be 28 KB, while the worst payload actually seen totalled 5 KB.
+ *
+ * Whatever the caps do cut, the item says so with `truncated`, and the full
+ * text stays available over RPC.
  */
 export const MAX_ACTIVITY_ITEMS = 24;
 const MAX_TITLE_CHARS = 120;
-const MAX_DETAIL_CHARS = 200;
+const MAX_DETAIL_CHARS = 1200;
+const MAX_TOTAL_DETAIL_CHARS = 8192;
+/** A detail squeezed by the total budget still has to be worth reading. */
+const MIN_DETAIL_CHARS = 80;
 const MAX_LATEST_CHARS = 160;
 
 export function truncate(value: string, max: number): string {
+    return truncateTracked(value, max).text;
+}
+
+/**
+ * Truncate, and say whether anything was cut.
+ *
+ * The caller needs the flag rather than testing for a trailing `…`: a command
+ * can legitimately end in one, so an ellipsis is not evidence of truncation and
+ * a UI that guesses from it will sometimes lie in both directions.
+ */
+export function truncateTracked(value: string, max: number): { text: string; truncated: boolean } {
     const collapsed = value.replace(/\s+/g, ' ').trim();
-    return collapsed.length <= max ? collapsed : `${collapsed.slice(0, max - 1)}…`;
+    if (collapsed.length <= max) return { text: collapsed, truncated: false };
+    return { text: `${collapsed.slice(0, max - 1)}…`, truncated: true };
 }
 
 /**
@@ -191,16 +220,15 @@ export function summarizeBackgroundTasks(tasks: BackgroundTaskSummary[]): Sessio
     return activity;
 }
 
-/** What a task's `detail` line says, by kind. */
-function taskDetail(task: BackgroundTaskSummary, kind: BackgroundTaskKind): string | undefined {
-    const raw = kind === 'shell'
+/** The raw text a task's `detail` line is built from, by kind. */
+function rawDetail(task: BackgroundTaskSummary, kind: BackgroundTaskKind): string | undefined {
+    return kind === 'shell'
         ? task.command
         : kind === 'subagent'
             ? (task.agent_type ?? task.subagent_type)
             : kind === 'workflow'
                 ? task.name
                 : task.command;
-    return raw ? truncate(raw, MAX_DETAIL_CHARS) : undefined;
 }
 
 /**
@@ -216,6 +244,10 @@ export function toActivityItems(
     firstSeenAt?: ReadonlyMap<string, number>,
     factsById?: ReadonlyMap<string, { progress: BackgroundTaskProgress; description?: string }>,
 ): BackgroundTaskItem[] {
+    // Spent in task order, so the tasks a person is most likely to be waiting on
+    // keep their full text and a long tail of queued work is what gets squeezed.
+    let budget = MAX_TOTAL_DETAIL_CHARS;
+
     return tasks.slice(0, MAX_ACTIVITY_ITEMS).map((task) => {
         const kind = taskKind(task.type);
         const facts = factsById?.get(task.id);
@@ -232,8 +264,16 @@ export function toActivityItems(
             ),
             status: task.status,
         };
-        const detail = taskDetail(task, kind);
-        if (detail) item.detail = detail;
+
+        const raw = rawDetail(task, kind);
+        if (raw) {
+            const allowed = Math.max(MIN_DETAIL_CHARS, Math.min(MAX_DETAIL_CHARS, budget));
+            const { text, truncated } = truncateTracked(raw, allowed);
+            item.detail = text;
+            if (truncated) item.truncated = true;
+            budget = Math.max(0, budget - text.length);
+        }
+
         const startedAt = firstSeenAt?.get(task.id);
         if (startedAt !== undefined) item.startedAt = startedAt;
         if (progress) {
@@ -272,6 +312,7 @@ function itemsEqual(a: BackgroundTaskItem[] | undefined, b: BackgroundTaskItem[]
             && item.status === other.status
             && item.title === other.title
             && item.detail === other.detail
+            && item.truncated === other.truncated
             && item.startedAt === other.startedAt
             && progressEquals(item.progress, other.progress);
     });

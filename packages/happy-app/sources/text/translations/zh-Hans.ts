@@ -113,6 +113,9 @@ export const zhHans: TranslationStructure = {
         queued: '排队中',
         showMore: '显示更多',
         showLess: '收起',
+        copyCommand: '复制命令',
+        copied: '已复制',
+        shortened: '为适应显示已截短，打开会话可加载完整命令。',
         kinds: {
             shell: 'shell',
             subagent: '代理',

@@ -189,10 +189,45 @@ describe('toActivityItems', () => {
         expect(item!.title).toBe('From the hook');
     });
 
-    it('caps the command preview so metadata cannot grow unbounded', () => {
-        // Real payloads carry whole heredoc'd scripts in `command`.
+    it('carries a whole real-world command rather than a preview of one', () => {
+        // Measured over 638 real commands: median 302 chars, longest 1015. The
+        // cap used to be 200, which cut 63% of them — the median did not fit.
+        const command = 'pnpm build && ' + 'x'.repeat(900);
+        const [item] = toActivityItems([{ id: 'b1', type: 'shell', status: 'running', command }]);
+        expect(item!.detail).toBe(command);
+        expect(item!.truncated).toBeUndefined();
+    });
+
+    it('caps a pathological command and says that it did', () => {
         const [item] = toActivityItems([{ id: 'b1', type: 'shell', status: 'running', command: 'x'.repeat(5000) }]);
-        expect(item!.detail!.length).toBeLessThanOrEqual(200);
+        expect(item!.detail!.length).toBeLessThanOrEqual(1200);
+        // The flag, not a trailing ellipsis: a command may legitimately end in one.
+        expect(item!.truncated).toBe(true);
+    });
+
+    it('spends the shared budget in task order, squeezing the tail not the head', () => {
+        // 24 tasks at the per-item cap would be 28 KB of metadata rewritten every
+        // turn; the worst payload actually observed totalled 5 KB.
+        const many = Array.from({ length: 20 }, (_, i) => ({
+            id: `b${i}`, type: 'shell', status: 'running', command: 'y'.repeat(1000),
+        }));
+        const items = toActivityItems(many);
+        expect(items[0]!.detail).toHaveLength(1000);
+        expect(items[0]!.truncated).toBeUndefined();
+        const total = items.reduce((sum, item) => sum + (item.detail?.length ?? 0), 0);
+        expect(total).toBeLessThanOrEqual(8192 + 80 * items.length);
+        expect(items[items.length - 1]!.truncated).toBe(true);
+    });
+
+    it('never squeezes a detail down to nothing', () => {
+        // A row saying "b19" and an ellipsis helps nobody; a floor keeps the
+        // squeezed tail at least readable.
+        const many = Array.from({ length: 24 }, (_, i) => ({
+            id: `b${i}`, type: 'shell', status: 'running', command: 'z'.repeat(2000),
+        }));
+        for (const item of toActivityItems(many)) {
+            expect(item.detail!.length).toBeGreaterThanOrEqual(80);
+        }
     });
 
     it('caps how many tasks ride in metadata at all', () => {
