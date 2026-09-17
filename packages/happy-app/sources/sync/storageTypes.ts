@@ -126,6 +126,7 @@ export const MetadataSchema = z.object({
             status: z.string(),
             title: z.string(),
             detail: z.string().optional(),
+            truncated: z.boolean().optional(),
             startedAt: z.number().optional(),
             progress: z.object({
                 done: z.number(),

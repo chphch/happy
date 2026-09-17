@@ -121,6 +121,9 @@ export const pl: TranslationStructure = {
         queued: 'w kolejce',
         showMore: 'Pokaż więcej',
         showLess: 'Pokaż mniej',
+        copyCommand: 'Kopiuj polecenie',
+        copied: 'Skopiowano',
+        shortened: 'Skrócone, aby się zmieściło — otwórz sesję, aby wczytać całe polecenie.',
         kinds: {
             shell: 'powłoka',
             subagent: 'agent',

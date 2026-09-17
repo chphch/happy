@@ -110,6 +110,9 @@ export const ca: TranslationStructure = {
         queued: 'en cua',
         showMore: 'Mostra més',
         showLess: 'Mostra menys',
+        copyCommand: "Copia l'ordre",
+        copied: 'Copiat',
+        shortened: "Escurçat per cabre: obre la sessió per carregar l'ordre sencera.",
         kinds: {
             shell: 'shell',
             subagent: 'agent',

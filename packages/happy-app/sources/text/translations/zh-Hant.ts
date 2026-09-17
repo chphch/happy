@@ -111,6 +111,9 @@ export const zhHant: TranslationStructure = {
         queued: '排隊中',
         showMore: '顯示更多',
         showLess: '收合',
+        copyCommand: '複製指令',
+        copied: '已複製',
+        shortened: '為配合顯示已截短，開啟工作階段可載入完整指令。',
         kinds: {
             shell: 'shell',
             subagent: '代理',
