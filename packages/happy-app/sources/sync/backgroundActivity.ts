@@ -48,6 +48,12 @@ export type BackgroundTaskItem = {
     status: string;
     title: string;
     detail?: string;
+    /**
+     * `detail` was cut to fit in metadata. The agent sends this rather than
+     * letting the screen infer it from a trailing ellipsis, which a command can
+     * legitimately end in — guessing would lie in both directions.
+     */
+    truncated?: boolean;
     startedAt?: number;
     progress?: BackgroundTaskProgress;
 };
@@ -80,6 +86,7 @@ const DetailSchema = z.object({
     status: z.string(),
     title: z.string(),
     detail: z.string().optional(),
+    truncated: z.boolean().optional(),
     startedAt: z.number().optional(),
     progress: ProgressSchema.optional(),
     agents: z.array(z.object({
@@ -119,6 +126,7 @@ export function getBackgroundTaskItems(metadata: Metadata | null | undefined): B
         status: item.status,
         title: item.title,
         detail: item.detail,
+        truncated: item.truncated,
         startedAt: item.startedAt,
         progress: item.progress,
     }));

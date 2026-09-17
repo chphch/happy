@@ -111,6 +111,9 @@ export const pt: TranslationStructure = {
         queued: 'na fila',
         showMore: 'Mostrar mais',
         showLess: 'Mostrar menos',
+        copyCommand: 'Copiar comando',
+        copied: 'Copiado',
+        shortened: 'Encurtado para caber: abra a sessão para carregar o comando completo.',
         kinds: {
             shell: 'shell',
             subagent: 'agente',
