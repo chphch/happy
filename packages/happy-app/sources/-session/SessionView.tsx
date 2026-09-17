@@ -1296,7 +1296,7 @@ export function SessionViewLoaded({
                 </AnimatedFade>
             ) : null}
             <AnimatedFade visible={showBottomDockDetails}>
-                <RigActivityBar metadata={session?.metadata ?? null} />
+                <RigActivityBar metadata={session?.metadata ?? null} sessionId={sessionId ?? undefined} />
             </AnimatedFade>
             {composer}
         </>

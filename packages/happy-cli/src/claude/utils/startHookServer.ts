@@ -84,8 +84,12 @@ export interface HookServerOptions {
      * Called on every Stop hook with the background work still in flight, and
      * on SessionEnd with an empty list. `thinking` only describes the current
      * turn, so this is what tells the app a session is idle-but-still-busy.
+     *
+     * `transcriptPath` comes along because it locates the session's on-disk
+     * directory, which is where a workflow's journal and a backgrounded agent's
+     * transcript live — the only source for how far along those tasks are.
      */
-    onBackgroundActivity?: (tasks: BackgroundTaskSummary[]) => void;
+    onBackgroundActivity?: (tasks: BackgroundTaskSummary[], transcriptPath?: string) => void;
 }
 
 export interface HookServer {
@@ -118,13 +122,13 @@ export async function startHookServer(options: HookServerOptions): Promise<HookS
         '/hook/stop': (data) => {
             const tasks = parseBackgroundTasks(data.background_tasks);
             logger.debug(`[hookServer] Stop hook: ${tasks.length} background task(s) in flight`);
-            onBackgroundActivity?.(tasks);
+            onBackgroundActivity?.(tasks, data.transcript_path);
         },
         // The session is gone, so whatever it had in flight is no longer ours to
         // report — clear it rather than leaving the last Stop's counts frozen.
-        '/hook/session-end': () => {
+        '/hook/session-end': (data) => {
             logger.debug('[hookServer] SessionEnd hook: clearing background activity');
-            onBackgroundActivity?.([]);
+            onBackgroundActivity?.([], data.transcript_path);
         },
     };
 
