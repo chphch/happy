@@ -15,6 +15,7 @@
 
 import * as React from 'react';
 import { View, Text, Pressable } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useUnistyles } from 'react-native-unistyles';
 import { Typography } from '@/constants/Typography';
@@ -121,6 +122,14 @@ export const BackgroundTaskCard = React.memo(function BackgroundTaskCard({
 }) {
     const { theme } = useUnistyles();
     const [expanded, setExpanded] = React.useState(false);
+    const [copied, setCopied] = React.useState(false);
+
+    const onCopy = React.useCallback(async () => {
+        if (!task.detail) return;
+        await Clipboard.setStringAsync(task.detail);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+    }, [task.detail]);
 
     const running = isRunningStatus(task.status);
     const elapsed = formatElapsed(task, now);
@@ -178,6 +187,20 @@ export const BackgroundTaskCard = React.memo(function BackgroundTaskCard({
                     >
                         {task.detail}
                     </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 }}>
+                        <Pressable onPress={onCopy} hitSlop={8}>
+                            <Text style={{ fontSize: 12, color: theme.colors.textLink, ...Typography.default() }}>
+                                {copied ? t('backgroundActivity.copied') : t('backgroundActivity.copyCommand')}
+                            </Text>
+                        </Pressable>
+                        {task.truncated ? (
+                            // Say it rather than trailing off: a command can end in
+                            // an ellipsis, so the character alone proves nothing.
+                            <Text style={{ fontSize: 12, color: theme.colors.textSecondary, flex: 1, ...Typography.default() }}>
+                                {t('backgroundActivity.shortened')}
+                            </Text>
+                        ) : null}
+                    </View>
                 </View>
             ) : null}
 

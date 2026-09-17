@@ -111,6 +111,9 @@ export const ja: TranslationStructure = {
         queued: '待機中',
         showMore: 'もっと見る',
         showLess: '折りたたむ',
+        copyCommand: 'コマンドをコピー',
+        copied: 'コピーしました',
+        shortened: '収まるように短縮されています。セッションを開くと全文が読み込まれます。',
         kinds: {
             shell: 'シェル',
             subagent: 'エージェント',

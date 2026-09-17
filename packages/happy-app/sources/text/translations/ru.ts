@@ -453,6 +453,9 @@ export const ru: TranslationStructure = {
         queued: 'в очереди',
         showMore: 'Показать больше',
         showLess: 'Показать меньше',
+        copyCommand: 'Копировать команду',
+        copied: 'Скопировано',
+        shortened: 'Сокращено, чтобы поместиться: откройте сессию, чтобы загрузить команду целиком.',
         kinds: {
             shell: 'оболочка',
             subagent: 'агент',

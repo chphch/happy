@@ -124,6 +124,9 @@ export const en: TranslationStructure = {
         queued: 'queued',
         showMore: 'Show more',
         showLess: 'Show less',
+        copyCommand: 'Copy command',
+        copied: 'Copied',
+        shortened: 'Shortened to fit — open the session to load the whole command.',
         kinds: {
             shell: 'shell',
             subagent: 'agent',

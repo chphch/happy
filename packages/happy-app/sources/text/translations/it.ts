@@ -108,6 +108,9 @@ export const it: TranslationStructure = {
         queued: 'in coda',
         showMore: 'Mostra altro',
         showLess: 'Mostra meno',
+        copyCommand: 'Copia il comando',
+        copied: 'Copiato',
+        shortened: "Accorciato per stare nello spazio: apri la sessione per caricare l'intero comando.",
         kinds: {
             shell: 'shell',
             subagent: 'agente',
