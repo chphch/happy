@@ -19,7 +19,7 @@ import { initialMachineMetadata } from '@/daemon/run';
 import { startHappyServer } from '@/claude/utils/startHappyServer';
 import { startHookServer } from '@/claude/utils/startHookServer';
 import { generateHookSettingsFile, cleanupHookSettingsFile } from '@/claude/utils/generateHookSettings';
-import { activityEquals, isActivityEmpty, summarizeBackgroundTasks, type SessionActivity } from '@/claude/utils/backgroundActivity';
+import { BackgroundActivityReporter } from '@/claude/utils/backgroundActivityReporter';
 import { registerKillSessionHandler } from './registerKillSessionHandler';
 import { projectPath } from '../projectPath';
 import { resolve } from 'node:path';
@@ -510,10 +510,12 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     // Used by hook server to notify Session when Claude changes session ID
     let currentSession: Session | null = null;
 
-    // Last background-activity summary pushed to metadata. The Stop hook fires
-    // on every turn, and most turns start no background work at all, so this
-    // keeps idle turns from re-sending an identical metadata update.
-    let lastReportedActivity: SessionActivity | undefined = undefined;
+    // Everything happy-cli knows about this session's background work: the last
+    // Stop hook's task list, when each id was first seen, and the journals that
+    // say how far along the fan-out kinds are. It also suppresses an identical
+    // metadata update, which matters because the Stop hook fires on every turn
+    // and most turns start no background work at all.
+    const backgroundActivity = new BackgroundActivityReporter();
 
     // Start Hook server for receiving Claude session notifications
     const hookServer = await startHookServer({
@@ -544,16 +546,16 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
                 }
             }
         },
-        onBackgroundActivity: (tasks) => {
-            const activity = summarizeBackgroundTasks(tasks);
-            if (activityEquals(activity, lastReportedActivity)) {
-                return;
-            }
-            lastReportedActivity = activity;
-            // Absent rather than an all-zero object once nothing is running, so
-            // a session with no background work carries no activity field at all.
-            const next = isActivityEmpty(activity) ? undefined : activity;
-            session.updateMetadata((metadata) => ({ ...metadata, activity: next }));
+        onBackgroundActivity: (tasks, transcriptPath) => {
+            // Reading the journals is async, but the hook handler is not allowed
+            // to wait on it — Claude's forwarder has already been answered, and
+            // a slow disk must never hold up the session.
+            void backgroundActivity.onTasks(tasks, transcriptPath).then((activity) => {
+                if (activity === null) return;
+                session.updateMetadata((metadata) => ({ ...metadata, activity }));
+            }).catch((error) => {
+                logger.debug(`[START] Background activity update failed: ${error}`);
+            });
         }
     });
     logger.debug(`[START] Hook server started on port ${hookServer.port}`);
@@ -622,6 +624,13 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         allowedTools: currentAllowedTools,
         disallowedTools: currentDisallowedTools,
         effort: currentEffort,
+    });
+
+    // Serves the activity sheet. The task list is as of the last turn end (the
+    // Stop hook is the only thing that knows it), but the per-task progress is
+    // re-read from disk on every call, so an open sheet keeps moving.
+    session.rpcHandlerManager.registerHandler('background-activity-detail', async () => {
+        return await backgroundActivity.detail();
     });
 
     session.rpcHandlerManager.registerHandler('goal-action', async (params: unknown) => {
