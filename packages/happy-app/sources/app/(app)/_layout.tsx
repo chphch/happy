@@ -153,6 +153,16 @@ export default function RootLayout() {
                 }}
             />
             <Stack.Screen
+                name="session/[id]/background"
+                options={{
+                    headerShown: true,
+                    header: createPlainHeader,
+                    headerTitle: t('backgroundActivity.title'),
+                    headerTitleAlign: 'center',
+                    headerBackTitle: t('common.back'),
+                }}
+            />
+            <Stack.Screen
                 name="settings/account"
                 options={{
                     headerTitle: t('settings.account'),

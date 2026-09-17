@@ -96,6 +96,32 @@ export const ca: TranslationStructure = {
         backgroundWork: ({ count }: { count: number }) => `${count} en segon pla`,
     },
 
+    backgroundActivity: {
+        title: 'Feina en segon pla',
+        empty: 'No hi ha res executant-se en segon pla.',
+        unsupported: 'Aquest agent no informa del que està executant. Actualitza la CLI en aquella màquina per veure el detall.',
+        refreshUnavailable: 'Mostrant la darrera instantània: no es pot contactar amb la sessió per actualitzar-la.',
+        listedAgo: ({ ago }: { ago: string }) => `La llista de tasques té ${ago} d'antiguitat`,
+        agentsDone: ({ done, total }: { done: number; total: number }) => `${done} de ${total} agents acabats`,
+        turns: ({ count }: { count: number }) => `${count} torn${count !== 1 ? 's' : ''} fins ara`,
+        lastMoved: ({ ago }: { ago: string }) => `s'ha mogut fa ${ago}`,
+        stalled: 'Sense moviment des de fa estona; pot estar bloquejat.',
+        queued: 'en cua',
+        showMore: 'Mostra més',
+        showLess: 'Mostra menys',
+        kinds: {
+            shell: 'shell',
+            subagent: 'agent',
+            workflow: 'flux',
+            other: 'tasca',
+        },
+        notes: {
+            shellOutputUnavailable: "Un shell en segon pla desa la sortida dins de Claude Code, així que aquí només se'n veu l'ordre.",
+            workflowUnnamed: "Aquest flux no ha informat de cap nom, així que no s'ha pogut trobar el seu registre.",
+            workflowJournalMissing: 'El flux encara no ha escrit el seu registre.',
+            subagentNoTranscript: 'Aquest agent encara no ha escrit res.',
+        },
+    },
     time: {
         justNow: 'ara mateix',
         minutesAgo: ({ count }: { count: number }) => `fa ${count} minut${count !== 1 ? 's' : ''}`,

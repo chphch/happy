@@ -96,6 +96,32 @@ export const pt: TranslationStructure = {
         backgroundWork: ({ count }: { count: number }) => `${count} em segundo plano`,
     },
 
+    backgroundActivity: {
+        title: 'Trabalho em segundo plano',
+        empty: 'Nada está em execução em segundo plano.',
+        unsupported: 'Este agente não informa o que está a executar. Atualize a CLI nessa máquina para ver o detalhe.',
+        refreshUnavailable: 'A mostrar o último instantâneo: a sessão não está acessível para atualizar.',
+        listedAgo: ({ ago }: { ago: string }) => `A lista de tarefas tem ${ago}`,
+        agentsDone: ({ done, total }: { done: number; total: number }) => `${done} de ${total} agentes concluídos`,
+        turns: ({ count }: { count: number }) => `${count} turno${count !== 1 ? 's' : ''} até agora`,
+        lastMoved: ({ ago }: { ago: string }) => `mudou há ${ago}`,
+        stalled: 'Sem movimento há algum tempo; pode estar bloqueado.',
+        queued: 'na fila',
+        showMore: 'Mostrar mais',
+        showLess: 'Mostrar menos',
+        kinds: {
+            shell: 'shell',
+            subagent: 'agente',
+            workflow: 'fluxo',
+            other: 'tarefa',
+        },
+        notes: {
+            shellOutputUnavailable: 'Uma shell em segundo plano mantém a saída dentro do Claude Code, por isso aqui só se vê o comando.',
+            workflowUnnamed: 'Este fluxo não informou um nome, por isso não foi possível encontrar o seu registo.',
+            workflowJournalMissing: 'O fluxo ainda não escreveu o seu registo.',
+            subagentNoTranscript: 'Este agente ainda não escreveu nada.',
+        },
+    },
     time: {
         justNow: 'agora mesmo',
         minutesAgo: ({ count }: { count: number }) => `há ${count} minuto${count !== 1 ? 's' : ''}`,
