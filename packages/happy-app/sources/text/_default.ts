@@ -728,6 +728,42 @@ export const en = {
         }
     },
 
+    canvas: {
+
+        title: 'Canvas',
+
+        placeholder: 'Write here — the agent reads this file',
+
+        statusPending: 'unsaved',
+
+        statusSaving: 'saving…',
+
+        statusSaved: 'saved',
+
+        statusConflict: 'changed on the machine',
+
+        statusFailed: 'could not save',
+
+        changedOnDisk: 'This file changed on the machine.',
+
+        reload: 'Take theirs',
+
+        keepMine: 'Keep mine',
+
+        showPreview: 'Show preview',
+
+        showEditor: 'Show editor',
+
+        close: 'Close canvas',
+
+        notCreatedYet: 'No canvas yet. Ask the agent to start one.',
+
+        cannotEdit: 'This file cannot be edited here.',
+
+        noWorkingDirectory: 'This session has no working directory.',
+
+    },
+
     files: {
         changes: 'Changes',
         searchPlaceholder: 'Search files...',
