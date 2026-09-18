@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Modal } from '@/modal';
 import { buildArtifactDocument, isSandboxedNavigation, parseArtifactHeight } from './artifactDocument';
+import { useArtifactMessageSink } from './useArtifactMessageSink';
 import { ArtifactViewer } from './ArtifactViewer';
 
 const MIN_HEIGHT = 120;
@@ -23,9 +24,10 @@ const MIN_HEIGHT = 120;
 // undid. Keep a ceiling only so a bad measurement cannot produce an absurd box.
 const MAX_REPORTED_HEIGHT = 8000;
 
-export const ArtifactRenderer = React.memo((props: { content: string }) => {
+export const ArtifactRenderer = React.memo((props: { content: string; sessionId?: string }) => {
     const { theme, rt } = useUnistyles();
     const [height, setHeight] = React.useState(MIN_HEIGHT);
+    const sendFromFrame = useArtifactMessageSink(props.sessionId);
 
     const html = React.useMemo(() => buildArtifactDocument({
         content: props.content,
@@ -34,15 +36,17 @@ export const ArtifactRenderer = React.memo((props: { content: string }) => {
     }), [props.content, rt.themeName]);
 
     const openViewer = React.useCallback(() => {
-        Modal.show({ component: ArtifactViewer, props: { content: props.content } } as any);
-    }, [props.content]);
+        Modal.show({ component: ArtifactViewer, props: { content: props.content, sessionId: props.sessionId } } as any);
+    }, [props.content, props.sessionId]);
 
     const onMessage = React.useCallback((event: { nativeEvent: { data: string } }) => {
         const reported = parseArtifactHeight(event.nativeEvent.data);
         if (reported !== null) {
             setHeight(Math.min(Math.max(reported, MIN_HEIGHT), MAX_REPORTED_HEIGHT));
+            return;
         }
-    }, []);
+        sendFromFrame(event.nativeEvent.data);
+    }, [sendFromFrame]);
 
     return (
         <View style={style.container}>
