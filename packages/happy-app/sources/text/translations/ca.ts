@@ -693,6 +693,42 @@ export const ca: TranslationStructure = {
         }
     },
 
+    canvas: {
+
+        title: 'Llenç',
+
+        placeholder: 'Escriu aquí — l’agent llegeix aquest fitxer',
+
+        statusPending: 'sense desar',
+
+        statusSaving: 'desant…',
+
+        statusSaved: 'desat',
+
+        statusConflict: 'ha canviat a la màquina',
+
+        statusFailed: 'no s’ha pogut desar',
+
+        changedOnDisk: 'Aquest fitxer ha canviat a la màquina.',
+
+        reload: 'Agafa la seva',
+
+        keepMine: 'Mantén la meva',
+
+        showPreview: 'Mostra la vista prèvia',
+
+        showEditor: 'Mostra l’editor',
+
+        close: 'Tanca el llenç',
+
+        notCreatedYet: 'Encara no hi ha llenç. Demana a l’agent que en creï un.',
+
+        cannotEdit: 'Aquest fitxer no es pot editar aquí.',
+
+        noWorkingDirectory: 'Aquesta sessió no té directori de treball.',
+
+    },
+
     files: {
         changes: 'Canvis',
         searchPlaceholder: 'Cerca fitxers...',

@@ -709,6 +709,42 @@ export const pl: TranslationStructure = {
         }
     },
 
+    canvas: {
+
+        title: 'Kanwa',
+
+        placeholder: 'Pisz tutaj — agent czyta ten plik',
+
+        statusPending: 'niezapisane',
+
+        statusSaving: 'zapisywanie…',
+
+        statusSaved: 'zapisano',
+
+        statusConflict: 'zmieniony na maszynie',
+
+        statusFailed: 'nie udało się zapisać',
+
+        changedOnDisk: 'Ten plik zmienił się na maszynie.',
+
+        reload: 'Weź ich wersję',
+
+        keepMine: 'Zostaw moją',
+
+        showPreview: 'Podgląd',
+
+        showEditor: 'Edytor',
+
+        close: 'Zamknij kanwę',
+
+        notCreatedYet: 'Nie ma jeszcze kanwy. Poproś agenta, aby ją utworzył.',
+
+        cannotEdit: 'Tego pliku nie można tu edytować.',
+
+        noWorkingDirectory: 'Ta sesja nie ma katalogu roboczego.',
+
+    },
+
     files: {
         changes: 'Zmiany',
         searchPlaceholder: 'Wyszukaj pliki...',
