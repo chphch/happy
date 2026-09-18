@@ -14,14 +14,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buildArtifactDocument, isSandboxedNavigation } from './artifactDocument';
+import { useArtifactMessageSink } from './useArtifactMessageSink';
 
 interface ArtifactViewerProps {
     content: string;
     onClose: () => void;
+    sessionId?: string;
 }
 
-export function ArtifactViewer({ content, onClose }: ArtifactViewerProps) {
+export function ArtifactViewer({ content, onClose, sessionId }: ArtifactViewerProps) {
     const { width, height } = useWindowDimensions();
+    const sendFromFrame = useArtifactMessageSink(sessionId);
     const insets = useSafeAreaInsets();
     const { theme, rt } = useUnistyles();
 
@@ -39,6 +42,7 @@ export function ArtifactViewer({ content, onClose }: ArtifactViewerProps) {
                 style={style.webview}
                 containerStyle={{ backgroundColor: theme.colors.surface }}
                 setSupportMultipleWindows={false}
+                onMessage={(event) => sendFromFrame(event.nativeEvent.data)}
                 onShouldStartLoadWithRequest={(request) => isSandboxedNavigation(request.url)}
             />
             <Pressable
