@@ -682,6 +682,42 @@ export const es: TranslationStructure = {
         }
     },
 
+    canvas: {
+
+        title: 'Lienzo',
+
+        placeholder: 'Escribe aquí — el agente lee este archivo',
+
+        statusPending: 'sin guardar',
+
+        statusSaving: 'guardando…',
+
+        statusSaved: 'guardado',
+
+        statusConflict: 'cambió en la máquina',
+
+        statusFailed: 'no se pudo guardar',
+
+        changedOnDisk: 'Este archivo cambió en la máquina.',
+
+        reload: 'Tomar la suya',
+
+        keepMine: 'Mantener la mía',
+
+        showPreview: 'Ver vista previa',
+
+        showEditor: 'Ver editor',
+
+        close: 'Cerrar lienzo',
+
+        notCreatedYet: 'Aún no hay lienzo. Pide al agente que cree uno.',
+
+        cannotEdit: 'Este archivo no se puede editar aquí.',
+
+        noWorkingDirectory: 'Esta sesión no tiene directorio de trabajo.',
+
+    },
+
     files: {
         changes: 'Cambios',
         searchPlaceholder: 'Buscar archivos...',

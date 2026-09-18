@@ -680,6 +680,42 @@ export const it: TranslationStructure = {
         }
     },
 
+    canvas: {
+
+        title: 'Canvas',
+
+        placeholder: 'Scrivi qui — l’agente legge questo file',
+
+        statusPending: 'non salvato',
+
+        statusSaving: 'salvataggio…',
+
+        statusSaved: 'salvato',
+
+        statusConflict: 'modificato sulla macchina',
+
+        statusFailed: 'salvataggio non riuscito',
+
+        changedOnDisk: 'Questo file è cambiato sulla macchina.',
+
+        reload: 'Prendi la loro',
+
+        keepMine: 'Tieni la mia',
+
+        showPreview: 'Mostra anteprima',
+
+        showEditor: 'Mostra editor',
+
+        close: 'Chiudi canvas',
+
+        notCreatedYet: 'Nessun canvas. Chiedi all’agente di crearne uno.',
+
+        cannotEdit: 'Questo file non può essere modificato qui.',
+
+        noWorkingDirectory: 'Questa sessione non ha una directory di lavoro.',
+
+    },
+
     files: {
         changes: 'Modifiche',
         searchPlaceholder: 'Cerca file...',

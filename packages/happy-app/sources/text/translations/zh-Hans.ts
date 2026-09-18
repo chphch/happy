@@ -683,6 +683,42 @@ export const zhHans: TranslationStructure = {
         }
     },
 
+    canvas: {
+
+        title: '画布',
+
+        placeholder: '在此书写 — 代理会读取这个文件',
+
+        statusPending: '未保存',
+
+        statusSaving: '保存中…',
+
+        statusSaved: '已保存',
+
+        statusConflict: '在机器上已更改',
+
+        statusFailed: '保存失败',
+
+        changedOnDisk: '此文件在机器上已更改。',
+
+        reload: '用对方的',
+
+        keepMine: '保留我的',
+
+        showPreview: '显示预览',
+
+        showEditor: '显示编辑器',
+
+        close: '关闭画布',
+
+        notCreatedYet: '还没有画布。让代理创建一个。',
+
+        cannotEdit: '此文件无法在这里编辑。',
+
+        noWorkingDirectory: '此会话没有工作目录。',
+
+    },
+
     files: {
         changes: '更改',
         searchPlaceholder: '搜索文件...',

@@ -78,6 +78,8 @@ import {
     rigCanUseShell,
 } from '@/sync/rig';
 import { RigActivityBar } from '@/components/RigActivityBar';
+import { CanvasPanel } from '@/components/canvas/CanvasPanel';
+import { canvasPathFor } from '@/components/canvas/canvasFile';
 import { AnimatedFade } from '@/components/AnimatedOverlay';
 
 export const SessionView = React.memo((props: { id: string }) => {
@@ -125,6 +127,17 @@ export const SessionView = React.memo((props: { id: string }) => {
 
     // Match left sidebar width: 30% of window, clamped to 250–360px
     const sidebarWidth = Math.min(Math.max(Math.floor(windowWidth * 0.3), 250), 360);
+
+    // Canvas: one document kept beside the chat. Its own gate, not the diff
+    // sidebar's — a canvas only needs a working directory to anchor its file to,
+    // and it is useful on a phone, where the diff sidebar never is.
+    const canvasPath = canvasPathFor(session?.metadata);
+    const [canvasOpen, setCanvasOpen] = React.useState(false);
+    const canvasVisible = canvasOpen && !!canvasPath && !zenMode;
+    // Side by side where there is room; stacked above the chat where there is not
+    // (the phone). Same width rule as the sidebar so the two read as one system.
+    const canvasSideBySide = windowWidth >= SIDEBAR_MIN_WINDOW_WIDTH;
+    const canvasWidth = Math.min(Math.max(Math.floor(windowWidth * 0.34), 320), 560);
 
     // Animate diff sidebar width.
     //
@@ -455,7 +468,27 @@ export const SessionView = React.memo((props: { id: string }) => {
                         gitChanges={session && isDataReady ? headerGit.changes : null}
                         backdropVisible={headerBackdropVisible}
                         extraPathSegment={fileViewPath ?? undefined}
-                        rightSlot={(diffViewOpen || !!fileViewPath) ? headerRightSlot : headerRight}
+                        rightSlot={(diffViewOpen || !!fileViewPath)
+                            ? headerRightSlot
+                            : (canvasPath
+                                ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                                        <Pressable
+                                            onPress={() => setCanvasOpen((v) => !v)}
+                                            hitSlop={10}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={t('canvas.title')}
+                                        >
+                                            <Ionicons
+                                                name={canvasVisible ? 'document-text' : 'document-text-outline'}
+                                                size={20}
+                                                color={theme.colors.header.tint}
+                                            />
+                                        </Pressable>
+                                        {headerRight}
+                                    </View>
+                                )
+                                : headerRight)}
                         onTitlePress={session ? () => router.push(`/session/${sessionId}/info`) : undefined}
                         onBackPress={() => router.back()}
                     />
@@ -468,8 +501,29 @@ export const SessionView = React.memo((props: { id: string }) => {
         </>
     );
 
+    const canvasNode = canvasVisible
+        ? <CanvasPanel sessionId={sessionId} onClose={() => setCanvasOpen(false)} />
+        : null;
+
     if (!canShowSidebar) {
-        return mainContent;
+        if (!canvasNode) return mainContent;
+        // The chat subtree stays mounted in both arrangements, so toggling the
+        // canvas never costs the user their scroll position or a half-typed message.
+        return canvasSideBySide ? (
+            <View style={{ flex: 1, flexDirection: 'row' }}>
+                <View style={{ flex: 1 }}>{mainContent}</View>
+                <View style={{ width: canvasWidth, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.colors.divider }}>
+                    {canvasNode}
+                </View>
+            </View>
+        ) : (
+            <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider }}>
+                    {canvasNode}
+                </View>
+                <View style={{ flex: 1 }}>{mainContent}</View>
+            </View>
+        );
     }
 
     // Desktop layout: chat + animated sidebar at the same level (full height).
@@ -528,6 +582,11 @@ export const SessionView = React.memo((props: { id: string }) => {
                     </View>
                 )}
             </View>
+            {canvasNode && (
+                <View style={{ width: canvasWidth, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.colors.divider }}>
+                    {canvasNode}
+                </View>
+            )}
             <Animated.View style={[{ minWidth: 0, alignSelf: 'stretch' }, animatedSidebarStyle]}>
                 <View style={{ width: sidebarWidth, flex: 1 }}>
                     <FilesSidebar

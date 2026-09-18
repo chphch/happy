@@ -681,6 +681,42 @@ export const pt: TranslationStructure = {
         }
     },
 
+    canvas: {
+
+        title: 'Tela',
+
+        placeholder: 'Escreva aqui — o agente lê este arquivo',
+
+        statusPending: 'não salvo',
+
+        statusSaving: 'salvando…',
+
+        statusSaved: 'salvo',
+
+        statusConflict: 'alterado na máquina',
+
+        statusFailed: 'não foi possível salvar',
+
+        changedOnDisk: 'Este arquivo mudou na máquina.',
+
+        reload: 'Usar a deles',
+
+        keepMine: 'Manter a minha',
+
+        showPreview: 'Mostrar prévia',
+
+        showEditor: 'Mostrar editor',
+
+        close: 'Fechar tela',
+
+        notCreatedYet: 'Ainda não há tela. Peça ao agente para criar uma.',
+
+        cannotEdit: 'Este arquivo não pode ser editado aqui.',
+
+        noWorkingDirectory: 'Esta sessão não tem diretório de trabalho.',
+
+    },
+
     files: {
         changes: 'Alterações',
         searchPlaceholder: 'Buscar arquivos...',

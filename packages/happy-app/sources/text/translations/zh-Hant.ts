@@ -682,6 +682,42 @@ export const zhHant: TranslationStructure = {
         }
     },
 
+    canvas: {
+
+        title: '畫布',
+
+        placeholder: '在此書寫 — 代理會讀取這個檔案',
+
+        statusPending: '未儲存',
+
+        statusSaving: '儲存中…',
+
+        statusSaved: '已儲存',
+
+        statusConflict: '在機器上已變更',
+
+        statusFailed: '儲存失敗',
+
+        changedOnDisk: '此檔案在機器上已變更。',
+
+        reload: '用對方的',
+
+        keepMine: '保留我的',
+
+        showPreview: '顯示預覽',
+
+        showEditor: '顯示編輯器',
+
+        close: '關閉畫布',
+
+        notCreatedYet: '還沒有畫布。讓代理建立一個。',
+
+        cannotEdit: '此檔案無法在這裡編輯。',
+
+        noWorkingDirectory: '此工作階段沒有工作目錄。',
+
+    },
+
     files: {
         changes: '變更',
         searchPlaceholder: '搜尋檔案...',
