@@ -189,6 +189,23 @@ export function saveRigComposerDraft(sessionId: string, draft: RigComposerDraftS
     else mmkv.set(key, JSON.stringify(draft));
 }
 
+const CANVAS_OPEN_KEY = 'session-canvas-open:';
+
+/**
+ * Whether the canvas panel was left open in a session, kept on this device so
+ * switching to another session and back does not close it. Only open sessions
+ * leave a key behind.
+ */
+export function loadCanvasOpen(sessionId: string): boolean {
+    return mmkv.getBoolean(CANVAS_OPEN_KEY + sessionId) === true;
+}
+
+export function saveCanvasOpen(sessionId: string, open: boolean) {
+    const key = CANVAS_OPEN_KEY + sessionId;
+    if (open) mmkv.set(key, true);
+    else mmkv.delete(key);
+}
+
 export function loadNewSessionDraft(): NewSessionDraft | null {
     const raw = mmkv.getString(NEW_SESSION_DRAFT_KEY);
     if (!raw) {
