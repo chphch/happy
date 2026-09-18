@@ -707,6 +707,42 @@ export const ru: TranslationStructure = {
         }
     },
 
+    canvas: {
+
+        title: 'Канвас',
+
+        placeholder: 'Пишите здесь — агент читает этот файл',
+
+        statusPending: 'не сохранено',
+
+        statusSaving: 'сохранение…',
+
+        statusSaved: 'сохранено',
+
+        statusConflict: 'изменён на машине',
+
+        statusFailed: 'не удалось сохранить',
+
+        changedOnDisk: 'Файл изменился на машине.',
+
+        reload: 'Взять их версию',
+
+        keepMine: 'Оставить свою',
+
+        showPreview: 'Предпросмотр',
+
+        showEditor: 'Редактор',
+
+        close: 'Закрыть канвас',
+
+        notCreatedYet: 'Канваса пока нет. Попросите агента создать его.',
+
+        cannotEdit: 'Этот файл нельзя редактировать здесь.',
+
+        noWorkingDirectory: 'У этой сессии нет рабочей папки.',
+
+    },
+
     files: {
         changes: 'Изменения',
         searchPlaceholder: 'Поиск файлов...',
