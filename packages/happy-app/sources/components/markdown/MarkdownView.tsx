@@ -90,7 +90,7 @@ export const MarkdownView = React.memo((props: {
                     } else if (block.type === 'math') {
                         return <MathBlock content={block.content} key={index} />;
                     } else if (block.type === 'artifact') {
-                        return <ArtifactRenderer content={block.content} key={index} />;
+                        return <ArtifactRenderer content={block.content} sessionId={props.sessionId} key={index} />;
                     } else if (block.type === 'options') {
                         return <RenderOptionsBlock items={block.items} key={index} first={index === 0} last={index === blocks.length - 1} selectable={selectable} onOptionPress={props.onOptionPress} />;
                     } else if (block.type === 'table') {

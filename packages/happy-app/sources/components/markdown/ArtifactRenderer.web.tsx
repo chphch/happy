@@ -11,16 +11,18 @@ import * as React from 'react';
 import { useUnistyles } from 'react-native-unistyles';
 import { Modal } from '@/modal';
 import { buildArtifactDocument, parseArtifactHeight } from './artifactDocument';
+import { useArtifactMessageSink } from './useArtifactMessageSink';
 import { ArtifactViewer } from './ArtifactViewer';
 
 const MIN_HEIGHT = 120;
 // Runaway guard on the reported height, NOT a design cap — see ArtifactRenderer.tsx.
 const MAX_REPORTED_HEIGHT = 8000;
 
-export const ArtifactRenderer = React.memo((props: { content: string }) => {
+export const ArtifactRenderer = React.memo((props: { content: string; sessionId?: string }) => {
     const { theme, rt } = useUnistyles();
     const iframeRef = React.useRef<HTMLIFrameElement>(null);
     const [height, setHeight] = React.useState(MIN_HEIGHT);
+    const sendFromFrame = useArtifactMessageSink(props.sessionId);
 
     const html = React.useMemo(() => buildArtifactDocument({
         content: props.content,
@@ -36,15 +38,17 @@ export const ArtifactRenderer = React.memo((props: { content: string }) => {
             const reported = parseArtifactHeight(event.data);
             if (reported !== null) {
                 setHeight(Math.min(Math.max(reported, MIN_HEIGHT), MAX_REPORTED_HEIGHT));
+                return;
             }
+            sendFromFrame(event.data);
         };
         window.addEventListener('message', onMessage);
         return () => window.removeEventListener('message', onMessage);
-    }, []);
+    }, [sendFromFrame]);
 
     const openViewer = React.useCallback(() => {
-        Modal.show({ component: ArtifactViewer, props: { content: props.content } } as any);
-    }, [props.content]);
+        Modal.show({ component: ArtifactViewer, props: { content: props.content, sessionId: props.sessionId } } as any);
+    }, [props.content, props.sessionId]);
 
     return (
         <div style={{ position: 'relative', width: '100%', marginTop: 8, marginBottom: 8 }}>

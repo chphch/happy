@@ -45,7 +45,7 @@ export function trackSessionSwitched(session: Pick<Session, 'id' | 'createdAt' |
     });
 }
 
-export type MessageSentSource = 'chat' | 'new_session' | 'option' | 'question' | 'voice';
+export type MessageSentSource = 'chat' | 'new_session' | 'option' | 'question' | 'voice' | 'artifact';
 
 export function trackMessageSent(source: MessageSentSource, metadata?: Metadata | null) {
     tracking?.capture('message_sent', {

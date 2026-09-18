@@ -9,15 +9,19 @@ import * as React from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useUnistyles } from 'react-native-unistyles';
 import { buildArtifactDocument } from './artifactDocument';
+import { useArtifactMessageSink } from './useArtifactMessageSink';
 
 interface ArtifactViewerProps {
     content: string;
     onClose: () => void;
+    sessionId?: string;
 }
 
-export function ArtifactViewer({ content, onClose }: ArtifactViewerProps) {
+export function ArtifactViewer({ content, onClose, sessionId }: ArtifactViewerProps) {
     const { width, height } = useWindowDimensions();
     const { theme, rt } = useUnistyles();
+    const iframeRef = React.useRef<HTMLIFrameElement>(null);
+    const sendFromFrame = useArtifactMessageSink(sessionId);
 
     const html = React.useMemo(() => buildArtifactDocument({
         content,
@@ -31,9 +35,22 @@ export function ArtifactViewer({ content, onClose }: ArtifactViewerProps) {
         return () => window.removeEventListener('keydown', onKey);
     }, [onClose]);
 
+    React.useEffect(() => {
+        // The inline frame is still mounted behind this modal and posts its own
+        // messages, so identify the sender by window rather than acting on every
+        // message that reaches this listener.
+        const onMessage = (event: MessageEvent) => {
+            if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
+            sendFromFrame(event.data);
+        };
+        window.addEventListener('message', onMessage);
+        return () => window.removeEventListener('message', onMessage);
+    }, [sendFromFrame]);
+
     return (
         <div style={{ width, height, position: 'relative', background: theme.colors.surface }}>
             <iframe
+                ref={iframeRef}
                 srcDoc={html}
                 sandbox="allow-scripts"
                 referrerPolicy="no-referrer"

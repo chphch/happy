@@ -24,6 +24,25 @@ export interface ArtifactDocumentOptions {
 
 export const ARTIFACT_HEIGHT_MESSAGE = 'artifact-height';
 
+/**
+ * The frame's one way to talk back: a single line of text, delivered into the
+ * session as an ordinary user message. This is what makes a rendered page
+ * interactive — a button, a small form — instead of a picture.
+ *
+ * The limits below are enforced TWICE on purpose. The helper the frame calls
+ * applies them so a page can tell its user "too long" before anything is sent;
+ * the host applies them again on arrival because the frame is not trusted to.
+ * Page content is authored elsewhere and runs in an opaque origin, so its
+ * cooperation is a convenience, never a guarantee.
+ */
+export const ARTIFACT_TEXT_MESSAGE = 'artifact-message';
+
+/** Longest text one send may carry. A chat message, not a document. */
+export const ARTIFACT_MESSAGE_MAX_LENGTH = 2000;
+
+/** Smallest gap between two accepted sends — stops a loop flooding the session. */
+export const ARTIFACT_MESSAGE_MIN_INTERVAL_MS = 400;
+
 const FULL_DOCUMENT_RE = /<html[\s>]/i;
 const HEAD_OPEN_RE = /<head[^>]*>/i;
 const HTML_OPEN_RE = /<html[^>]*>/i;
@@ -54,6 +73,17 @@ if (window.ResizeObserver) {
 }
 setTimeout(report, 120);
 setTimeout(report, 600);
+var lastSend = 0;
+window.canvasSend = function (text) {
+    if (typeof text !== 'string') return false;
+    var trimmed = text.trim();
+    if (!trimmed || trimmed.length > ${ARTIFACT_MESSAGE_MAX_LENGTH}) return false;
+    var now = Date.now();
+    if (now - lastSend < ${ARTIFACT_MESSAGE_MIN_INTERVAL_MS}) return false;
+    lastSend = now;
+    send(JSON.stringify({ type: ${JSON.stringify(ARTIFACT_TEXT_MESSAGE)}, text: trimmed }));
+    return true;
+};
 })();</script>`;
 }
 
@@ -126,4 +156,32 @@ export function parseArtifactHeight(data: unknown): number | null {
     if (message.type !== ARTIFACT_HEIGHT_MESSAGE) return null;
     if (typeof message.height !== 'number' || !Number.isFinite(message.height) || message.height <= 0) return null;
     return message.height;
+}
+
+/**
+ * Reads the text out of a bridge message the frame wants sent to the session,
+ * or null for anything that is not one.
+ *
+ * Every limit the injected helper already applies is re-applied here. The helper
+ * runs inside the frame, where the page could simply not call it — posting the
+ * message shape directly — so treating its checks as having happened would mean
+ * trusting a writer we do not control. Rate limiting is deliberately NOT here:
+ * it needs memory across calls, which belongs to the component holding the
+ * frame, not to a pure parser.
+ */
+export function parseArtifactMessage(data: unknown): string | null {
+    if (typeof data !== 'string') return null;
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(data);
+    } catch {
+        return null;
+    }
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const message = parsed as { type?: unknown; text?: unknown };
+    if (message.type !== ARTIFACT_TEXT_MESSAGE) return null;
+    if (typeof message.text !== 'string') return null;
+    const text = message.text.trim();
+    if (!text || text.length > ARTIFACT_MESSAGE_MAX_LENGTH) return null;
+    return text;
 }
