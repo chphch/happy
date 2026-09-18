@@ -694,6 +694,42 @@ export const ja: TranslationStructure = {
         }
     },
 
+    canvas: {
+
+        title: 'キャンバス',
+
+        placeholder: 'ここに書いてください — エージェントがこのファイルを読みます',
+
+        statusPending: '未保存',
+
+        statusSaving: '保存中…',
+
+        statusSaved: '保存しました',
+
+        statusConflict: 'マシン側で変更されました',
+
+        statusFailed: '保存できませんでした',
+
+        changedOnDisk: 'このファイルがマシン側で変更されました。',
+
+        reload: '向こうを取る',
+
+        keepMine: '自分のを残す',
+
+        showPreview: 'プレビュー',
+
+        showEditor: 'エディタ',
+
+        close: 'キャンバスを閉じる',
+
+        notCreatedYet: 'まだキャンバスがありません。エージェントに作成を頼んでください。',
+
+        cannotEdit: 'このファイルはここでは編集できません。',
+
+        noWorkingDirectory: 'このセッションには作業ディレクトリがありません。',
+
+    },
+
     files: {
         changes: '変更',
         searchPlaceholder: 'ファイルを検索...',
