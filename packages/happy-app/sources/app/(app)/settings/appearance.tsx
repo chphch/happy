@@ -10,7 +10,7 @@ import { Switch } from '@/components/Switch';
 import { Appearance, Platform, Pressable, Text, View } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import { darkTheme, lightTheme } from '@/theme';
-import { SESSION_LIST_GROUPING_MODES, type SessionListGrouping } from '@/sync/settings';
+import { SESSION_LIST_GROUPING_MODES, normalizeSessionListGrouping, type SessionListGrouping } from '@/sync/settings';
 import { t, getLanguageNativeName, SUPPORTED_LANGUAGES } from '@/text';
 import {
     normalizeUserMessageBubbleColor,
@@ -124,14 +124,6 @@ function AvatarStyleOption(props: {
         </Pressable>
     );
 }
-
-// A settings payload is synced, so it can carry a value this build does not
-// know. Fall back to the default layout rather than showing a blank row.
-const normalizeSessionListGrouping = (mode: string): SessionListGrouping => (
-    (SESSION_LIST_GROUPING_MODES as readonly string[]).includes(mode)
-        ? mode as SessionListGrouping
-        : 'flat'
-);
 
 const getSessionListGroupingLabel = (mode: SessionListGrouping): string => {
     switch (mode) {

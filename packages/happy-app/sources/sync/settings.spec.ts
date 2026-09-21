@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SettingsSchema, settingsParse, settingsParseFromServer, applySettings, settingsDefaults, settingsToSyncPayload, type Settings } from './settings';
+import { SettingsSchema, settingsParse, settingsParseFromServer, applySettings, settingsDefaults, settingsToSyncPayload, normalizeSessionListGrouping, type Settings } from './settings';
 
 describe('settings', () => {
     describe('settingsParse', () => {
@@ -490,6 +490,42 @@ describe('settings', () => {
 
         it('throws on a non-object payload', () => {
             expect(() => settingsParseFromServer('not settings')).toThrow(/Failed to decrypt/);
+        });
+    });
+    describe('sessionListGrouping forward compatibility', () => {
+        // A layout name a newer build wrote must not cost the user every other
+        // setting. settingsParse answers a schema rejection by returning defaults
+        // for EVERY known field, and the caller then pushes those back — the same
+        // account-wide reset the settingsParseFromServer tests above guard against.
+        it('keeps the rest of the settings when the layout name is unfamiliar', () => {
+            const parsed = settingsParse({
+                sessionListGrouping: 'project-tiled-from-the-future',
+                experiments: true,
+                avatarMonochrome: true,
+                preferredLanguage: 'ja',
+            });
+            expect(parsed.experiments).toBe(true);
+            expect(parsed.avatarMonochrome).toBe(true);
+            expect(parsed.preferredLanguage).toBe('ja');
+        });
+
+        it('leaves the unfamiliar value in place rather than rewriting it', () => {
+            // Preserving it is what lets the build that understands it keep working
+            // after this one has written settings back.
+            const parsed = settingsParse({ sessionListGrouping: 'project-tiled-from-the-future' });
+            expect(parsed.sessionListGrouping).toBe('project-tiled-from-the-future');
+        });
+
+        it('renders an unfamiliar or missing value as the default layout', () => {
+            expect(normalizeSessionListGrouping('project-tiled-from-the-future')).toBe('flat');
+            expect(normalizeSessionListGrouping(undefined)).toBe('flat');
+            expect(normalizeSessionListGrouping(null)).toBe('flat');
+        });
+
+        it('passes through every layout this build knows', () => {
+            expect(normalizeSessionListGrouping('flat')).toBe('flat');
+            expect(normalizeSessionListGrouping('project')).toBe('project');
+            expect(normalizeSessionListGrouping('project-folded')).toBe('project-folded');
         });
     });
 });
