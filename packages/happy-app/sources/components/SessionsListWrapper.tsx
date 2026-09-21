@@ -9,6 +9,7 @@ import { useAllMachines, useSetting, useSettingMutable } from '@/sync/storage';
 import { collectMachineChoices } from '@/sync/machineChoices';
 import { LinkComputerChecklist } from './onboarding/LinkComputer';
 import { resolveHomeEmptyState } from './onboarding/firstRunOnboarding';
+import { normalizeSessionListGrouping } from '@/sync/settings';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -60,7 +61,9 @@ export const SessionsListWrapper = React.memo(({
     const [, setHideArchivedSessions] = useSettingMutable('hideInactiveSessions');
     // The activity-sorted chat list is the default; the project hierarchy —
     // project, then checkout, with chats as tabs — is the other layout.
-    const groupByProject = useSetting('sessionListGrouping') === 'project';
+    // 'project-folded' is neither: it falls through to SessionsList, which draws
+    // the older project-card list and folds a whole project at a time.
+    const groupByProject = normalizeSessionListGrouping(useSetting('sessionListGrouping')) === 'project';
     const styles = stylesheet;
 
     if (sessionListViewData === null) {

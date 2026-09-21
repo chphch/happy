@@ -195,3 +195,14 @@ export function projectWorkspaceCollapseKey(
 ): string {
     return workspaceId ? projectId + '\u0000' + workspaceId : projectId;
 }
+
+/**
+ * Key for folding a whole project — every one of its checkouts at once.
+ * Prefixed so it can never collide with the keys above, which are a bare
+ * `projectId` for the primary checkout and `projectId\0workspaceId` for a
+ * named worktree. The two live in the same `collapsedProjects` map because
+ * they are the same kind of state, just at different granularity.
+ */
+export function projectCollapseKey(projectId: string): string {
+    return 'project\u0000' + projectId;
+}
