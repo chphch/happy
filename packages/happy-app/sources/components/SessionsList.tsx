@@ -28,6 +28,7 @@ import { t } from '@/text';
 import { SessionShortcutHintBadge } from './ShortcutHints';
 import { ProviderIcon } from './ProviderIcon';
 import { buildSessionProjectDisplayGroups } from '@/utils/sessionDisplayOrder';
+import { normalizeSessionListGrouping } from '@/sync/settings';
 
 type SessionListDisplayItem = SessionListViewItem | {
     type: 'machine-header';
@@ -338,7 +339,7 @@ export function SessionsList({
     // is offered back through the home filter menu for people who organized
     // around it. 'project-folded' is the same card hierarchy with one fold per
     // project instead of one per checkout.
-    const sessionListGrouping = useSetting('sessionListGrouping');
+    const sessionListGrouping = normalizeSessionListGrouping(useSetting('sessionListGrouping'));
     const flatSessionList = sessionListGrouping === 'flat';
     const foldWholeProject = sessionListGrouping === 'project-folded';
     const machines = useAllMachines();
