@@ -336,8 +336,11 @@ export function SessionsList({
     const [hideArchivedSessions, setHideArchivedSessions] = useSettingMutable('hideInactiveSessions');
     // The activity-sorted chat list is the default; the project-card hierarchy
     // is offered back through the home filter menu for people who organized
-    // around it.
-    const flatSessionList = useSetting('sessionListGrouping') !== 'project';
+    // around it. 'project-folded' is the same card hierarchy with one fold per
+    // project instead of one per checkout.
+    const sessionListGrouping = useSetting('sessionListGrouping');
+    const flatSessionList = sessionListGrouping === 'flat';
+    const foldWholeProject = sessionListGrouping === 'project-folded';
     const machines = useAllMachines();
     const pathname = usePathname();
     const isTablet = useIsTablet();
@@ -541,6 +544,7 @@ export function SessionsList({
                     <ProjectGroup
                         project={item.project}
                         selectedSessionId={selectedSessionId}
+                        foldWholeProject={foldWholeProject}
                     />
                 );
 
@@ -579,7 +583,7 @@ export function SessionsList({
                     />
                 );
         }
-    }, [selectedSessionId, data, flatSessionList]);
+    }, [selectedSessionId, data, flatSessionList, foldWholeProject]);
 
 
     // Remove this section as we'll use FlatList for all items now
