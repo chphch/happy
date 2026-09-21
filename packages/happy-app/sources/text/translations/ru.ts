@@ -201,6 +201,7 @@ export const ru: TranslationStructure = {
         groupingTitle: 'Группировка',
         flatList: 'Общий список',
         groupByProject: 'Группировать по проектам',
+        groupByProjectFoldable: 'Сворачиваемые проекты',
         appearanceSettings: 'Настройки внешнего вида',
         worktreeTabs: ({ count }: { count: number }) => `${count} ${plural({ count, one: 'вкладка', few: 'вкладки', many: 'вкладок' })}`,
     },

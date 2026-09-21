@@ -247,6 +247,7 @@ export const zhHans: TranslationStructure = {
         groupingTitle: '分组',
         flatList: '平铺列表',
         groupByProject: '按项目分组',
+        groupByProjectFoldable: '可折叠项目',
         appearanceSettings: '外观设置',
         worktreeTabs: ({ count }: { count: number }) => `${count} 个标签页`,
     },
