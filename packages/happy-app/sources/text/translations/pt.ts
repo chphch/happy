@@ -247,6 +247,7 @@ export const pt: TranslationStructure = {
         groupingTitle: 'Agrupamento',
         flatList: 'Lista simples',
         groupByProject: 'Agrupar por projeto',
+        groupByProjectFoldable: 'Projetos recolhíveis',
         appearanceSettings: 'Configurações de aparência',
         worktreeTabs: ({ count }: { count: number }) => count === 1 ? '1 aba' : `${count} abas`,
     },
