@@ -246,6 +246,7 @@ export const en = {
         groupingTitle: 'Grouping',
         flatList: 'Flat List',
         groupByProject: 'Group by Project',
+        groupByProjectFoldable: 'Foldable Projects',
         appearanceSettings: 'Appearance Settings',
         worktreeTabs: ({ count }: { count: number }) => count === 1 ? '1 tab' : `${count} tabs`,
     },

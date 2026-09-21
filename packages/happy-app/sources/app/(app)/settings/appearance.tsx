@@ -10,7 +10,7 @@ import { Switch } from '@/components/Switch';
 import { Appearance, Platform, Pressable, Text, View } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import { darkTheme, lightTheme } from '@/theme';
-import { type SessionListGrouping } from '@/sync/settings';
+import { SESSION_LIST_GROUPING_MODES, type SessionListGrouping } from '@/sync/settings';
 import { t, getLanguageNativeName, SUPPORTED_LANGUAGES } from '@/text';
 import {
     normalizeUserMessageBubbleColor,
@@ -125,12 +125,22 @@ function AvatarStyleOption(props: {
     );
 }
 
+// A settings payload is synced, so it can carry a value this build does not
+// know. Fall back to the default layout rather than showing a blank row.
+const normalizeSessionListGrouping = (mode: string): SessionListGrouping => (
+    (SESSION_LIST_GROUPING_MODES as readonly string[]).includes(mode)
+        ? mode as SessionListGrouping
+        : 'flat'
+);
+
 const getSessionListGroupingLabel = (mode: SessionListGrouping): string => {
     switch (mode) {
         case 'flat':
             return t('sessionsFilter.flatList');
         case 'project':
             return t('sessionsFilter.groupByProject');
+        case 'project-folded':
+            return t('sessionsFilter.groupByProjectFoldable');
     }
 };
 
@@ -469,14 +479,16 @@ export default function AppearanceSettingsScreen() {
             </ItemGroup>
 
             <ItemGroup title={t('settingsAppearance.display')} footer={t('settingsAppearance.displayDescription')}>
-                {/* Same setting the home filter menu drives; two values, so a
-                    tap flips between them like the theme row does. */}
+                {/* Same setting the home filter menu drives; a tap steps to the
+                    next layout and wraps, like the theme row does. */}
                 <Item
                     title={t('sessionsFilter.groupingTitle')}
                     icon={<Ionicons name="list-outline" size={29} color="#5856D6" />}
-                    detail={getSessionListGroupingLabel(sessionListGrouping === 'project' ? 'project' : 'flat')}
+                    detail={getSessionListGroupingLabel(normalizeSessionListGrouping(sessionListGrouping))}
                     onPress={() => {
-                        setSessionListGrouping(sessionListGrouping === 'project' ? 'flat' : 'project');
+                        const modes = SESSION_LIST_GROUPING_MODES;
+                        const current = modes.indexOf(normalizeSessionListGrouping(sessionListGrouping));
+                        setSessionListGrouping(modes[(current + 1) % modes.length]);
                     }}
                 />
                 <Item

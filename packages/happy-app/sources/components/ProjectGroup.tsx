@@ -7,7 +7,7 @@ import { Text } from '@/components/StyledText';
 import { Typography } from '@/constants/Typography';
 import { t } from '@/text';
 import { ProjectGroupData, ProjectWorkspaceGroup, useIsProjectStarred, useLocalSettingMutable, useSessionGitStatus, storage } from '@/sync/storage';
-import { projectWorkspaceCollapseKey } from '@/sync/projectGroups';
+import { projectCollapseKey, projectWorkspaceCollapseKey } from '@/sync/projectGroups';
 import { orderSessionRowsByForkLineage } from '@/utils/forkLineage';
 import { CompactSessionRow } from './ActiveSessionsGroupCompact';
 import { Avatar } from './Avatar';
@@ -28,7 +28,20 @@ const ADD_ICON_SIZE = 18;
 interface ProjectGroupProps {
     project: ProjectGroupData;
     selectedSessionId?: string;
+    /**
+     * Fold the project as one unit instead of one checkout at a time. The
+     * first checkout's header carries the only chevron and it hides every
+     * checkout, which is how the list folded before it was rebuilt around
+     * worktrees. The other headers keep their name and `+` but lose the
+     * chevron, so there is never more than one fold control per project.
+     */
+    foldWholeProject?: boolean;
 }
+
+/** What the header at the top of one checkout does about folding. */
+type SectionFold =
+    | { chevron: false }
+    | { chevron: true; collapsed: boolean; count: number; onToggle: () => void };
 
 /**
  * One project and its sessions, split into the primary checkout and any named
@@ -36,7 +49,7 @@ interface ProjectGroupProps {
  * own header and card: the worktree name reads as a second line under the
  * project, so the card itself stays a plain list of sessions.
  */
-export const ProjectGroup = React.memo(({ project, selectedSessionId }: ProjectGroupProps) => {
+export const ProjectGroup = React.memo(({ project, selectedSessionId, foldWholeProject = false }: ProjectGroupProps) => {
     const styles = stylesheet;
 
     // Only path-grouped cards are starrable: the star key is machine-and-path,
@@ -51,9 +64,48 @@ export const ProjectGroup = React.memo(({ project, selectedSessionId }: ProjectG
         storage.getState().toggleProjectStarred(project.machineId, starPath);
     }, [project.machineId, starPath]);
 
+    // Folding state lives here, not in the section, because the whole-project
+    // mode needs one decision for every checkout — and reading the setting once
+    // per project beats one subscription per checkout either way.
+    const [collapsedProjects, setCollapsedProjects] = useLocalSettingMutable('collapsedProjects');
+    const setCollapsed = React.useCallback((key: string, collapsed: boolean) => {
+        setCollapsedProjects({ ...collapsedProjects, [key]: collapsed });
+    }, [collapsedProjects, setCollapsedProjects]);
+
+    const wholeProjectKey = projectCollapseKey(project.id);
+    const wholeProjectCollapsed = foldWholeProject && !!collapsedProjects[wholeProjectKey];
+    const totalSessions = React.useMemo(
+        () => project.workspaces.reduce((total, workspace) => total + workspace.sessions.length, 0),
+        [project.workspaces],
+    );
+
+    // Collapsed as one project: only the header that carries the chevron stays
+    // on screen, so the whole project reads as a single folded row.
+    const workspaces = wholeProjectCollapsed ? project.workspaces.slice(0, 1) : project.workspaces;
+
+    const foldFor = (workspace: ProjectWorkspaceGroup, index: number): SectionFold => {
+        if (foldWholeProject) {
+            if (index > 0) return { chevron: false };
+            return {
+                chevron: true,
+                collapsed: wholeProjectCollapsed,
+                count: totalSessions,
+                onToggle: () => setCollapsed(wholeProjectKey, !wholeProjectCollapsed),
+            };
+        }
+        const key = projectWorkspaceCollapseKey(project.id, workspace.id);
+        const collapsed = !!collapsedProjects[key];
+        return {
+            chevron: true,
+            collapsed,
+            count: workspace.sessions.length,
+            onToggle: () => setCollapsed(key, !collapsed),
+        };
+    };
+
     return (
         <View style={styles.container}>
-            {project.workspaces.map((workspace, index) => (
+            {workspaces.map((workspace, index) => (
                 <WorkspaceSection
                     key={workspace.id || 'primary'}
                     project={project}
@@ -62,15 +114,17 @@ export const ProjectGroup = React.memo(({ project, selectedSessionId }: ProjectG
                     showStar={canStar && index === 0}
                     isStarred={isStarred}
                     onToggleStar={handleToggleStar}
+                    fold={foldFor(workspace, index)}
                 />
             ))}
         </View>
     );
 });
 
-const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, showStar, isStarred, onToggleStar }: {
+const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, showStar, isStarred, onToggleStar, fold }: {
     project: ProjectGroupData;
     workspace: ProjectWorkspaceGroup;
+    fold: SectionFold;
     selectedSessionId?: string;
     // The star belongs to the project, so only the first section renders one.
     showStar?: boolean;
@@ -103,15 +157,11 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, sh
             })
             : null;
 
-    // Collapsing follows the header, and the header is per checkout: a project
-    // with three worktrees renders four of these sections, so one toggle folds
-    // exactly the card it sits on rather than every checkout of the project.
-    const collapseKey = projectWorkspaceCollapseKey(project.id, workspace.id);
-    const [collapsedProjects, setCollapsedProjects] = useLocalSettingMutable('collapsedProjects');
-    const collapsed = !!collapsedProjects[collapseKey];
-    const toggleCollapsed = React.useCallback(() => {
-        setCollapsedProjects({ ...collapsedProjects, [collapseKey]: !collapsed });
-    }, [collapsed, collapsedProjects, collapseKey, setCollapsedProjects]);
+    // What folding means here is decided by the parent: per checkout (a project
+    // with three worktrees renders four of these sections, each folding the card
+    // it sits on) or per project (only the first header has a chevron and it
+    // folds all of them).
+    const collapsed = fold.chevron && fold.collapsed;
 
     // Point the draft at this exact checkout before opening the composer, so
     // the dock's machine, project and worktree rows already read correctly.
@@ -151,18 +201,25 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, sh
         <View style={styles.section}>
             <View style={styles.header}>
                 <Pressable
-                    onPress={toggleCollapsed}
+                    onPress={fold.chevron ? fold.onToggle : undefined}
+                    disabled={!fold.chevron}
                     hitSlop={{ top: 8, bottom: 8 }}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: !collapsed }}
+                    accessibilityRole={fold.chevron ? 'button' : 'header'}
+                    accessibilityState={fold.chevron ? { expanded: !collapsed } : undefined}
                     accessibilityLabel={worktreeName ? `${project.name} / ${worktreeName}` : project.name}
                     style={styles.headerPress}
                 >
-                    <Ionicons
-                        name={collapsed ? 'chevron-forward' : 'chevron-down'}
-                        size={14}
-                        color={theme.colors.textSecondary}
-                    />
+                    {fold.chevron ? (
+                        <Ionicons
+                            name={collapsed ? 'chevron-forward' : 'chevron-down'}
+                            size={14}
+                            color={theme.colors.textSecondary}
+                        />
+                    ) : (
+                        // Keeps every header's name on the same left edge, with
+                        // or without a chevron.
+                        <View style={styles.chevronSpacer} />
+                    )}
                     {firstSession && (
                         <Avatar id={firstSession.avatarId} size={HEADER_AVATAR_SIZE} flavor={null} imageUrl={firstSession.projectAvatarUri} thumbhash={firstSession.projectAvatarThumbhash} />
                     )}
@@ -177,9 +234,9 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, sh
                             <GitLineChanges changes={changes} />
                         </View>
                     </View>
-                    {collapsed && (
+                    {collapsed && fold.chevron && (
                         <Text style={styles.count}>
-                            {workspace.sessions.length}
+                            {fold.count}
                         </Text>
                     )}
                 </Pressable>
@@ -254,6 +311,11 @@ const stylesheet = StyleSheet.create((theme) => ({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
+    },
+    // Same width as the chevron so a header without one still lines its name up
+    // with the headers that have it.
+    chevronSpacer: {
+        width: 14,
     },
     headerText: {
         flex: 1,

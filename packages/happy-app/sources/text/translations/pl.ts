@@ -265,6 +265,7 @@ export const pl: TranslationStructure = {
         groupingTitle: 'Grupowanie',
         flatList: 'Płaska lista',
         groupByProject: 'Grupuj według projektu',
+        groupByProjectFoldable: 'Zwijane projekty',
         appearanceSettings: 'Ustawienia wyglądu',
         worktreeTabs: ({ count }: { count: number }) => `${count} ${plural({ count, one: 'karta', few: 'karty', many: 'kart' })}`,
     },

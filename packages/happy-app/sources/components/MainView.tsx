@@ -162,6 +162,7 @@ const HeaderRight = React.memo(({ activeTab }: { activeTab: ActiveTabType }) => 
                     options: [
                         { key: 'flat', label: t('sessionsFilter.flatList') },
                         { key: 'project', label: t('sessionsFilter.groupByProject') },
+                        { key: 'project-folded', label: t('sessionsFilter.groupByProjectFoldable') },
                     ],
                     selectedKey: sessionListGrouping,
                     onSelect: (key) => {
