@@ -17,6 +17,19 @@ export const SUPPORTED_SCHEMA_VERSION = 2;
 // by project, where one chevron folds a whole project — every checkout at once.
 export const SESSION_LIST_GROUPING_MODES = ['flat', 'project', 'project-folded'] as const;
 export type SessionListGrouping = typeof SESSION_LIST_GROUPING_MODES[number];
+export const DEFAULT_SESSION_LIST_GROUPING: SessionListGrouping = 'flat';
+
+/**
+ * Settings are synced, so a build can meet a layout a newer build wrote. Read
+ * the field through here — never compare the raw string — and an unknown value
+ * renders the default layout while staying in the blob untouched, which is what
+ * the forward/backward-compatibility note below requires.
+ */
+export function normalizeSessionListGrouping(value: string | null | undefined): SessionListGrouping {
+    return (SESSION_LIST_GROUPING_MODES as readonly string[]).includes(value ?? '')
+        ? value as SessionListGrouping
+        : DEFAULT_SESSION_LIST_GROUPING;
+}
 
 export const SettingsSchema = z.object({
     // Schema version for compatibility detection
@@ -37,7 +50,12 @@ export const SettingsSchema = z.object({
     // normalizeAvatarStyle so unknown values fall back to brutalist.
     avatarStyle: z.string().describe('Generated avatar style: brutalist, pixelated, or gradient'),
     avatarMonochrome: z.boolean().describe('Render generated avatars in black and white'),
-    sessionListGrouping: z.enum(SESSION_LIST_GROUPING_MODES).describe('Home session list layout: flat activity list, grouped by project, or grouped by project with each project foldable'),
+    // A plain string, like avatarStyle above, NOT z.enum: settingsParse falls back
+    // to defaults for EVERY known field when the schema rejects anything, so one
+    // unfamiliar layout name would silently reset the whole settings object — and
+    // an older build could then sync those defaults back. Read it through
+    // normalizeSessionListGrouping instead.
+    sessionListGrouping: z.string().describe('Home session list layout: flat activity list, grouped by project, or grouped by project with each project foldable'),
     // Keep the legacy key for synced settings compatibility. It controls the
     // harness badges in the session list.
     showFlavorIcons: z.boolean().describe('Whether to show harness icons in the session list'),

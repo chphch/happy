@@ -8,7 +8,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useFriendRequests, useRealtimeStatus, useSettingMutable } from '@/sync/storage';
-import { SESSION_LIST_GROUPING_MODES, type SessionListGrouping } from '@/sync/settings';
+import { SESSION_LIST_GROUPING_MODES, normalizeSessionListGrouping, type SessionListGrouping } from '@/sync/settings';
 import { NativeSettingsMenu, type NativeSettingsMenuGroup } from './NativeSettingsMenu';
 import { useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
 import { useIsTablet } from '@/utils/responsive';
@@ -164,7 +164,7 @@ const HeaderRight = React.memo(({ activeTab }: { activeTab: ActiveTabType }) => 
                         { key: 'project', label: t('sessionsFilter.groupByProject') },
                         { key: 'project-folded', label: t('sessionsFilter.groupByProjectFoldable') },
                     ],
-                    selectedKey: sessionListGrouping,
+                    selectedKey: normalizeSessionListGrouping(sessionListGrouping),
                     onSelect: (key) => {
                         if ((SESSION_LIST_GROUPING_MODES as readonly string[]).includes(key)) {
                             setSessionListGrouping(key as SessionListGrouping);
