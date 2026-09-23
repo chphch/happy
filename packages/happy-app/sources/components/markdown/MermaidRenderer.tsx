@@ -7,6 +7,7 @@ import { Typography } from '@/constants/Typography';
 import { t } from '@/text';
 import { Modal } from '@/modal';
 import { MermaidViewer } from './MermaidViewer';
+import { jsonForScriptElement } from './scriptEncoding';
 
 // Runaway guard on the WebView-reported height, NOT a design cap. It used to be
 // 600, which silently cropped any diagram taller than that: the container is a
@@ -135,9 +136,10 @@ export const MermaidRenderer = React.memo((props: {
         );
     }
 
-    // For iOS/Android, use WebView
-    // Pass mermaid content via JSON to prevent XSS from HTML interpolation
-    const mermaidContent = JSON.stringify(props.content);
+    // For iOS/Android, use WebView.
+    // The diagram body is interpolated into a <script> element below, so it
+    // needs an HTML script-data encoder, not only a JavaScript-string one.
+    const mermaidContent = jsonForScriptElement(props.content);
     const html = `
         <!DOCTYPE html>
         <html>
