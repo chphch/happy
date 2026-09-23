@@ -152,6 +152,8 @@ describe('modelModeOptions', () => {
         expect(models.map((model) => model.key)).toEqual([
             'claude-fable-5-1',
             'claude-fable-5',
+            'claude-opus-5-5',
+            'claude-opus-5-5[1m]',
             'claude-opus-5',
             'claude-opus-5[1m]',
             'claude-sonnet-5',
@@ -159,6 +161,8 @@ describe('modelModeOptions', () => {
         expect(models.map((model) => model.name)).toEqual([
             'Fable 5.1',
             'Fable 5',
+            'Opus 5.5',
+            'Opus 5.5 [1M]',
             'Opus 5',
             'Opus 5 [1M]',
             'Sonnet 5',
@@ -194,7 +198,7 @@ describe('modelModeOptions', () => {
         // brackets that union with two levels of its own — `auto` pins no effort
         // at all and `ultracode` maps to xhigh plus Claude Code's ultracode mode
         // — so they ride along on every model too.
-        for (const model of ['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5', 'claude-sonnet-5']) {
+        for (const model of ['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5']) {
             const keys = getEffortLevelsForModel('claude', model).map((level) => level.key);
             expect(keys).toEqual(['auto', 'low', 'medium', 'high', 'xhigh', 'max', 'ultracode']);
             // Claude's floor is `low`; there is no off.
