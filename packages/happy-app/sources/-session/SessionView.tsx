@@ -80,6 +80,7 @@ import {
 import { RigActivityBar } from '@/components/RigActivityBar';
 import { CanvasPanel } from '@/components/canvas/CanvasPanel';
 import { canvasPathFor } from '@/components/canvas/canvasFile';
+import { useCanvasOpen } from '@/hooks/useCanvasOpen';
 import { AnimatedFade } from '@/components/AnimatedOverlay';
 
 export const SessionView = React.memo((props: { id: string }) => {
@@ -189,7 +190,7 @@ export const SessionView = React.memo((props: { id: string }) => {
     // sidebar's — a canvas only needs a working directory to anchor its file to,
     // and it is useful on a phone, where the diff sidebar never is.
     const canvasPath = canvasPathFor(session?.metadata);
-    const [canvasOpen, setCanvasOpen] = React.useState(false);
+    const [canvasOpen, setCanvasOpen] = useCanvasOpen(sessionId);
     const canvasVisible = canvasOpen && !!canvasPath && !zenMode;
     // Side by side where there is room; stacked above the chat where there is not
     // (the phone). Same width rule as the sidebar so the two read as one system.
@@ -549,7 +550,7 @@ export const SessionView = React.memo((props: { id: string }) => {
                                 ? (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                                         <Pressable
-                                            onPress={() => setCanvasOpen((v) => !v)}
+                                            onPress={() => setCanvasOpen(!canvasOpen)}
                                             hitSlop={10}
                                             accessibilityRole="button"
                                             accessibilityLabel={t('canvas.title')}
