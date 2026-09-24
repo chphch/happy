@@ -178,21 +178,53 @@ export function useRemoteFile(
         return () => { cancelled = true; };
     }, [sessionId, filePath, readErrorMessage]);
 
+    // The poll below reads these at the moment a change arrives, not when the
+    // interval was set up — otherwise it would judge "untouched" against the
+    // text as it stood seconds ago.
+    const editContentRef = React.useRef(editContent);
+    editContentRef.current = editContent;
+
     // Watch for a change made on the machine — most often the agent rewriting it.
+    // With nothing typed here since the last load, there is nothing to lose, so
+    // the new text simply replaces the old one. Only when the person has
+    // unsaved edits of their own does it wait behind the banner for a choice.
     React.useEffect(() => {
         if (!filePath || pollMs <= 0) return;
         if (state.kind !== 'loaded' || !state.originalHash) return;
         const originalHash = state.originalHash;
+        const loadedContent = state.content;
 
         const interval = setInterval(async () => {
             const content = await readRemoteFile(sessionId, filePath);
             if (content === null) return;
             const hash = await computeSHA256(content);
-            if (hash !== originalHash) setExternalChange(content);
+            if (hash === originalHash) return;
+            if (editContentRef.current === loadedContent) {
+                setExternalChange(null);
+                setState({ kind: 'loaded', content, originalHash: hash });
+                setEditContent(content);
+            } else {
+                setExternalChange(content);
+            }
         }, pollMs);
 
         return () => clearInterval(interval);
     }, [sessionId, filePath, state, pollMs]);
+
+    // A file that did not exist when the panel opened (a canvas the agent has
+    // not written yet) is picked up as soon as it appears, instead of leaving
+    // the "not created yet" message on screen until the panel is reopened.
+    React.useEffect(() => {
+        if (!filePath || pollMs <= 0 || state.kind !== 'error') return;
+        const interval = setInterval(async () => {
+            const content = await readRemoteFile(sessionId, filePath);
+            if (content === null) return;
+            const hash = await computeSHA256(content);
+            setState({ kind: 'loaded', content, originalHash: hash });
+            setEditContent(content);
+        }, pollMs);
+        return () => clearInterval(interval);
+    }, [sessionId, filePath, state.kind, pollMs]);
 
     /** Take the machine's version, discarding local edits. */
     const reload = React.useCallback(() => {
