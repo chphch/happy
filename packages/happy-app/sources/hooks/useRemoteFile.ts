@@ -13,6 +13,7 @@
  * reports `kind: 'idle'`.
  */
 import * as React from 'react';
+import * as Crypto from 'expo-crypto';
 import { sessionReadFile, sessionWriteFile } from '@/sync/ops';
 
 export type RemoteFileState =
@@ -74,10 +75,16 @@ export function encodeStringToBase64(str: string): string {
     return btoa(binary);
 }
 
-/** Matches the server's `crypto.createHash('sha256').update(str).digest('hex')`. */
+/**
+ * Matches the server's `crypto.createHash('sha256').update(str).digest('hex')`.
+ *
+ * Through expo-crypto rather than `crypto.subtle`: the phone's JS engine has no
+ * `crypto.subtle`, so the digest threw after every successful read there and
+ * the file showed as unreadable.
+ */
 export async function computeSHA256(content: string): Promise<string> {
     const data = new TextEncoder().encode(content);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashBuffer = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, data);
     return Array.from(new Uint8Array(hashBuffer))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
