@@ -191,7 +191,9 @@ export const SessionView = React.memo((props: { id: string }) => {
     // and it is useful on a phone, where the diff sidebar never is.
     const canvasPath = canvasPathFor(session?.metadata);
     const [canvasOpen, setCanvasOpen] = useCanvasOpen(sessionId);
-    const canvasVisible = canvasOpen && !!canvasPath && !zenMode;
+    // Not gated on zen mode: collapsing the left menu hides chrome the user did
+    // not ask for, and an open canvas is something they explicitly asked for.
+    const canvasVisible = canvasOpen && !!canvasPath;
     // Side by side where there is room; stacked above the chat where there is not
     // (the phone). Same width rule as the sidebar so the two read as one system.
     const canvasSideBySide = windowWidth >= SIDEBAR_MIN_WINDOW_WIDTH;
