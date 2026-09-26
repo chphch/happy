@@ -267,6 +267,14 @@ export const pl: TranslationStructure = {
         appearanceSettings: 'Ustawienia wyglądu',
         worktreeTabs: ({ count }: { count: number }) => `${count} ${plural({ count, one: 'karta', few: 'karty', many: 'kart' })}`,
     },
+    projectOrder: {
+        title: 'Zmień kolejność projektów',
+        hint: 'Przeciągnij projekt za uchwyt, aby go przenieść. Kolejność synchronizuje się między Twoimi urządzeniami.',
+        done: 'Gotowe',
+        moveUp: 'Przenieś w górę',
+        moveDown: 'Przenieś w dół',
+        empty: 'Brak projektów do uporządkowania',
+    },
 
     settingsFeatures: {
         // Features settings screen

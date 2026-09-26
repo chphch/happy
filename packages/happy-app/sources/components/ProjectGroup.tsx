@@ -17,6 +17,7 @@ import { formatPathRelativeToHome } from '@/utils/sessionUtils';
 import { visibleRigGitLineChanges } from '@/utils/rigGitLineChanges';
 import { GitLineChanges } from './GitLineChanges';
 import { getRepoPath, isWorktreePath } from '@/utils/worktreePaths';
+import { openProjectOrderEditor } from './ProjectOrderEditor';
 
 // Tall enough to span the name and branch lines together.
 const HEADER_AVATAR_SIZE = 30;
@@ -100,17 +101,20 @@ export const ProjectGroup = React.memo(({ project, selectedSessionId, foldWholeP
                     workspace={workspace}
                     selectedSessionId={selectedSessionId}
                     fold={foldFor(workspace, index)}
+                    showReorder={index === 0}
                 />
             ))}
         </View>
     );
 });
 
-const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, fold }: {
+const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, fold, showReorder = false }: {
     project: ProjectGroupData;
     workspace: ProjectWorkspaceGroup;
     fold: SectionFold;
     selectedSessionId?: string;
+    // The order belongs to the project, so only its first header offers it.
+    showReorder?: boolean;
 }) => {
     const styles = stylesheet;
     const { theme } = useUnistyles();
@@ -178,10 +182,29 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, fo
         [workspace.sessions],
     );
 
+    // Opens the dialog that arranges the project cards, on this one. Besides
+    // the button, the header itself opens it: a long press on a phone, a right
+    // click on the web — the same gestures that open a session row's menu.
+    const openReorder = React.useCallback(() => {
+        openProjectOrderEditor(project.id);
+    }, [project.id]);
+    const reorderGestureProps = !showReorder
+        ? {}
+        : Platform.OS === 'web'
+            ? {
+                onContextMenu: (event: { preventDefault?: () => void; stopPropagation?: () => void }) => {
+                    event.preventDefault?.();
+                    event.stopPropagation?.();
+                    openReorder();
+                },
+            } as any
+            : { onLongPress: openReorder };
+
     return (
         <View style={styles.section}>
             <View style={styles.header}>
                 <Pressable
+                    {...reorderGestureProps}
                     onPress={fold.chevron ? fold.onToggle : undefined}
                     disabled={!fold.chevron}
                     hitSlop={{ top: 8, bottom: 8 }}
@@ -221,6 +244,17 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, fo
                         </Text>
                     )}
                 </Pressable>
+                {showReorder && (
+                    <Pressable
+                        onPress={openReorder}
+                        hitSlop={{ top: 15, bottom: 15, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('projectOrder.title')}
+                        style={({ pressed }) => [styles.reorderButton, pressed && styles.addButtonPressed]}
+                    >
+                        <Ionicons name="swap-vertical" size={15} color={theme.colors.textSecondary} />
+                    </Pressable>
+                )}
                 <Pressable
                     onPress={handleNewSession}
                     hitSlop={12}
@@ -298,6 +332,9 @@ const stylesheet = StyleSheet.create((theme) => ({
         letterSpacing: Platform.select({ ios: -0.08, default: 0.1 }),
         fontWeight: Platform.select({ ios: 'normal', default: '500' }),
         ...Typography.default('regular'),
+    },
+    reorderButton: {
+        padding: 4,
     },
     branchLine: {
         flexDirection: 'row',

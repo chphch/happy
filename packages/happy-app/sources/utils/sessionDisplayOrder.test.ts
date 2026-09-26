@@ -5,6 +5,7 @@ import {
     buildSessionProjectDisplayGroups,
     getSessionShortcutIdsInDisplayOrder,
 } from './sessionDisplayOrder';
+import { createProjectRank } from './projectOrder';
 
 function session(
     id: string,
@@ -235,5 +236,65 @@ describe('session display order', () => {
             'child',
             'unrelated',
         ]);
+    });
+
+    describe('the order the user arranged', () => {
+        function projectItem(id: string, name: string, machineId: string | null = 'machine-a'): SessionListViewItem {
+            return {
+                type: 'project',
+                source: 'happy',
+                project: {
+                    id,
+                    name,
+                    machineId,
+                    activeCount: 0,
+                    sessionCount: 1,
+                    workspaces: [{ id: '', name: null, sessions: [session(`${id}-session`, machineId ?? '', `/${id}`)] }],
+                },
+            };
+        }
+
+        const cards = [
+            projectItem('alpha', 'Alpha project'),
+            projectItem('bravo', 'Bravo project'),
+            projectItem('zulu', 'Zulu project'),
+        ];
+
+        function projectIds(data: SessionListViewItem[], order: string[]): string[] {
+            const groups = buildSessionProjectDisplayGroups(data, machines, 'Unknown', createProjectRank(order));
+            return groups.flatMap((group) => group.projects.map((item) => item.project.id));
+        }
+
+        it('lays the cards out in the stored order', () => {
+            expect(projectIds(cards, ['zulu', 'alpha', 'bravo'])).toEqual(['zulu', 'alpha', 'bravo']);
+        });
+
+        it('puts cards the order does not name after it, by name', () => {
+            expect(projectIds(cards, ['bravo'])).toEqual(['bravo', 'alpha', 'zulu']);
+        });
+
+        it('falls back to names when nothing is stored', () => {
+            expect(projectIds(cards, [])).toEqual(['alpha', 'bravo', 'zulu']);
+            expect(buildSessionProjectDisplayGroups(cards, machines, 'Unknown')
+                .flatMap((group) => group.projects.map((item) => item.project.id)))
+                .toEqual(['alpha', 'bravo', 'zulu']);
+        });
+
+        it('keeps a card inside its own machine group', () => {
+            const data = [projectItem('alpha', 'Alpha project'), projectItem('remote', 'Remote project', 'machine-z')];
+
+            // machine-a (Alpha) leads machine-z (Zulu) by name; ranking the
+            // machine-z card first reorders nothing across that boundary.
+            expect(projectIds(data, ['remote', 'alpha'])).toEqual(['alpha', 'remote']);
+        });
+
+        it('numbers the session shortcuts in the arranged order too', () => {
+            expect(getSessionShortcutIdsInDisplayOrder(
+                cards,
+                machines,
+                'Unknown',
+                createProjectRank(['zulu', 'alpha', 'bravo']),
+            )).toEqual(['zulu-session', 'alpha-session', 'bravo-session']);
+        });
     });
 });
