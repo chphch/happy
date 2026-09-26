@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useSession, useSessionMessages } from '@/sync/storage';
-import { Pressable, View } from 'react-native';
+import { sync } from '@/sync/sync';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useHeaderHeight } from '@/utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageView } from './MessageView';
@@ -14,16 +15,21 @@ const SCROLL_THRESHOLD = 300;
 
 // Render windowing. The web variant renders messages into a plain
 // column-reverse <div> with no list virtualization (unlike the native
-// ChatList.tsx FlatList). Without a cap, every loaded message becomes a live
-// DOM node + React fiber — and prefetchOlderMessagesInBackground keeps growing
-// the store to the full session history, so a long session mounts thousands of
-// MessageViews on open and re-mounts all of them on every session switch.
+// ChatList.tsx list). Without a cap, every loaded message becomes a live
+// DOM node + React fiber, so a long session would mount hundreds of
+// MessageViews on open and re-mount all of them on every session switch.
 //
 // Fix: render only the newest INITIAL_WINDOW messages on mount, then reveal
 // WINDOW_STEP more whenever the user scrolls within REVEAL_THRESHOLD_PX of the
 // oldest rendered message. Messages are newest-first, so slice(0, n) is the
-// newest n — stable as background prefetch appends older messages to the tail,
-// which means that growth no longer triggers any re-render of the visible slice.
+// newest n — stable as older pages append to the tail, which means that
+// growth does not re-render the visible slice.
+//
+// History beyond the store is fetched here as well. Background prefetch stops
+// after a few pages (fetchOlderMessagesInBackground in sync.ts), so once the
+// window has revealed everything the store holds, this list asks for the next
+// older page itself — otherwise a long session ends wherever that prefetch
+// happened to stop.
 const INITIAL_WINDOW = 50;
 const WINDOW_STEP = 50;
 const REVEAL_THRESHOLD_PX = 1500;
@@ -40,12 +46,14 @@ const REVEAL_THRESHOLD_PX = 1500;
 const sessionScrollOffsets: Map<string, number> = new Map();
 
 export const ChatList = React.memo((props: { session: Session }) => {
-    const { messages } = useSessionMessages(props.session.id);
+    const { messages, hasMoreOlder, isLoadingOlder } = useSessionMessages(props.session.id);
     return (
         <ChatListInternal
             metadata={props.session.metadata}
             sessionId={props.session.id}
             messages={messages}
+            hasMoreOlder={hasMoreOlder}
+            isLoadingOlder={isLoadingOlder}
         />
     );
 });
@@ -54,6 +62,8 @@ const ChatListInternal = React.memo((props: {
     metadata: Metadata | null;
     sessionId: string;
     messages: Message[];
+    hasMoreOlder: boolean;
+    isLoadingOlder: boolean;
 }) => {
     const { theme } = useUnistyles();
     const headerHeight = useHeaderHeight();
@@ -86,6 +96,57 @@ const ChatListInternal = React.memo((props: {
         [props.messages, renderLimit],
     );
 
+    // This list's own older-history page, so a burst of scroll events asks for
+    // it once. The store's isLoadingOlder also covers background prefetch.
+    const olderRequestRef = React.useRef<Promise<boolean> | null>(null);
+    // A failed page waits for the reader's next scroll instead of retrying on
+    // its own: the effect below would otherwise ask again the moment the
+    // loading flag drops, in a loop, against a server that keeps failing.
+    const olderFailedRef = React.useRef(false);
+    // Bumped when a page moved the cursor back, so the effect below re-checks
+    // once olderRequestRef is clear — a page can land without changing the
+    // message count (a tool result merging into its call).
+    const [olderSettled, setOlderSettled] = React.useState(0);
+
+    // Near the oldest rendered message, reveal the next slice of the store;
+    // once the store is spent, fetch the next older page.
+    const growTowardOlder = React.useCallback((node: HTMLDivElement) => {
+        const distanceToTop = node.scrollHeight - node.clientHeight - Math.abs(node.scrollTop);
+        if (distanceToTop >= REVEAL_THRESHOLD_PX) return;
+        if (renderLimit < props.messages.length) {
+            // revealPendingRef caps a single momentum gesture to one step.
+            if (revealPendingRef.current) return;
+            revealPendingRef.current = true;
+            setRenderLimit((prev) => Math.min(prev + WINDOW_STEP, props.messages.length));
+            return;
+        }
+        if (!props.hasMoreOlder || props.isLoadingOlder || olderRequestRef.current || olderFailedRef.current) return;
+        const request = sync.loadOlderMessages(props.sessionId);
+        olderRequestRef.current = request;
+        request.then(
+            (advanced) => {
+                if (olderRequestRef.current !== request) return;
+                olderRequestRef.current = null;
+                // A no-op page rests until the next scroll or store change,
+                // so it cannot spin.
+                if (advanced) setOlderSettled((n) => n + 1);
+            },
+            () => {
+                if (olderRequestRef.current !== request) return;
+                olderRequestRef.current = null;
+                olderFailedRef.current = true;
+            },
+        );
+    }, [props.sessionId, props.messages.length, props.hasMoreOlder, props.isLoadingOlder, renderLimit]);
+
+    // A page landing, or the window growing, is re-checked without waiting for
+    // a scroll event: a reader holding the list at the top is not scrolling.
+    React.useEffect(() => {
+        const node = scrollRef.current;
+        if (!node || !hasRestoredRef.current) return;
+        growTowardOlder(node);
+    }, [growTowardOlder, olderSettled]);
+
     // Save scroll position on every scroll event. Skip writes while the
     // restore loop below is still in progress: during restore we set
     // scrollTop programmatically, which fires onScroll with the clamped
@@ -100,18 +161,14 @@ const ChatListInternal = React.memo((props: {
         const node = e.currentTarget;
         const scrollTop = node.scrollTop;
 
-        // Reveal older messages as the user approaches the oldest rendered one.
-        // column-reverse: the visual top is reached as |scrollTop| approaches
-        // (scrollHeight - clientHeight). Reveal a buffer early so older content
-        // is already mounted before it scrolls into view. revealPendingRef caps
-        // a single momentum gesture to one WINDOW_STEP grow.
-        if (!revealPendingRef.current && renderLimit < props.messages.length) {
-            const distanceToTop = node.scrollHeight - node.clientHeight - Math.abs(scrollTop);
-            if (distanceToTop < REVEAL_THRESHOLD_PX) {
-                revealPendingRef.current = true;
-                setRenderLimit((prev) => Math.min(prev + WINDOW_STEP, props.messages.length));
-            }
-        }
+        // Reveal older messages, or fetch them once the store is spent, as the
+        // user approaches the oldest rendered one. column-reverse: the visual
+        // top is reached as |scrollTop| approaches (scrollHeight - clientHeight),
+        // and the work starts a buffer early so older content is already
+        // mounted before it scrolls into view. A scroll is also the reader
+        // asking again, which is how a failed page gets retried.
+        olderFailedRef.current = false;
+        growTowardOlder(node);
 
         if (!hasRestoredRef.current) return;
         sessionScrollOffsets.set(props.sessionId, scrollTop);
@@ -120,7 +177,7 @@ const ChatListInternal = React.memo((props: {
             showScrollButtonRef.current = next;
             setShowScrollButton(next);
         }
-    }, [props.sessionId, props.messages.length, renderLimit]);
+    }, [props.sessionId, growTowardOlder]);
 
     const scrollToBottom = React.useCallback(() => {
         const node = scrollRef.current;
@@ -204,8 +261,14 @@ const ChatListInternal = React.memo((props: {
                         sessionId={props.sessionId}
                     />
                 ))}
-                {/* Top spacer for header — last in DOM = visual top */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', height: headerHeight + safeArea.top + 32 }} />
+                {/* Top spacer for header — last in DOM = visual top. Its lowest
+                    32px, directly above the oldest message and clear of the
+                    header, carry the spinner while older history loads. */}
+                <View style={{ height: headerHeight + safeArea.top + 32, justifyContent: 'flex-end' }}>
+                    <View style={{ height: 32, alignItems: 'center', justifyContent: 'center' }}>
+                        {props.isLoadingOlder && renderLimit >= props.messages.length && <ActivityIndicator size="small" />}
+                    </View>
+                </View>
             </div>
             {showScrollButton && (
                 <View style={styles.scrollButtonContainer}>
