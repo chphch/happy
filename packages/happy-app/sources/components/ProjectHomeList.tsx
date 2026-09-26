@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Text } from '@/components/StyledText';
 import { Typography } from '@/constants/Typography';
-import { Modal } from '@/modal';
+import { Modal, type AlertButton } from '@/modal';
 import { t } from '@/text';
 import {
     storage,
@@ -35,6 +35,7 @@ import {
     type SessionRowData,
 } from '@/sync/storage';
 import { useHasArchivedSessions, useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
+import { useProjectRank } from '@/hooks/useProjectOrder';
 import {
     buildProjectHomeRows,
     workspaceOrigin,
@@ -55,6 +56,7 @@ import { StatusDot } from './StatusDot';
 import { ShimmerText } from './ShimmerText';
 import { HomeListHeader } from './HomeListHeader';
 import { layout } from './layout';
+import { openProjectOrderEditor } from './ProjectOrderEditor';
 
 // Every row starts with the same avatar and name columns. Disclosure controls
 // live at the trailing edge so rows without worktrees do not reserve space for
@@ -121,6 +123,8 @@ export const ProjectHomeList = React.memo((props: ProjectHomeListLayout) => {
     // Stored under its original `hideInactiveSessions` key — synced settings
     // have no rename migration — but it hides archived sessions only.
     const [archiveHidden, setArchiveHidden] = useSettingMutable('hideInactiveSessions');
+    // The order the user arranged the cards in; the card list uses the same.
+    const projectRank = useProjectRank();
 
     const rows = React.useMemo(() => buildProjectHomeRows({
         data: data ?? [],
@@ -130,7 +134,8 @@ export const ProjectHomeList = React.memo((props: ProjectHomeListLayout) => {
         labels: { bots: t('sidebar.bots'), projects: t('sidebar.projects') },
         hasArchivedSessions,
         archiveHidden,
-    }), [archiveHidden, expanded, data, hasArchivedSessions, machines]);
+        projectRank,
+    }), [archiveHidden, expanded, data, hasArchivedSessions, machines, projectRank]);
 
     const toggleArchive = React.useCallback(() => {
         setArchiveHidden(!archiveHidden);
@@ -460,15 +465,19 @@ const ProjectRow = React.memo(({ project }: {
 
     const canCreateWorkspace = !!place;
 
+    // Arranging the cards is open to every project, so the menu always has
+    // something to offer; creating a workspace needs a place to create it in.
     const showProjectActions = React.useCallback(() => {
-        if (!canCreateWorkspace) return;
-        Modal.alert(project.name, undefined, [
-            { text: 'Create workspace', onPress: createWorkspace },
-            { text: t('common.cancel'), style: 'cancel' },
-        ]);
-    }, [canCreateWorkspace, createWorkspace, project.name]);
+        const actions: AlertButton[] = [];
+        if (canCreateWorkspace) {
+            actions.push({ text: 'Create workspace', onPress: createWorkspace });
+        }
+        actions.push({ text: t('projectOrder.title'), onPress: () => openProjectOrderEditor(project.id) });
+        actions.push({ text: t('common.cancel'), style: 'cancel' });
+        Modal.alert(project.name, undefined, actions);
+    }, [canCreateWorkspace, createWorkspace, project.id, project.name]);
 
-    const menuHandlers = Platform.OS === 'web' && canCreateWorkspace
+    const menuHandlers = Platform.OS === 'web'
         ? {
             onContextMenu: (event: { preventDefault: () => void; stopPropagation?: () => void }) => {
                 event.preventDefault?.();
@@ -476,9 +485,7 @@ const ProjectRow = React.memo(({ project }: {
                 showProjectActions();
             },
         } as any
-        : canCreateWorkspace
-            ? { onLongPress: showProjectActions }
-            : {};
+        : { onLongPress: showProjectActions };
 
     return (
         <RowPressable

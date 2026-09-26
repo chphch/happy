@@ -16,6 +16,7 @@ import {
 } from '@/keyboard/shortcuts';
 import { isTauri } from '@/utils/isTauri';
 import { useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
+import { useProjectRank } from '@/hooks/useProjectOrder';
 import { getSessionShortcutIdsInDisplayOrder } from '@/utils/sessionDisplayOrder';
 import { t } from '@/text';
 
@@ -28,6 +29,9 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
     const commandPaletteEnabled = storage(useShallow((state) => state.localSettings.commandPaletteEnabled));
     const sessionListViewData = useVisibleSessionListViewData();
     const machines = useAllMachines();
+    // The number badges follow what is on screen, so they have to be built from
+    // the same order the list lays its project cards out in.
+    const projectRank = useProjectRank();
     const navigateToSession = useNavigateToSession();
     const preferredModifier = useMemo(() => getPreferredShortcutModifier(
         typeof navigator === 'undefined' ? undefined : navigator
@@ -37,7 +41,8 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
         sessionListViewData,
         machines,
         t('status.unknown'),
-    ), [machines, sessionListViewData]);
+        projectRank,
+    ), [machines, projectRank, sessionListViewData]);
 
     // Define available commands
     const commands = useMemo((): Command[] => {
