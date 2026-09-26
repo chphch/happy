@@ -205,6 +205,14 @@ export const ru: TranslationStructure = {
         appearanceSettings: 'Настройки внешнего вида',
         worktreeTabs: ({ count }: { count: number }) => `${count} ${plural({ count, one: 'вкладка', few: 'вкладки', many: 'вкладок' })}`,
     },
+    projectOrder: {
+        title: 'Порядок проектов',
+        hint: 'Перетащите проект за ручку, чтобы переместить его. Порядок синхронизируется между вашими устройствами.',
+        done: 'Готово',
+        moveUp: 'Переместить вверх',
+        moveDown: 'Переместить вниз',
+        empty: 'Нет проектов для упорядочивания',
+    },
 
     settingsFeatures: {
         // Features settings screen

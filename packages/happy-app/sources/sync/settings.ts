@@ -75,6 +75,7 @@ export const SettingsSchema = z.object({
     fileDiffsSidebar: z.boolean().describe('Show the file diffs sidebar next to the chat on desktop'),
     groupToolCalls: z.boolean().describe('Collapse consecutive tool calls into grouped containers in chat'),
     compactToolCalls: z.boolean().describe('Render non-interactive tool calls as compact one-line rows'),
+    projectOrder: z.array(z.string()).describe('Home list project cards (ProjectGroupData ids) in the order the user arranged them; synced across the user\'s devices'),
     reviewPromptAnswered: z.boolean().describe('Whether the review prompt has been answered'),
     reviewPromptLikedApp: z.boolean().nullish().describe('Whether user liked the app when asked'),
     voiceAssistantLanguage: z.string().nullable().describe('Preferred language for voice assistant (null for auto-detect)'),
@@ -153,6 +154,7 @@ export const settingsDefaults: Settings = {
     groupToolCalls: false,
     // Full tool views by default: edit diffs render inline in the chat.
     compactToolCalls: false,
+    projectOrder: [],
     reviewPromptAnswered: false,
     reviewPromptLikedApp: null,
     voiceAssistantLanguage: null,

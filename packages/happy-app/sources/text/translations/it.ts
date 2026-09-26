@@ -248,6 +248,14 @@ export const it: TranslationStructure = {
         appearanceSettings: 'Impostazioni aspetto',
         worktreeTabs: ({ count }: { count: number }) => count === 1 ? '1 scheda' : `${count} schede`,
     },
+    projectOrder: {
+        title: 'Riordina progetti',
+        hint: 'Trascina un progetto dalla maniglia per spostarlo. L\'ordine si sincronizza tra i tuoi dispositivi.',
+        done: 'Fine',
+        moveUp: 'Sposta su',
+        moveDown: 'Sposta giù',
+        empty: 'Nessun progetto da riordinare',
+    },
 
     settingsFeatures: {
         // Features settings screen

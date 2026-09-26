@@ -12,6 +12,7 @@ import { FlatSessionRow, flatListBackgroundColor } from './FlatSessionRow';
 import { buildFlatSessionRows, toFlatSessionRow, type FlatSessionRowData } from '@/utils/flatSessionList';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHasArchivedSessions, useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
+import { useProjectRank } from '@/hooks/useProjectOrder';
 import { Typography } from '@/constants/Typography';
 import { StatusDot } from './StatusDot';
 import { ForkLineageConnector, forkIndentPadding } from './ForkLineageConnector';
@@ -355,6 +356,17 @@ export function SessionsList({
         return pathname.split('/')[2];
     }, [isTablet, pathname]);
 
+    // The card order is a synced setting, which does not rebuild the cached
+    // list data, so it is read here where a change re-runs the grouping below.
+    // It also rides in extraData: web re-renders eagerly, but native FlatList
+    // memoizes cells and would keep showing the old order until something else
+    // forced a repaint.
+    const projectRank = useProjectRank();
+    const listExtraData = React.useMemo(
+        () => ({ selectedSessionId, projectRank }),
+        [selectedSessionId, projectRank],
+    );
+
     // Request review
     React.useEffect(() => {
         if (sourceData && sourceData.length > 0) {
@@ -412,6 +424,7 @@ export function SessionsList({
             groupedRows,
             machines,
             t('status.unknown'),
+            projectRank,
         );
         if (machineGroups.length === 0) {
             return [...groupedRows, ...archiveToggle, ...archivedRows];
@@ -429,7 +442,7 @@ export function SessionsList({
             item.type !== 'project' && item.type !== 'projects-header'
         ));
         return [...legacyItems, ...hierarchy, ...archiveToggle, ...archivedRows];
-    }, [flatSessionList, hasArchivedSessions, hideArchivedSessions, machines, sourceData]);
+    }, [flatSessionList, hasArchivedSessions, hideArchivedSessions, machines, projectRank, sourceData]);
 
     const keyExtractor = React.useCallback((item: SessionListDisplayItem, index: number) => {
         switch (item.type) {
@@ -608,7 +621,7 @@ export function SessionsList({
                     data={data}
                     renderItem={renderItem}
                     keyExtractor={keyExtractor}
-                    extraData={selectedSessionId}
+                    extraData={listExtraData}
                     contentContainerStyle={{
                         paddingTop: topContentInset,
                         paddingBottom: safeArea.bottom + bottomContentInset,
