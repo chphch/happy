@@ -12,6 +12,15 @@ import { FlatSessionRow, flatListBackgroundColor } from './FlatSessionRow';
 import { buildFlatSessionRows, toFlatSessionRow, type FlatSessionRowData } from '@/utils/flatSessionList';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHasArchivedSessions, useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
+import { useProjectRank } from '@/hooks/useProjectOrder';
+import {
+    ProjectCardDragCell,
+    ProjectCardDragContext,
+    ProjectCardGhost,
+    slotAround,
+    useProjectCardDrag,
+    type ProjectCardDragGroup,
+} from './ProjectCardDrag';
 import { Typography } from '@/constants/Typography';
 import { StatusDot } from './StatusDot';
 import { ForkLineageConnector, forkIndentPadding } from './ForkLineageConnector';
@@ -355,6 +364,13 @@ export function SessionsList({
         return pathname.split('/')[2];
     }, [isTablet, pathname]);
 
+    // The card order is a synced setting, which does not rebuild the cached
+    // list data, so it is read here where a change re-runs the grouping below.
+    // It also rides in extraData (with the drag state, below): web re-renders
+    // eagerly, but native FlatList memoizes cells and would keep showing the
+    // old order until something else forced a repaint.
+    const projectRank = useProjectRank();
+
     // Request review
     React.useEffect(() => {
         if (sourceData && sourceData.length > 0) {
@@ -412,6 +428,7 @@ export function SessionsList({
             groupedRows,
             machines,
             t('status.unknown'),
+            projectRank,
         );
         if (machineGroups.length === 0) {
             return [...groupedRows, ...archiveToggle, ...archivedRows];
@@ -429,7 +446,45 @@ export function SessionsList({
             item.type !== 'project' && item.type !== 'projects-header'
         ));
         return [...legacyItems, ...hierarchy, ...archiveToggle, ...archivedRows];
-    }, [flatSessionList, hasArchivedSessions, hideArchivedSessions, machines, sourceData]);
+    }, [flatSessionList, hasArchivedSessions, hideArchivedSessions, machines, projectRank, sourceData]);
+
+    // Holding a card header lifts the card to be dragged to a new place in its
+    // machine's group (ProjectCardDrag). The groups are read off what is drawn,
+    // so a drag can only ever reorder cards the user can see.
+    const dragGroups = React.useMemo<ProjectCardDragGroup[]>(() => {
+        const groups: ProjectCardDragGroup[] = [];
+        if (!data || flatSessionList) return groups;
+        let current: ProjectCardDragGroup | null = null;
+        for (const item of data) {
+            if (item.type === 'machine-header') {
+                current = { key: `machine:${item.machineId ?? ''}`, ids: [] };
+                groups.push(current);
+            } else if (item.type === 'project' && current) {
+                current.ids.push(item.project.id);
+            }
+        }
+        return groups;
+    }, [data, flatSessionList]);
+    const projectDrag = useProjectCardDrag({
+        groups: dragGroups,
+        topInset: topContentInset,
+        // Only the phone layout has a dock lying over the bottom of the list.
+        bottomInset: topContentInset > 0 ? safeArea.bottom + bottomContentInset : 0,
+    });
+    const dragState = projectDrag.state;
+    const draggedProject = React.useMemo(() => {
+        if (!dragState || !data) return null;
+        const item = data.find((candidate) => candidate.type === 'project' && candidate.project.id === dragState.id);
+        return item?.type === 'project' ? item.project : null;
+    }, [data, dragState]);
+    const listExtraData = React.useMemo(
+        () => ({ selectedSessionId, projectRank, dragState }),
+        [selectedSessionId, projectRank, dragState],
+    );
+    const handleScroll = React.useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        projectDrag.onScroll(event);
+        onScroll?.(event);
+    }, [onScroll, projectDrag.onScroll]);
 
     const keyExtractor = React.useCallback((item: SessionListDisplayItem, index: number) => {
         switch (item.type) {
@@ -528,14 +583,23 @@ export function SessionsList({
                     </View>
                 );
 
-            case 'project':
+            case 'project': {
+                const slot = slotAround(dragState, item.project.id);
                 return (
-                    <ProjectGroup
-                        project={item.project}
-                        selectedSessionId={selectedSessionId}
-                        foldWholeProject={foldWholeProject}
-                    />
+                    <ProjectCardDragCell
+                        projectId={item.project.id}
+                        hidden={dragState?.id === item.project.id}
+                        slotBefore={slot.before}
+                        slotAfter={slot.after}
+                    >
+                        <ProjectGroup
+                            project={item.project}
+                            selectedSessionId={selectedSessionId}
+                            foldWholeProject={foldWholeProject}
+                        />
+                    </ProjectCardDragCell>
                 );
+            }
 
             case 'project-group':
                 return (
@@ -572,7 +636,7 @@ export function SessionsList({
                     />
                 );
         }
-    }, [selectedSessionId, data, flatSessionList, foldWholeProject]);
+    }, [selectedSessionId, data, flatSessionList, foldWholeProject, dragState]);
 
 
     // Remove this section as we'll use FlatList for all items now
@@ -603,28 +667,51 @@ export function SessionsList({
 
     return (
         <View style={[styles.container, flatSessionList && styles.containerFlat]}>
-            <View style={styles.contentContainer}>
-                <FlatList
-                    data={data}
-                    renderItem={renderItem}
-                    keyExtractor={keyExtractor}
-                    extraData={selectedSessionId}
-                    contentContainerStyle={{
-                        paddingTop: topContentInset,
-                        paddingBottom: safeArea.bottom + bottomContentInset,
-                        maxWidth: layout.maxWidth,
-                    }}
-                    ListHeaderComponent={HeaderComponent}
-                    automaticallyAdjustsScrollIndicatorInsets={scrollIndicatorTopInset === 0}
-                    scrollIndicatorInsets={scrollIndicatorTopInset > 0
-                        ? { top: scrollIndicatorTopInset }
-                        : undefined}
-                    windowSize={5}
-                    maxToRenderPerBatch={8}
-                    initialNumToRender={12}
-                    onScroll={onScroll}
-                    scrollEventThrottle={16}
-                />
+            <View
+                ref={projectDrag.containerRef}
+                collapsable={false}
+                onLayout={projectDrag.onContainerLayout}
+                style={styles.contentContainer}
+            >
+                <ProjectCardDragContext.Provider value={flatSessionList ? null : projectDrag.api}>
+                    <FlatList
+                        ref={projectDrag.listRef}
+                        data={data}
+                        renderItem={renderItem}
+                        keyExtractor={keyExtractor}
+                        extraData={listExtraData}
+                        contentContainerStyle={{
+                            paddingTop: topContentInset,
+                            paddingBottom: safeArea.bottom + bottomContentInset,
+                            maxWidth: layout.maxWidth,
+                        }}
+                        ListHeaderComponent={HeaderComponent}
+                        automaticallyAdjustsScrollIndicatorInsets={scrollIndicatorTopInset === 0}
+                        scrollIndicatorInsets={scrollIndicatorTopInset > 0
+                            ? { top: scrollIndicatorTopInset }
+                            : undefined}
+                        windowSize={5}
+                        maxToRenderPerBatch={8}
+                        initialNumToRender={12}
+                        onScroll={handleScroll}
+                        onContentSizeChange={projectDrag.onContentSizeChange}
+                        scrollEventThrottle={16}
+                        // A held card scrolls the list itself; the finger must not.
+                        // The held card shrinks to nothing, which Android would
+                        // otherwise clip away — and with it the drag's own view.
+                        scrollEnabled={!dragState}
+                        removeClippedSubviews={dragState ? false : undefined}
+                    />
+                </ProjectCardDragContext.Provider>
+                {dragState && draggedProject && (
+                    <ProjectCardGhost ghost={projectDrag.ghost}>
+                        <ProjectGroup
+                            project={draggedProject}
+                            selectedSessionId={selectedSessionId}
+                            foldWholeProject={foldWholeProject}
+                        />
+                    </ProjectCardGhost>
+                )}
             </View>
         </View>
     );

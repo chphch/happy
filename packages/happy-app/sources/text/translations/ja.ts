@@ -251,6 +251,14 @@ export const ja: TranslationStructure = {
         appearanceSettings: '外観設定',
         worktreeTabs: ({ count }: { count: number }) => `${count} 個のタブ`,
     },
+    projectOrder: {
+        title: 'プロジェクトの並べ替え',
+        hint: 'ハンドルをドラッグしてプロジェクトを移動します。順序はすべてのデバイスで同期されます。',
+        done: '完了',
+        moveUp: '上へ移動',
+        moveDown: '下へ移動',
+        empty: '並べ替えるプロジェクトがありません',
+    },
 
     settingsFeatures: {
         // Features settings screen
