@@ -250,6 +250,14 @@ export const zhHant: TranslationStructure = {
         appearanceSettings: '外觀設定',
         worktreeTabs: ({ count }: { count: number }) => `${count} 個分頁`,
     },
+    projectOrder: {
+        title: '調整專案順序',
+        hint: '拖曳把手即可移動專案。順序會在你的所有裝置間同步。',
+        done: '完成',
+        moveUp: '上移',
+        moveDown: '下移',
+        empty: '沒有可調整順序的專案',
+    },
 
     settingsFeatures: {
         // Features settings screen

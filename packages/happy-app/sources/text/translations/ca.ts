@@ -250,6 +250,14 @@ export const ca: TranslationStructure = {
         appearanceSettings: 'Configuració d\'aparença',
         worktreeTabs: ({ count }: { count: number }) => count === 1 ? '1 pestanya' : `${count} pestanyes`,
     },
+    projectOrder: {
+        title: 'Reordena els projectes',
+        hint: 'Arrossega un projecte per la nansa per moure\'l. L\'ordre se sincronitza entre els teus dispositius.',
+        done: 'Fet',
+        moveUp: 'Mou amunt',
+        moveDown: 'Mou avall',
+        empty: 'No hi ha projectes per reordenar',
+    },
 
     settingsFeatures: {
         // Features settings screen

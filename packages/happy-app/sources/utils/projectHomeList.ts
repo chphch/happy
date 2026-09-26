@@ -5,6 +5,7 @@ import {
     type SessionDisplayMachine,
 } from '@/utils/sessionDisplayOrder';
 import { getRepoPath, isWorktreePath } from '@/utils/worktreePaths';
+import type { ProjectRank } from '@/utils/projectOrder';
 
 /**
  * One checkout of a project — the project's own, or one of its worktrees —
@@ -145,6 +146,8 @@ interface BuildOptions {
     hasArchivedSessions?: boolean;
     /** The archive-visibility setting, as the toggle should report it. */
     archiveHidden?: boolean;
+    /** The order the user arranged the project cards in (utils/projectOrder). */
+    projectRank?: ProjectRank;
 }
 
 /** Checkouts are addressed through their project, which owns their names. */
@@ -352,6 +355,7 @@ export function buildProjectHomeRows({
     labels,
     hasArchivedSessions = false,
     archiveHidden = true,
+    projectRank,
 }: BuildOptions): ProjectHomeRow[] {
     const rows: ProjectHomeRow[] = [];
     const machinesById = new Map(machines.map((machine) => [machine.id, machine]));
@@ -392,7 +396,7 @@ export function buildProjectHomeRows({
         }
     }
 
-    for (const group of buildSessionProjectDisplayGroups(data, machines, unknownMachineText)) {
+    for (const group of buildSessionProjectDisplayGroups(data, machines, unknownMachineText, projectRank)) {
         const section = sectionFor(group.machineId);
         for (const { project } of group.projects) {
             const built = projectRows(project, expanded);
