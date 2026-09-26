@@ -1,5 +1,6 @@
 import type { SessionListViewItem, SessionRowData } from '@/sync/storage';
 import { orderSessionRowsByForkLineage } from '@/utils/forkLineage';
+import { compareProjectRank, unrankedProjects, type ProjectRank } from '@/utils/projectOrder';
 
 type SessionProjectListItem = Extract<SessionListViewItem, { type: 'project' }>;
 
@@ -95,11 +96,18 @@ export function buildActiveSessionDisplayGroups(
 /**
  * Restores the home list's original top-level hierarchy: machine first, then
  * projects, with worktrees and sessions kept inside each project.
+ *
+ * `rank` is the order the user arranged the cards in (`settings.projectOrder`,
+ * see utils/projectOrder). It is applied here because this is the last pass
+ * over the cards before they render: an order applied to the list data upstream
+ * would be undone by the sort below. A card keeps its machine — the user's
+ * order moves it within its machine's group, never above another one's header.
  */
 export function buildSessionProjectDisplayGroups(
     data: readonly SessionListViewItem[],
     machines: readonly SessionDisplayMachine[],
     unknownText: string,
+    rank: ProjectRank = unrankedProjects,
 ): SessionProjectDisplayMachineGroup[] {
     const machinesMap = new Map(machines.map((machine) => [machine.id, machine]));
     const byMachine = new Map<string | null, SessionProjectDisplayMachineGroup>();
@@ -122,7 +130,8 @@ export function buildSessionProjectDisplayGroups(
 
     byMachine.forEach((group) => {
         group.projects.sort((a, b) => (
-            a.project.name.localeCompare(b.project.name)
+            compareProjectRank(rank(a.project.id), rank(b.project.id))
+            || a.project.name.localeCompare(b.project.name)
             || a.project.id.localeCompare(b.project.id)
         ));
     });
@@ -137,6 +146,7 @@ export function getSessionShortcutIdsInDisplayOrder(
     data: readonly SessionListViewItem[] | null,
     machines: readonly SessionDisplayMachine[],
     unknownText: string,
+    rank: ProjectRank = unrankedProjects,
 ): string[] {
     if (!data) {
         return [];
@@ -146,7 +156,7 @@ export function getSessionShortcutIdsInDisplayOrder(
     for (const item of data) {
         if (item.type === 'bots') sessionIds.push(...item.sessions.map((session) => session.id));
     }
-    const projectGroups = buildSessionProjectDisplayGroups(data, machines, unknownText);
+    const projectGroups = buildSessionProjectDisplayGroups(data, machines, unknownText, rank);
     projectGroups.forEach((machineGroup) => {
         machineGroup.projects.forEach((item) => {
             item.project.workspaces.forEach((workspace) => {
