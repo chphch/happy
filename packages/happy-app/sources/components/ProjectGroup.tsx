@@ -17,6 +17,9 @@ import { formatPathRelativeToHome } from '@/utils/sessionUtils';
 import { visibleRigGitLineChanges } from '@/utils/rigGitLineChanges';
 import { GitLineChanges } from './GitLineChanges';
 import { getRepoPath, isWorktreePath } from '@/utils/worktreePaths';
+import { GestureDetector } from 'react-native-gesture-handler';
+import { openProjectOrderEditor } from './ProjectOrderEditor';
+import { useProjectCardDragApi } from './ProjectCardDrag';
 
 // Tall enough to span the name and branch lines together.
 const HEADER_AVATAR_SIZE = 30;
@@ -100,17 +103,20 @@ export const ProjectGroup = React.memo(({ project, selectedSessionId, foldWholeP
                     workspace={workspace}
                     selectedSessionId={selectedSessionId}
                     fold={foldFor(workspace, index)}
+                    isFirstSection={index === 0}
                 />
             ))}
         </View>
     );
 });
 
-const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, fold }: {
+const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, fold, isFirstSection = false }: {
     project: ProjectGroupData;
     workspace: ProjectWorkspaceGroup;
     fold: SectionFold;
     selectedSessionId?: string;
+    // The project's own place in the list is offered once, on its first header.
+    isFirstSection?: boolean;
 }) => {
     const styles = stylesheet;
     const { theme } = useUnistyles();
@@ -178,59 +184,110 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId, fo
         [workspace.sessions],
     );
 
+    // Holding any of the project's headers lifts the whole card so it can be
+    // dragged to a new place in its machine's group (see ProjectCardDrag). The
+    // hold outlasts a tap, so folding and `+` keep working on a quick press.
+    const dragApi = useProjectCardDragApi();
+    const headerRef = React.useRef<View>(null);
+    const headerKey = project.id + '\u0000' + workspace.id;
+    React.useEffect(() => {
+        if (!dragApi) return;
+        dragApi.registerHeader(headerKey, headerRef.current);
+        return () => dragApi.registerHeader(headerKey, null);
+    }, [dragApi, headerKey]);
+    const dragGesture = React.useMemo(
+        () => dragApi?.headerGesture(project.id, headerKey) ?? null,
+        [dragApi, headerKey, project.id],
+    );
+
+    // The web still reports the press a drag ended with; it is not a tap.
+    const handleFoldPress = React.useCallback(() => {
+        if (!fold.chevron || dragApi?.pressSuppressed()) return;
+        fold.onToggle();
+    }, [dragApi, fold]);
+    const handleAddPress = React.useCallback(() => {
+        if (dragApi?.pressSuppressed()) return;
+        handleNewSession();
+    }, [dragApi, handleNewSession]);
+
+    // Screen readers move the card a place at a time instead of dragging it.
+    // A right click on the web also opens the dialog that arranges every card.
+    const orderProps = !isFirstSection || !dragApi ? {} : {
+        accessibilityActions: [
+            { name: 'decrement', label: t('projectOrder.moveUp') },
+            { name: 'increment', label: t('projectOrder.moveDown') },
+        ],
+        onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => {
+            if (event.nativeEvent.actionName === 'decrement') dragApi.moveBy(project.id, -1);
+            if (event.nativeEvent.actionName === 'increment') dragApi.moveBy(project.id, 1);
+        },
+        ...(Platform.OS === 'web' ? {
+            onContextMenu: (event: { preventDefault?: () => void; stopPropagation?: () => void }) => {
+                event.preventDefault?.();
+                event.stopPropagation?.();
+                openProjectOrderEditor(project.id);
+            },
+        } : {}),
+    } as any;
+
+    const header = (
+        <View ref={headerRef} collapsable={false} style={styles.header}>
+            <Pressable
+                {...orderProps}
+                onPress={fold.chevron ? handleFoldPress : undefined}
+                disabled={!fold.chevron}
+                hitSlop={{ top: 8, bottom: 8 }}
+                accessibilityRole={fold.chevron ? 'button' : 'header'}
+                accessibilityState={fold.chevron ? { expanded: !collapsed } : undefined}
+                accessibilityLabel={worktreeName ? `${project.name} / ${worktreeName}` : project.name}
+                style={styles.headerPress}
+            >
+                {fold.chevron ? (
+                    <Ionicons
+                        name={collapsed ? 'chevron-forward' : 'chevron-down'}
+                        size={14}
+                        color={theme.colors.textSecondary}
+                    />
+                ) : (
+                    // Keeps every header's name on the same left edge, with
+                    // or without a chevron.
+                    <View style={styles.chevronSpacer} />
+                )}
+                {firstSession && (
+                    <Avatar id={firstSession.avatarId} size={HEADER_AVATAR_SIZE} flavor={null} imageUrl={firstSession.projectAvatarUri} thumbhash={firstSession.projectAvatarThumbhash} />
+                )}
+                <View style={styles.headerText}>
+                    <Text style={styles.title} numberOfLines={1}>
+                        {project.name}
+                    </Text>
+                    <View style={styles.branchLine}>
+                        <Text style={styles.branchText} numberOfLines={1}>
+                            {branchName}
+                        </Text>
+                        <GitLineChanges changes={changes} />
+                    </View>
+                </View>
+                {collapsed && fold.chevron && (
+                    <Text style={styles.count}>
+                        {fold.count}
+                    </Text>
+                )}
+            </Pressable>
+            <Pressable
+                onPress={handleAddPress}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={t('sidebar.newSession')}
+                style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+            >
+                <Ionicons name="add" size={ADD_ICON_SIZE} color={theme.colors.text} />
+            </Pressable>
+        </View>
+    );
+
     return (
         <View style={styles.section}>
-            <View style={styles.header}>
-                <Pressable
-                    onPress={fold.chevron ? fold.onToggle : undefined}
-                    disabled={!fold.chevron}
-                    hitSlop={{ top: 8, bottom: 8 }}
-                    accessibilityRole={fold.chevron ? 'button' : 'header'}
-                    accessibilityState={fold.chevron ? { expanded: !collapsed } : undefined}
-                    accessibilityLabel={worktreeName ? `${project.name} / ${worktreeName}` : project.name}
-                    style={styles.headerPress}
-                >
-                    {fold.chevron ? (
-                        <Ionicons
-                            name={collapsed ? 'chevron-forward' : 'chevron-down'}
-                            size={14}
-                            color={theme.colors.textSecondary}
-                        />
-                    ) : (
-                        // Keeps every header's name on the same left edge, with
-                        // or without a chevron.
-                        <View style={styles.chevronSpacer} />
-                    )}
-                    {firstSession && (
-                        <Avatar id={firstSession.avatarId} size={HEADER_AVATAR_SIZE} flavor={null} imageUrl={firstSession.projectAvatarUri} thumbhash={firstSession.projectAvatarThumbhash} />
-                    )}
-                    <View style={styles.headerText}>
-                        <Text style={styles.title} numberOfLines={1}>
-                            {project.name}
-                        </Text>
-                        <View style={styles.branchLine}>
-                            <Text style={styles.branchText} numberOfLines={1}>
-                                {branchName}
-                            </Text>
-                            <GitLineChanges changes={changes} />
-                        </View>
-                    </View>
-                    {collapsed && fold.chevron && (
-                        <Text style={styles.count}>
-                            {fold.count}
-                        </Text>
-                    )}
-                </Pressable>
-                <Pressable
-                    onPress={handleNewSession}
-                    hitSlop={12}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('sidebar.newSession')}
-                    style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
-                >
-                    <Ionicons name="add" size={ADD_ICON_SIZE} color={theme.colors.text} />
-                </Pressable>
-            </View>
+            {dragGesture ? <GestureDetector gesture={dragGesture}>{header}</GestureDetector> : header}
 
             {!collapsed && (
                 <View style={styles.workspaceCard}>
