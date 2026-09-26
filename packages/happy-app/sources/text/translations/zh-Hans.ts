@@ -251,6 +251,14 @@ export const zhHans: TranslationStructure = {
         appearanceSettings: '外观设置',
         worktreeTabs: ({ count }: { count: number }) => `${count} 个标签页`,
     },
+    projectOrder: {
+        title: '调整项目顺序',
+        hint: '拖动手柄即可移动项目。顺序会在你的所有设备间同步。',
+        done: '完成',
+        moveUp: '上移',
+        moveDown: '下移',
+        empty: '没有可调整顺序的项目',
+    },
 
     settingsFeatures: {
         // Features settings screen
