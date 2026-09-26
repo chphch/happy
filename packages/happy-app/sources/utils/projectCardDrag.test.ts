@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     autoScrollSpeed,
+    gatedAutoScrollSpeed,
     groupTopFromCard,
     nextGapIndex,
     orderWithDrop,
@@ -90,5 +91,28 @@ describe('autoScrollSpeed', () => {
 
     it('does not scroll a viewport too short to hold both edges', () => {
         expect(autoScrollSpeed(10, 0, 100, 60, 900)).toBe(0);
+    });
+});
+
+describe('gatedAutoScrollSpeed', () => {
+    it('keeps the list still while a card lifted inside an edge band has not moved', () => {
+        // The phone case: a card just above the dock, held without moving.
+        expect(gatedAutoScrollSpeed(450, 0, 24)).toBe(0);
+        expect(gatedAutoScrollSpeed(-450, 3, 24)).toBe(0);
+    });
+
+    it('scrolls once the finger has travelled far enough toward that edge', () => {
+        expect(gatedAutoScrollSpeed(450, 24, 24)).toBe(450);
+        expect(gatedAutoScrollSpeed(-450, -40, 24)).toBe(-450);
+    });
+
+    it('never scrolls toward the edge the finger is moving away from', () => {
+        // Picked up by the dock and dragged up: the bottom band must not pull it back down.
+        expect(gatedAutoScrollSpeed(450, -80, 24)).toBe(0);
+        expect(gatedAutoScrollSpeed(-450, 80, 24)).toBe(0);
+    });
+
+    it('passes a still list through unchanged', () => {
+        expect(gatedAutoScrollSpeed(0, 200, 24)).toBe(0);
     });
 });

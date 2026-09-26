@@ -90,3 +90,18 @@ export function autoScrollSpeed(
     }
     return 0;
 }
+
+/**
+ * Lets `speed` through only when the finger has travelled at least
+ * `armDistance` since the card lifted, and toward the edge it would scroll to.
+ *
+ * Where the finger is decides nothing on its own: a card picked up inside an
+ * edge band — just above the phone's dock, or just under its header — would
+ * otherwise set the list scrolling the moment it lifted, with the finger still,
+ * and the slot would race off down (or up) the list.
+ */
+export function gatedAutoScrollSpeed(speed: number, travel: number, armDistance: number): number {
+    if (speed > 0) return travel >= armDistance ? speed : 0;
+    if (speed < 0) return travel <= -armDistance ? speed : 0;
+    return 0;
+}

@@ -16,6 +16,7 @@ import { saveProjectOrder } from '@/hooks/useProjectOrder';
 import { moveProjectId } from '@/utils/projectOrder';
 import {
     autoScrollSpeed,
+    gatedAutoScrollSpeed,
     groupTopFromCard,
     nextGapIndex,
     orderWithDrop,
@@ -29,6 +30,11 @@ const LONG_PRESS_MS = 300;
 const AUTO_SCROLL_EDGE = 72;
 /** Auto-scroll speed at the very edge, in points per second. */
 const AUTO_SCROLL_SPEED = 900;
+/**
+ * How far the finger has to move toward an edge, after the card lifts, before
+ * that edge scrolls the list. A card lifted inside an edge band stays put.
+ */
+const AUTO_SCROLL_ARM_DISTANCE = 24;
 const SETTLE = { duration: 160 };
 const LIFT = { duration: 120 };
 /** How long a header ignores presses after a drag ends (the web fires one on release). */
@@ -272,12 +278,16 @@ export function useProjectCardDrag({ groups, topInset, bottomInset }: {
             if (geo && stateRef.current && previous > 0) {
                 const elapsed = Math.min(48, now - previous) / 1000;
                 const finger = geo.startTop + geo.grabY + geo.translation;
-                const speed = autoScrollSpeed(
-                    finger,
-                    insetsRef.current.top,
-                    scroll.viewport - insetsRef.current.bottom,
-                    AUTO_SCROLL_EDGE,
-                    AUTO_SCROLL_SPEED,
+                const speed = gatedAutoScrollSpeed(
+                    autoScrollSpeed(
+                        finger,
+                        insetsRef.current.top,
+                        scroll.viewport - insetsRef.current.bottom,
+                        AUTO_SCROLL_EDGE,
+                        AUTO_SCROLL_SPEED,
+                    ),
+                    geo.translation,
+                    AUTO_SCROLL_ARM_DISTANCE,
                 );
                 if (speed !== 0) {
                     const maxOffset = Math.max(0, scroll.content - scroll.viewport);
