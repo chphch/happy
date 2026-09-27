@@ -87,6 +87,36 @@ export function useProjectCardDragApi(): ProjectCardDragApi | null {
     return React.useContext(ProjectCardDragContext);
 }
 
+/**
+ * Where `view` sits inside `container`, the view that holds the list.
+ *
+ * Native subtracts two window positions. measureLayout there leaves the list's
+ * scroll out — React Native adds a scroll view's offset only to measurements
+ * that count transforms, and measureLayout never does — so after scrolling, a
+ * held card measured as far below its real place as the list had scrolled, and
+ * its lifted copy was drawn there. measureInWindow never fails: a view that is
+ * gone answers with an empty box, which counts as a failure here. Web keeps
+ * measureLayout, which subtracts each ancestor's scroll and is what the web drag
+ * was verified with.
+ */
+function measureInContainer(
+    view: View,
+    container: View,
+    done: (top: number, height: number) => void,
+    fail: () => void,
+) {
+    if (Platform.OS === 'web') {
+        view.measureLayout(container as any, (_x, top, _width, height) => done(top, height), fail);
+        return;
+    }
+    container.measureInWindow((_containerX, containerY, containerWidth) => {
+        view.measureInWindow((_x, y, width, height) => {
+            if (containerWidth === 0 || width === 0) fail();
+            else done(y - containerY, height);
+        });
+    });
+}
+
 interface Geometry {
     /** Top of the group's first card in the scroll content. */
     groupTop: number;
@@ -177,8 +207,8 @@ export function useProjectCardDrag({ groups, topInset, bottomInset }: {
         const fail = () => {
             if (pending.current === projectId) pending.current = null;
         };
-        cell.measureLayout(container as any, (_cellX, cellTop, _cellWidth, cellHeight) => {
-            header.measureLayout(container as any, (_headerX, headerTop) => {
+        measureInContainer(cell, container, (cellTop, cellHeight) => {
+            measureInContainer(header, container, (headerTop) => {
                 // Let go, or another card lifted, while this one was measured.
                 if (pending.current !== projectId) return;
                 pending.current = null;
