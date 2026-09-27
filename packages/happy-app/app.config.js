@@ -141,6 +141,7 @@ export default {
         },
         plugins: [
             require("./plugins/withEinkCompatibility.js"),
+            require("./plugins/withTransformAwareScrollView.js"),
             [
                 "expo-router",
                 {
