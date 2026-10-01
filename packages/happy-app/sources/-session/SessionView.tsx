@@ -38,6 +38,8 @@ import { HappyError } from '@/utils/errors';
 import { Session } from '@/sync/storageTypes';
 import { sync } from '@/sync/sync';
 import { supportsImageAttachmentsForFlavor } from '@/sync/attachmentSupport';
+import { parseSideQuestionCommand, supportsSideQuestions } from '@/sync/sideQuestion';
+import { openSideQuestion, SideQuestionPanel } from '@/components/SideQuestionPanel';
 import { t } from '@/text';
 import { tracking } from '@/track';
 import { getVoiceMessageCount, getVoiceOnboardingPromptLoadCount } from '@/sync/persistence';
@@ -1035,6 +1037,16 @@ export function SessionViewLoaded({
                 return;
             }
         }
+        // /btw asks Claude a side question in the chat's side panel; it never
+        // becomes a message
+        const sideQuestion = supportsSideQuestions(storage.getState().sessions[sessionId]?.metadata)
+            ? parseSideQuestionCommand(liveMessage)
+            : null;
+        if (sideQuestion !== null) {
+            composer?.clearMessage();
+            openSideQuestion(sessionId, sideQuestion);
+            return;
+        }
         const draftUpdatedAt = storage.getState().sessions[sessionId]?.draftUpdatedAt;
         if (trimmed || selectedImages.length > 0) {
             const attachments = selectedImages.length > 0 ? selectedImages : undefined;
@@ -1420,6 +1432,11 @@ export function SessionViewLoaded({
                     onDockInsetChange={handleBottomDockInsetChange}
                 />
             </View >
+
+            {/* The chat's /btw thread, drawn over the top of the chat */}
+            {sessionId && (
+                <SideQuestionPanel sessionId={sessionId} top={chatListTopContentInset ?? 12} />
+            )}
 
             {/* Back button for landscape phone mode when header is hidden */}
             {
