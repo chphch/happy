@@ -38,6 +38,8 @@ import { HappyError } from '@/utils/errors';
 import { Session } from '@/sync/storageTypes';
 import { sync } from '@/sync/sync';
 import { supportsImageAttachmentsForFlavor } from '@/sync/attachmentSupport';
+import { parseSideQuestionCommand, supportsSideQuestions } from '@/sync/sideQuestion';
+import { showSideQuestionSheet } from '@/components/SideQuestionSheet';
 import { t } from '@/text';
 import { tracking } from '@/track';
 import { getVoiceMessageCount, getVoiceOnboardingPromptLoadCount } from '@/sync/persistence';
@@ -1034,6 +1036,15 @@ export function SessionViewLoaded({
                 sync.runBashCommand(sessionId, command);
                 return;
             }
+        }
+        // /btw asks Claude a side question in a sheet; it never becomes a message
+        const sideQuestion = supportsSideQuestions(storage.getState().sessions[sessionId]?.metadata)
+            ? parseSideQuestionCommand(liveMessage)
+            : null;
+        if (sideQuestion !== null) {
+            composer?.clearMessage();
+            showSideQuestionSheet(sessionId, sideQuestion);
+            return;
         }
         const draftUpdatedAt = storage.getState().sessions[sessionId]?.draftUpdatedAt;
         if (trimmed || selectedImages.length > 0) {
