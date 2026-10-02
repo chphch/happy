@@ -7,6 +7,7 @@ interface SessionCacheEntry {
     lastUpdateSent: number;
     pendingUpdate: number | null;
     userId: string;
+    active: boolean;
 }
 
 interface MachineCacheEntry {
@@ -93,7 +94,8 @@ class ActivityCache {
                     validUntil: now + this.CACHE_TTL,
                     lastUpdateSent: session.lastActiveAt.getTime(),
                     pendingUpdate: null,
-                    userId
+                    userId,
+                    active: session.active
                 });
                 return true;
             }
@@ -159,9 +161,12 @@ class ActivityCache {
             return false; // Should validate first
         }
         
-        // Only queue if time difference is significant
+        // Always persist a heartbeat that flips an inactive session online, as
+        // machines do. A session started again right after it stopped has a
+        // lastActiveAt only seconds old, so the threshold alone would leave it
+        // inactive in the database for half a minute.
         const timeDiff = Math.abs(timestamp - cached.lastUpdateSent);
-        if (timeDiff > this.UPDATE_THRESHOLD) {
+        if (!cached.active || timeDiff > this.UPDATE_THRESHOLD) {
             cached.pendingUpdate = timestamp;
             return true;
         }
@@ -231,6 +236,7 @@ class ActivityCache {
             if (entry.pendingUpdate) {
                 sessionUpdates.push({ id: sessionId, timestamp: entry.pendingUpdate });
                 entry.lastUpdateSent = entry.pendingUpdate;
+                entry.active = true;
                 entry.pendingUpdate = null;
             }
         }
