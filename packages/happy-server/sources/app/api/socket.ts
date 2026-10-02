@@ -15,6 +15,7 @@ import { machineUpdateHandler } from "./socket/machineUpdateHandler";
 import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
 import { accessKeyHandler } from "./socket/accessKeyHandler";
 import { socketServerOptions } from "./socketConfig";
+import { activityCache } from "@/app/presence/sessionCache";
 
 export function startSocket(app: Fastify) {
     const io = new Server(app.server, socketServerOptions);
@@ -132,6 +133,16 @@ export function startSocket(app: Fastify) {
         }
         eventRouter.addConnection(userId, connection);
         websocketConnectionsGauge.inc({ type: connection.connectionType, ...labels });
+
+        // A session's own process connecting is that session starting back up.
+        // Stopping a session ignores its heartbeats for a minute, and
+        // POST /v1/sessions lifts that for a process that starts by looking the
+        // session up again — but the daemon's resume reattaches straight to the
+        // session id and never calls it, so a session resumed right after it
+        // stopped was shown offline until the minute ran out.
+        if (connection.connectionType === 'session-scoped') {
+            activityCache.resumeSessionUpdates(connection.sessionId);
+        }
 
         // Broadcast daemon online status
         if (connection.connectionType === 'machine-scoped') {
