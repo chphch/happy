@@ -808,6 +808,7 @@ export const zhHant: TranslationStructure = {
         followUpPlaceholder: '繼續追問…',
         send: '提問',
         close: '關閉',
+        fork: '在新會話中繼續',
         answering: 'Claude 正在回答…',
         queued: '正在等待上一個問題的回答…',
         noAnswer: 'Claude 沒有給出回答。',

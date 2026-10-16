@@ -826,6 +826,7 @@ export const ru: TranslationStructure = {
         followUpPlaceholder: 'Задайте уточняющий вопрос…',
         send: 'Спросить',
         close: 'Закрыть',
+        fork: 'Продолжить в новой сессии',
         answering: 'Claude отвечает…',
         queued: 'Ждёт ответа на предыдущий вопрос…',
         noAnswer: 'У Claude нет ответа.',

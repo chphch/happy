@@ -809,6 +809,7 @@ export const ja: TranslationStructure = {
         followUpPlaceholder: '続けて質問…',
         send: '質問する',
         close: '閉じる',
+        fork: '新しいセッションで続ける',
         answering: 'Claude が回答中…',
         queued: '前の質問への回答を待っています…',
         noAnswer: 'Claude からの回答はありませんでした。',

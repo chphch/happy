@@ -824,6 +824,7 @@ export const pl: TranslationStructure = {
         followUpPlaceholder: 'Zadaj pytanie uzupełniające…',
         send: 'Zapytaj',
         close: 'Zamknij',
+        fork: 'Kontynuuj w nowej sesji',
         answering: 'Claude odpowiada…',
         queued: 'Czeka na odpowiedź na poprzednie pytanie…',
         noAnswer: 'Claude nie ma odpowiedzi.',
