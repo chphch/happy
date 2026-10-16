@@ -809,7 +809,6 @@ export const zhHans: TranslationStructure = {
         followUpPlaceholder: '继续追问…',
         send: '提问',
         close: '关闭',
-        fork: '在新会话中继续',
         answering: 'Claude 正在回答…',
         queued: '正在等待上一个问题的回答…',
         noAnswer: 'Claude 没有给出回答。',

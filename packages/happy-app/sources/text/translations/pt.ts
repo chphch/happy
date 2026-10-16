@@ -807,7 +807,6 @@ export const pt: TranslationStructure = {
         followUpPlaceholder: 'Faça outra pergunta…',
         send: 'Perguntar',
         close: 'Fechar',
-        fork: 'Continuar em uma nova sessão',
         answering: 'Claude está respondendo…',
         queued: 'Aguardando a resposta anterior…',
         noAnswer: 'Claude não teve resposta.',

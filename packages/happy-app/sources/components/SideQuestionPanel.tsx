@@ -14,13 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
-import { useHappyAction } from '@/hooks/useHappyAction';
-import { useNavigateToSession } from '@/hooks/useNavigateToSession';
-import { storage, useSession } from '@/sync/storage';
-import { forkAndSpawn, sessionSideQuestion } from '@/sync/ops';
-import { sync } from '@/sync/sync';
-import { HappyError } from '@/utils/errors';
-import { getSessionForkSource } from '@/utils/sessionFork';
+import { storage } from '@/sync/storage';
+import { sessionSideQuestion } from '@/sync/ops';
 import {
     createSideQuestionThreads,
     type SideQuestionExchange,
@@ -187,71 +182,6 @@ function SideQuestionPanelView({ sessionId, top, thread }: {
 }
 
 function ExchangeAnswer({ exchange, sessionId }: { exchange: SideQuestionExchange; sessionId: string }) {
-    const { state } = exchange;
-    const settled = state.status !== 'queued' && state.status !== 'asking';
-    const answer = state.status === 'answered' && state.response !== null && !state.synthetic
-        ? state.response
-        : null;
-    return (
-        <View>
-            <AnswerBody exchange={exchange} sessionId={sessionId} />
-            {settled && (
-                <View style={styles.answerActions}>
-                    {/* Copies the answer alone, as `c` does in Claude Code's panel, to paste into the chat */}
-                    {answer !== null && <MessageCopyButton text={answer} />}
-                    <ForkButton sessionId={sessionId} question={exchange.question} />
-                </View>
-            )}
-        </View>
-    );
-}
-
-// The glyph is small, so the touch target reaches well past it
-const FORK_HIT_SLOP = { top: 14, bottom: 14, left: 10, right: 14 };
-
-/**
- * Takes the question further in a new session: forks this chat into one that
- * carries the same conversation, asks the question there as its first
- * message, where Claude has its tools, and opens it. Claude Code's `f` hands
- * the question to a forked subagent instead, which only its terminal UI can
- * start; a forked session is how the app gets the question the same reach.
- */
-function ForkButton({ sessionId, question }: { sessionId: string; question: string }) {
-    const { theme } = useUnistyles();
-    const session = useSession(sessionId);
-    const navigateToSession = useNavigateToSession();
-    const forkSource = session ? getSessionForkSource(session) : null;
-    const [forking, fork] = useHappyAction(async () => {
-        if (!forkSource) {
-            throw new HappyError(t('session.forkErrorMissingMetadata'), false);
-        }
-        const result = await forkAndSpawn(forkSource);
-        if (result.type !== 'success') {
-            throw new HappyError(result.type === 'error' ? result.errorMessage : t('session.forkErrorGeneric'), false);
-        }
-        await sync.sendMessage(result.sessionId, question, { source: 'chat' });
-        navigateToSession(result.sessionId);
-    });
-    if (!forkSource) {
-        return null;
-    }
-    return (
-        <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('sideQuestion.fork')}
-            hitSlop={FORK_HIT_SLOP}
-            onPress={fork}
-            disabled={forking}
-            style={({ pressed }) => [styles.forkAction, pressed && styles.pressed]}
-        >
-            {forking
-                ? <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                : <Ionicons name="git-branch-outline" size={16} color={theme.colors.text} />}
-        </Pressable>
-    );
-}
-
-function AnswerBody({ exchange, sessionId }: { exchange: SideQuestionExchange; sessionId: string }) {
     const { theme } = useUnistyles();
     const { state } = exchange;
     switch (state.status) {
@@ -276,7 +206,14 @@ function AnswerBody({ exchange, sessionId }: { exchange: SideQuestionExchange; s
             if (state.synthetic) {
                 return <Text style={styles.mutedText}>{state.response}</Text>;
             }
-            return <MarkdownView markdown={state.response} sessionId={sessionId} />;
+            // Copies the answer alone, as `c` does in Claude Code's panel, to
+            // paste into the chat
+            return (
+                <View>
+                    <MarkdownView markdown={state.response} sessionId={sessionId} />
+                    <MessageCopyButton text={state.response} />
+                </View>
+            );
     }
 }
 
@@ -429,14 +366,5 @@ const styles = StyleSheet.create((theme) => ({
     },
     pressed: {
         opacity: 0.7,
-    },
-    answerActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 18,
-    },
-    forkAction: {
-        height: 20,
-        justifyContent: 'center',
     },
 }));

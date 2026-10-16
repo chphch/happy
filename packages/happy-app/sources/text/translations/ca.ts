@@ -808,7 +808,6 @@ export const ca: TranslationStructure = {
         followUpPlaceholder: 'Fes una altra pregunta…',
         send: 'Pregunta',
         close: 'Tanca',
-        fork: 'Continua en una sessió nova',
         answering: 'Claude està responent…',
         queued: 'Esperant la resposta anterior…',
         noAnswer: 'Claude no té cap resposta.',
