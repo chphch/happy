@@ -358,11 +358,11 @@ export function useSessionQuickActions(
         // Before the first await: the screen has to be off this chat while it is
         // still whole, not once the store has started dismantling it.
         onBeforeArchive?.();
-        // Also before it. Archiving asks a machine to check a worktree, then to
-        // kill the agent, and sometimes the server to retire the session after
-        // that — seconds, during which the row the user just archived used to
-        // sit in the list looking untouched. It leaves now, and the only thing
-        // that brings it back is the archive not working.
+        // Also before it. Archiving asks a machine to kill the agent, sometimes
+        // the server to retire the session after that, and then the machine to
+        // check a worktree — seconds, during which the row the user just
+        // archived used to sit in the list looking untouched. It leaves now, and
+        // the only thing that brings it back is the archive not working.
         storage.getState().markArchiving(session.id);
         try {
             if (session.metadata?.bot) {
@@ -373,8 +373,6 @@ export function useSessionQuickActions(
                 onAfterArchive?.();
                 return;
             }
-            await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
-
             // Try to kill the CLI process; if it's already dead, force-archive via server
             const killResult = await sessionKill(session.id);
             if (!killResult.success) {
@@ -386,6 +384,12 @@ export function useSessionQuickActions(
                     throw new HappyError(archiveResult.message || t('sessionInfo.failedToArchiveSession'), false);
                 }
             }
+
+            // Only then offer to delete the worktree: removing it stops every
+            // process still inside, which would cut the CLI's own shutdown
+            // short. It never throws, so a cleanup problem cannot bring the
+            // archived row back.
+            await maybeCleanupWorktree(session.id, session.metadata?.path, session.metadata?.machineId);
             onAfterArchive?.();
         } catch (error) {
             // Back into the list, where it still is as far as the machine is
