@@ -15,6 +15,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as WebBrowser from 'expo-web-browser';
 import { MermaidRenderer } from './MermaidRenderer';
 import { ImageViewer } from '@/components/ImageViewer';
+import { SvgViewer } from './SvgViewer';
 import { MathBlock, InlineMathRun, MathInline } from './MathView';
 import { ArtifactRenderer } from './ArtifactRenderer';
 import { t } from '@/text';
@@ -267,16 +268,28 @@ function RenderImageBlock(props: { url: string, alt: string, first: boolean, las
         maxWidth: intrinsicSize?.width,
     }), [intrinsicSize]);
 
+    // An SVG gets the WebView-backed viewer: the browser re-rasterises the
+    // vector as the zoom changes, so a diagram's labels stay legible all the
+    // way in, which is the whole point of enlarging one.
     const openViewer = React.useCallback(() => {
-        Modal.show({ component: ImageViewer, props: { uri: props.url } } as any);
-    }, [props.url]);
+        Modal.show({
+            component: isSvg ? SvgViewer : ImageViewer,
+            props: { uri: props.url },
+        } as any);
+    }, [props.url, isSvg]);
 
     return (
         <View style={[style.imageBlock, props.first && style.first, props.last && style.last]}>
             {isSvg ? (
-                // Keyed by URL so a different image never inherits the previous
-                // one's size.
-                <RenderSvgImage key={props.url} url={props.url} accessibilityLabel={accessibleLabel} />
+                // Tappable for the same reason a raster image is: the inline box
+                // is small, and a diagram's labels are only legible once it
+                // fills the screen. The viewer re-renders the SVG at the
+                // zoomed size, so it stays sharp all the way in.
+                <Pressable onPress={openViewer} accessibilityRole="imagebutton">
+                    {/* Keyed by URL so a different image never inherits the
+                        previous one's size. */}
+                    <RenderSvgImage key={props.url} url={props.url} accessibilityLabel={accessibleLabel} />
+                </Pressable>
             ) : (
                 <Pressable onPress={openViewer} accessibilityRole="imagebutton">
                     <Image
