@@ -18,6 +18,8 @@ import { useAttachmentImage } from '@/hooks/useAttachmentImage';
 import { thumbhashToDataUri } from '@/utils/thumbhash';
 import { Modal } from '@/modal';
 import { ImageViewer } from '@/components/ImageViewer';
+import { SvgViewer } from '@/components/markdown/SvgViewer';
+import { isSvgImageUrl } from '@/components/markdown/svgImageSource';
 
 const fileInputSchema = z.object({
     ref: z.string(),
@@ -68,7 +70,13 @@ export const FileView = React.memo<ToolViewProps>(({ tool, sessionId }) => {
 
     const openViewer = React.useCallback(() => {
         if (!uri) return;
-        Modal.show({ component: ImageViewer, props: { uri } } as any);
+        // expo-image decodes raster formats only, so an SVG needs the viewer
+        // that renders vectors — the same split MarkdownView makes for a chat
+        // image. Without it an attached .svg opens as a blank screen.
+        Modal.show({
+            component: isSvgImageUrl(uri) ? SvgViewer : ImageViewer,
+            props: { uri },
+        } as any);
     }, [uri]);
 
     return (
