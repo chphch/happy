@@ -158,11 +158,13 @@ export async function listWorktrees(
  * Kill any process whose working directory is inside the worktree.
  *
  * `git worktree remove --force` deletes the directory even while a process is
- * still cwd'd into it — most often a happy session that got orphaned when its
- * daemon restarted. That orphan then lives on inside a now-deleted directory,
- * holding its server socket open and re-reporting the session as `active`
- * forever, so the session can never be archived from the app. We therefore
- * stop those processes *before* removing the directory.
+ * still cwd'd into it, and that process then lives on inside a now-deleted
+ * directory. Callers stop the session first (see useWorktreeCleanup), so what
+ * this usually catches is something the agent started there — a dev server, a
+ * watcher. It also catches a session process that did not stop, such as one
+ * orphaned by a daemon restart, which would otherwise hold its server socket
+ * open and keep re-reporting the session as `active`. We therefore stop those
+ * processes *before* removing the directory.
  *
  * Portable across the machine's OS: Linux reads /proc/<pid>/cwd, macOS falls
  * back to lsof (resolved by absolute path so a stripped PATH still finds it).
