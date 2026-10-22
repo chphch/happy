@@ -391,6 +391,17 @@ export async function claudeRemote(opts: {
                 // Start thinking when session initializes
                 updateThinking(true);
 
+                // A new turn reports its own end: its result defers again if
+                // background work is still running then. An idle report the
+                // previous turn deferred would otherwise be released when that
+                // work finishes, in the middle of this turn, showing a working
+                // session as idle and sending a "done" push.
+                if (readyDeferred) {
+                    logger.debug('[claudeRemote] New turn started, dropping the idle report the previous turn deferred');
+                    readyDeferred = false;
+                    providerAuthFailed = false;
+                }
+
                 const systemInit = message as SDKSystemMessage;
 
                 // Session id is still in memory, wait until session file is written to disk

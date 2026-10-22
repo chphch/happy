@@ -55,6 +55,99 @@ describe('claudeRemote', () => {
         return { onReady, onCompletionEvent, onMessage, nextMessage };
     }
 
+    // Records the working state, ready reports and main-loop text in the order
+    // they happen, so a test can tell when the session was reported idle.
+    async function runTimeline(sdkMessages: unknown[]) {
+        vi.mocked(query).mockReturnValue({
+            async *[Symbol.asyncIterator]() { yield* sdkMessages; },
+        } as any);
+        const events: string[] = [];
+        await claudeRemote({
+            sessionId: null,
+            path: '/fixture/project',
+            allowedTools: [],
+            hookSettingsPath: '/fixture/settings.json',
+            nextMessage: vi.fn()
+                .mockResolvedValueOnce({ message: 'Original prompt', mode })
+                .mockResolvedValue(null),
+            onReady: () => { events.push('ready'); },
+            onThinkingChange: (thinking) => { events.push(thinking ? 'working' : 'idle'); },
+            onMessage: (message) => {
+                if (message.type === 'assistant') {
+                    const block = message.message.content[0];
+                    if (block?.type === 'text') events.push(`text: ${block.text}`);
+                }
+            },
+            canCallTool: async () => ({ behavior: 'allow', updatedInput: {} }),
+            isAborted: () => false,
+            onSessionFound: vi.fn(),
+        });
+        return events;
+    }
+
+    const mainLoopText = (text: string) => ({
+        type: 'assistant',
+        parent_tool_use_id: null,
+        message: { role: 'assistant', content: [{ type: 'text', text }] },
+    });
+    const backgroundTasks = (count: number) => ({
+        type: 'system',
+        subtype: 'background_tasks_changed',
+        tasks: Array.from({ length: count }, (_, i) => ({ id: `task-${i}` })),
+    });
+    const result = { type: 'result', subtype: 'success', is_error: false, result: 'ok' };
+    const newTurn = { type: 'system', subtype: 'init', session_id: 'fixture-session' };
+
+    it('defers the idle report while background work outlives the turn', async () => {
+        const events = await runTimeline([
+            backgroundTasks(1),
+            mainLoopText('Started the build in the background'),
+            result,
+            backgroundTasks(0),
+        ]);
+        expect(events).toEqual(['working', 'text: Started the build in the background', 'idle', 'ready']);
+    });
+
+    it('keeps a later turn working when the earlier turn\'s background work ends during it', async () => {
+        const events = await runTimeline([
+            backgroundTasks(1),
+            mainLoopText('Started the build in the background'),
+            result,
+            newTurn,
+            mainLoopText('Looking at the next request'),
+            backgroundTasks(0),
+            mainLoopText('Still working on it'),
+            result,
+        ]);
+        expect(events).toEqual([
+            'working',
+            'text: Started the build in the background',
+            'text: Looking at the next request',
+            'text: Still working on it',
+            'idle',
+            'ready',
+        ]);
+    });
+
+    it('defers a later turn\'s idle report again while the background work still runs', async () => {
+        const events = await runTimeline([
+            backgroundTasks(1),
+            mainLoopText('Started the build in the background'),
+            result,
+            newTurn,
+            mainLoopText('Answered while the build runs'),
+            result,
+            backgroundTasks(0),
+        ]);
+        expect(events).toEqual([
+            'working',
+            'text: Started the build in the background',
+            'text: Answered while the build runs',
+            'idle',
+            'ready',
+        ]);
+    });
+
     it('explains host OAuth expiry once and closes the turn as failed', async () => {
         const callbacks = await runMessages([
             authAssistant,
