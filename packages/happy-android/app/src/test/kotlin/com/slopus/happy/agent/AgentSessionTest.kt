@@ -27,7 +27,10 @@ import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -885,6 +888,59 @@ class AgentSessionTest {
         eventually({ session.notice.value }) { it == "Only the owner can archive this task." }
         eventually({ session.feed.value.conversations.map { it.agentId } }) { "at1" in it }
         assertTrue("POST /v0/tasks/t1/archive" in agent.calls)
+    }
+
+    @Test
+    fun aNewProjectRegistersItsFolderWithHomeSpelledOutClonesARepositoryAndSaysWhyNot(): Unit = runBlocking {
+        val home = Wire.project("ph", "Home", emptyList(), avatar = "home").with("compute", buildJsonObject { put("type", "host"); put("path", "/Users/me/") })
+        agent.bootstrap = Wire.bootstrap(projects = listOf(home))
+        val posted = mutableListOf<Pair<String, String>>()
+        val transport = { _: AgentConnectionCredentials ->
+            object : Transport by agent {
+                override suspend fun request(method: String, path: String, credential: String, body: ByteArray?, headers: Map<String, String>, category: RequestCategory): TransportResponse {
+                    agent.calls += "$method $path"
+                    val text = body?.decodeToString().orEmpty()
+                    return when {
+                        method == "POST" && path == "/v0/projects" && "nope" in text ->
+                            TransportResponse(400, body = "{\"error\":\"/Users/me/nope does not exist.\",\"code\":\"invalid_request\"}".toByteArray())
+                        method == "POST" && (path == "/v0/projects" || path == "/v0/projects/clone") -> {
+                            posted += path to text
+                            TransportResponse(if (path.endsWith("/clone")) 202 else 200, body = "{\"project\":{\"id\":\"p9\",\"name\":\"app\"}}".toByteArray())
+                        }
+                        else -> agent.request(method, path, credential, body, headers)
+                    }
+                }
+            }
+        }
+        val session = sessions(transport = transport).session(id)!!
+        agent.frames.send(Wire.hello("c0"))
+        eventually({ session.catalog.value.projects.keys }) { "ph" in it }
+        assertNull(session.addProject("  ~/Projects/app "))
+        assertNull(session.addProject("https://github.com/slopus/happy.git"))
+        // The agent's own words for a folder it can't register; words that are neither never go.
+        assertEquals(ProjectAddFailure.Refused("/Users/me/nope does not exist."), session.addProject("~/nope"))
+        assertEquals(ProjectAddFailure.Unreadable, session.addProject("just words"))
+        assertEquals(3, agent.calls.count { it.startsWith("POST /v0/projects") })
+        val (folderPath, folderText) = posted[0]
+        val folder = Json.parseToJsonElement(folderText).jsonObject
+        assertEquals("/v0/projects", folderPath)
+        assertEquals("/Users/me/Projects/app", folder["path"]!!.jsonPrimitive.content)
+        assertEquals(setOf("path", "projectId", "mutationId"), folder.keys)
+        val (clonePath, cloneText) = posted[1]
+        val clone = Json.parseToJsonElement(cloneText).jsonObject
+        assertEquals("/v0/projects/clone", clonePath)
+        assertEquals("happy", clone["name"]!!.jsonPrimitive.content)
+        assertEquals("""{"kind":"github","repository":"slopus/happy"}""", clone["source"].toString())
+    }
+
+    @Test
+    fun aFolderUnderHomeWaitsForTheHomeFolderAndAsksForItsFullPath(): Unit = runBlocking {
+        val session = sessions().session(id)!!
+        agent.frames.send(Wire.hello("c0"))
+        eventually({ session.feed.value.loaded }) { it }
+        // No home project listed: `~` can't be spelled out, and the agent takes only absolute paths.
+        assertEquals(ProjectAddFailure.HomeUnknown, session.addProject("~/Projects/app"))
+        assertTrue(agent.calls.none { it.startsWith("POST /v0/projects") })
     }
 
     @Test
