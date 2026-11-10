@@ -47,4 +47,13 @@
     <string name="agent_settings_update">需要更新</string>
     <string name="agent_settings_remove_message">Happy 会在此手机上忘记此智能体。在你也从 Happy Agent 中移除之前，它会继续列出此手机。</string>
     <string name="agent_home_new_session_in">在 %1$s 中新建会话</string>
+    <string name="agent_home_new_project">新建项目</string>
+    <string name="agent_new_project_message">此 Happy Agent 运行处已有的文件夹（如 ~/Projects/app），或要克隆的 GitHub 仓库（如 owner/app）。</string>
+    <string name="agent_new_project_add">添加</string>
+    <string name="agent_new_project_failed">无法添加项目</string>
+    <string name="agent_new_project_edit">编辑</string>
+    <string name="agent_new_project_unreadable">请输入以 / 或 ~ 开头的文件夹，或 owner/name 形式的 GitHub 仓库。</string>
+    <string name="agent_new_project_home_unknown">此 Happy Agent 尚未提供它的主文件夹。请输入文件夹的完整路径。</string>
+    <string name="agent_new_project_refused">Happy Agent 没有添加它。</string>
+    <string name="agent_new_project_unreachable">无法连接到 Happy Agent。请在它连接后重试。</string>
 </resources>

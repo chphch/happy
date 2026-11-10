@@ -113,6 +113,7 @@ import androidx.compose.ui.platform.LocalDensity
 import com.slopus.happy.agent.AgentFeed
 import com.slopus.happy.agent.AgentFeedRow
 import com.slopus.happy.agent.AgentLinkStatus
+import com.slopus.happy.agent.ProjectAddFailure
 import com.slopus.happy.agent.TeamUser
 import com.slopus.happy.connection.LinkState
 import com.slopus.happy.ui.chat.rememberShownLinkState
@@ -122,6 +123,8 @@ import com.slopus.happy.ui.components.AlertButton
 import com.slopus.happy.ui.components.GlassBarLayout
 import com.slopus.happy.ui.components.GlassSpec
 import com.slopus.happy.ui.components.HappyAlert
+import com.slopus.happy.ui.components.Prompt
+import com.slopus.happy.ui.components.PromptModal
 import com.slopus.happy.ui.components.HomeCardSpec
 import com.slopus.happy.ui.components.Icon
 import com.slopus.happy.ui.components.LoadingIndicator
@@ -189,6 +192,12 @@ class AgentHomeActions(
     val onOpenPerson: ((userId: String) -> Unit)? = null,
     /** Opens a new chat in a project or worktree ([AgentFeedRow.Folder]) from its row; null: those rows open nothing. */
     val onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
+    /**
+     * Adds a project from what New project was given
+     * ([com.slopus.happy.agent.AgentSession.addProject]): null once the agent
+     * has it, else why not. Null shows no New project row.
+     */
+    val onAddProject: (suspend (String) -> ProjectAddFailure?)? = null,
 )
 
 /** The colours of every bar on an agent connection's screens: the page's own [container], scrolled or not. */
@@ -298,6 +307,9 @@ fun AgentHomeScreen(
     // The Surface whose Leave waits on the confirm, and a refused one's name and the agent's reason.
     var confirmingLeave by remember { mutableStateOf<AgentFeedRow.Surface?>(null) }
     var leaveRefused by remember { mutableStateOf<Pair<String, String>?>(null) }
+    // New project's prompt, open on what it holds; then an entry the agent didn't add, and why.
+    var newProject by rememberSaveable { mutableStateOf<String?>(null) }
+    var projectRefused by remember { mutableStateOf<Pair<String, ProjectAddFailure>?>(null) }
     val closeSearch = {
         focus.clearFocus()
         searching = false
@@ -314,7 +326,8 @@ fun AgentHomeScreen(
         if (atStart) listState.scrollToItem(0)
     }
 
-    val items = remember(feed) { agentHomeItems(feed) }
+    val addsProjects = actions.onAddProject != null
+    val items = remember(feed, addsProjects) { agentHomeItems(feed, newProject = addsProjects) }
     // New work takes the screen, so the search gives it back first (iOS); everything else leaves it for coming back.
     val compose = {
         closeSearch()
@@ -359,7 +372,8 @@ fun AgentHomeScreen(
                 AgentFeedRow.Artifacts -> artifacts
                 is AgentFeedRow.Feed -> feedTitle
                 AgentFeedRow.Todos -> todos
-                is AgentFeedRow.Section -> null
+                // Home's own row, never in the feed search reads.
+                is AgentFeedRow.Section, AgentFeedRow.NewProject -> null
             }
         }
         // Only the answer to what is typed now joins in; an earlier query's would bring in what no longer answers.
@@ -463,6 +477,7 @@ fun AgentHomeScreen(
                             onLeaveSurface = actions.onLeaveSurface?.let { { surface: AgentFeedRow.Surface -> confirmingLeave = surface } },
                             onHold = preview?.let { { row, source -> chatPreview.open(row, source) } },
                             onComposeIn = actions.onComposeIn,
+                            onNewProject = { newProject = "" },
                             // The list starts under the glass bar and scrolls on beneath it.
                             contentPadding = PaddingValues(top = top),
                             // The notice is the list's first row (iOS ba0d7da0e): it comes and goes as a row does, the rows it
@@ -580,6 +595,72 @@ fun AgentHomeScreen(
         onDismissConfirm = { confirmingLeave = null },
         onDismissRefused = { leaveRefused = null },
     )
+    NewProjectDialogs(
+        draft = newProject,
+        refused = projectRefused,
+        onAdd = { text ->
+            actions.onAddProject?.let { add -> scope.launch { add(text)?.let { failure -> projectRefused = text to failure } } }
+        },
+        onDismissDraft = { newProject = null },
+        onEdit = { text -> newProject = text },
+        onDismissRefused = { projectRefused = null },
+    )
+}
+
+/**
+ * New project, from the projects card's last row: Android's text prompt
+ * ([PromptModal]) titled New project, saying it takes a folder that already
+ * exists where the Happy Agent runs or a GitHub repository to clone, the
+ * field holding [draft], Add once it isn't blank. If the agent doesn't add
+ * it, "Couldn't add the project" says why, in the agent's words or ours,
+ * with Cancel, or Edit to open the prompt again on what was typed. An
+ * added project's row comes with the agent's own event.
+ */
+@Composable
+private fun NewProjectDialogs(
+    draft: String?,
+    refused: Pair<String, ProjectAddFailure>?,
+    onAdd: (String) -> Unit,
+    onDismissDraft: () -> Unit,
+    onEdit: (String) -> Unit,
+    onDismissRefused: () -> Unit,
+) {
+    if (draft != null) {
+        PromptModal(
+            Prompt(
+                title = stringResource(R.string.agent_home_new_project),
+                message = stringResource(R.string.agent_new_project_message),
+                placeholder = stringResource(R.string.agent_new_project_placeholder),
+                defaultValue = draft,
+                confirmText = stringResource(R.string.agent_new_project_add),
+                allowBlank = false,
+            ) { text -> if (text != null) onAdd(text) },
+            onDismiss = onDismissDraft,
+        )
+    }
+    if (refused != null) {
+        val (text, failure) = refused
+        HappyAlert(
+            Alert(
+                title = stringResource(R.string.agent_new_project_failed),
+                message = projectAddFailureText(failure),
+                buttons = listOf(
+                    AlertButton(stringResource(R.string.common_cancel)),
+                    AlertButton(stringResource(R.string.agent_new_project_edit)) { onEdit(text) },
+                ),
+            ),
+            onDismiss = onDismissRefused,
+        )
+    }
+}
+
+/** Why a project wasn't added, as the person reads it: the agent's own words where it gave some. */
+@Composable
+private fun projectAddFailureText(failure: ProjectAddFailure): String = when (failure) {
+    ProjectAddFailure.Unreadable -> stringResource(R.string.agent_new_project_unreadable)
+    ProjectAddFailure.HomeUnknown -> stringResource(R.string.agent_new_project_home_unknown)
+    is ProjectAddFailure.Refused -> if (failure.reason.isBlank()) stringResource(R.string.agent_new_project_refused) else failure.reason
+    ProjectAddFailure.Unreachable -> stringResource(R.string.agent_new_project_unreachable)
 }
 
 /**
@@ -963,6 +1044,8 @@ private fun SignedInAgentHome(
             onCompose = onCompose,
             // A project's session is new work too: whoever may start work may start one in a project.
             onComposeIn = onComposeIn.takeIf { canCompose && !session.client.cloud },
+            // Projects belong to self-hosted connections; adding one is starting work there.
+            onAddProject = if (canCompose && !session.client.cloud) session::addProject else null,
             onComposeWithPicture = onComposeWithPicture,
             onSettings = onSettings,
             onSettingsRow = onSettingsRow,

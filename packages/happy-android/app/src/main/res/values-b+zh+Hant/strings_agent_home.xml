@@ -47,4 +47,13 @@
     <string name="agent_settings_update">需要更新</string>
     <string name="agent_settings_remove_message">Happy 會在此手機上忘記此代理程式。在你也從 Happy Agent 中移除之前，它會繼續列出此手機。</string>
     <string name="agent_home_new_session_in">在 %1$s 中新建對話</string>
+    <string name="agent_home_new_project">新增專案</string>
+    <string name="agent_new_project_message">此 Happy Agent 執行處已有的資料夾（例如 ~/Projects/app），或要複製的 GitHub 儲存庫（例如 owner/app）。</string>
+    <string name="agent_new_project_add">新增</string>
+    <string name="agent_new_project_failed">無法新增專案</string>
+    <string name="agent_new_project_edit">編輯</string>
+    <string name="agent_new_project_unreadable">請輸入以 / 或 ~ 開頭的資料夾，或 owner/name 形式的 GitHub 儲存庫。</string>
+    <string name="agent_new_project_home_unknown">此 Happy Agent 尚未提供它的主資料夾。請輸入資料夾的完整路徑。</string>
+    <string name="agent_new_project_refused">Happy Agent 沒有新增它。</string>
+    <string name="agent_new_project_unreachable">無法連線到 Happy Agent。請在它連線後再試一次。</string>
 </resources>

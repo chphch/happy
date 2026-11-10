@@ -49,4 +49,13 @@
     <string name="agent_settings_update">Requiere actualización</string>
     <string name="agent_settings_remove_message">Happy olvida este agente en este teléfono. Happy Agent seguirá mostrando el teléfono hasta que también lo quites allí.</string>
     <string name="agent_home_new_session_in">Nueva sesión en %1$s</string>
+    <string name="agent_home_new_project">Nuevo proyecto</string>
+    <string name="agent_new_project_message">Una carpeta que ya exista donde se ejecuta este Happy Agent, como ~/Projects/app, o un repositorio de GitHub para clonar, como owner/app.</string>
+    <string name="agent_new_project_add">Añadir</string>
+    <string name="agent_new_project_failed">No se pudo añadir el proyecto</string>
+    <string name="agent_new_project_edit">Editar</string>
+    <string name="agent_new_project_unreadable">Escribe una carpeta que empiece por / o ~, o un repositorio de GitHub como owner/name.</string>
+    <string name="agent_new_project_home_unknown">Este Happy Agent aún no ha compartido su carpeta personal. Escribe la ruta completa de la carpeta.</string>
+    <string name="agent_new_project_refused">Happy Agent no lo añadió.</string>
+    <string name="agent_new_project_unreachable">No se pudo conectar con Happy Agent. Vuelve a intentarlo cuando esté conectado.</string>
 </resources>
