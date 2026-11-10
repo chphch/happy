@@ -340,15 +340,31 @@ sealed interface AgentHomeItem {
     }
 }
 
-/** The feed's rows, each knowing where it stands in its section's card. */
-fun agentHomeItems(feed: AgentFeed): List<AgentHomeItem> {
-    val out = ArrayList<AgentHomeItem>(feed.rows.size)
+/**
+ * The feed's rows, each knowing where it stands in its section's card. With
+ * [newProject] the projects card ends with New project
+ * ([AgentFeedRow.NewProject]); a home whose projects are hidden has no such
+ * card, and so no New project either.
+ */
+fun agentHomeItems(feed: AgentFeed, newProject: Boolean = false): List<AgentHomeItem> {
+    val out = ArrayList<AgentHomeItem>(feed.rows.size + 1)
+    var section: AgentFeedSection? = null
+    fun endSection() {
+        if (newProject && section == AgentFeedSection.Projects) {
+            out += AgentHomeItem.Row(AgentFeedRow.NewProject, first = out.lastOrNull() !is AgentHomeItem.Row, last = false)
+        }
+    }
     for (row in feed.rows) {
+        if (row is AgentFeedRow.Section) {
+            endSection()
+            section = row.section
+        }
         out += when (row) {
             is AgentFeedRow.Section -> AgentHomeItem.Gap(row.section, first = out.isEmpty())
             else -> AgentHomeItem.Row(row, first = out.lastOrNull() !is AgentHomeItem.Row, last = false)
         }
     }
+    endSection()
     for (index in out.indices) {
         val item = out[index] as? AgentHomeItem.Row ?: continue
         if (out.getOrNull(index + 1) !is AgentHomeItem.Row) out[index] = item.copy(last = true)
@@ -373,6 +389,8 @@ fun LazyListScope.agentHomeRows(
     onOpenTodos: () -> Unit = {},
     /** A project's or worktree's row starts a new session in it; null: those rows open nothing. */
     onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
+    /** The projects card's New project, where [agentHomeItems] put one. */
+    onNewProject: () -> Unit = {},
 ) {
     items(items, key = { it.key }, contentType = { (it as? AgentHomeItem.Row)?.row?.let { row -> row::class } ?: it::class }) { item ->
         val motion = if (reduceMotion) Modifier else Modifier.animateItem(
@@ -392,6 +410,7 @@ fun LazyListScope.agentHomeRows(
                 item.drawn(), motion, selected != null && selected == item.row.panelKey(), AgentHomeTags.row(item.key),
                 onOpen, onOpenArtifacts, onOpenSurface, onLeaveSurface, onHold, onOpenFeed, onOpenTodos,
                 onComposeIn = onComposeIn,
+                onNewProject = onNewProject,
             )
         }
     }
@@ -416,6 +435,7 @@ internal fun AgentHomeCardRow(
     onOpenFeed: () -> Unit = {},
     onOpenTodos: () -> Unit = {},
     onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
+    onNewProject: () -> Unit = {},
 ) {
     HomeCardRow(
         place = HomeCardPlace(item.first, item.last),
@@ -432,6 +452,7 @@ internal fun AgentHomeCardRow(
             is AgentFeedRow.Feed -> FeedPlaceRow(row.unread, onOpenFeed)
             AgentFeedRow.Todos -> PlaceRow(stringResource(R.string.agent_search_todos), { TileMark(Ionicon.CheckboxOutline, RowTile.Green) }, onOpenTodos)
             is AgentFeedRow.Surface -> SurfaceRow(row, { onOpenSurface(row) }, onLeaveSurface)
+            AgentFeedRow.NewProject -> PlaceRow(stringResource(R.string.agent_home_new_project), { TileMark(Ionicon.Add, RowTile.Blue) }, onNewProject)
             is AgentFeedRow.Section -> Unit
         }
     }
@@ -507,7 +528,7 @@ private fun titleStart(row: AgentFeedRow): Dp {
     val (depth, marked) = when (row) {
         is AgentFeedRow.Conversation -> row.depth to AgentHomeSpec.hasMark(row.kind)
         is AgentFeedRow.Folder -> row.depth to (row.mark != null)
-        AgentFeedRow.Artifacts, is AgentFeedRow.Feed, AgentFeedRow.Todos, is AgentFeedRow.Surface -> 0 to true
+        AgentFeedRow.Artifacts, is AgentFeedRow.Feed, AgentFeedRow.Todos, is AgentFeedRow.Surface, AgentFeedRow.NewProject -> 0 to true
         is AgentFeedRow.Section -> return 0.dp
     }
     return AgentHomeSpec.markInset + AgentHomeSpec.indent * depth + if (marked) AgentHomeSpec.mark + AgentHomeSpec.markGap else 0.dp
@@ -764,6 +785,8 @@ fun AgentHomeList(
     onOpenTodos: () -> Unit = {},
     /** A project's or worktree's row starts a new session in it; null: those rows open nothing. */
     onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
+    /** The projects card's New project, where [agentHomeItems] put one. */
+    onNewProject: () -> Unit = {},
 ) {
     val reduceMotion = rememberReduceMotion()
     // The call brings a conversation's row on screen here before it presses it ([VoiceTouch.rows]).
@@ -783,7 +806,7 @@ fun AgentHomeList(
         contentPadding = contentPadding,
     ) {
         header?.invoke(this)
-        agentHomeRows(items, reduceMotion, onOpen, onOpenArtifacts, onOpenSurface, onLeaveSurface, onHold, selected, onOpenFeed, onOpenTodos, onComposeIn)
+        agentHomeRows(items, reduceMotion, onOpen, onOpenArtifacts, onOpenSurface, onLeaveSurface, onHold, selected, onOpenFeed, onOpenTodos, onComposeIn, onNewProject)
         item(key = "bottom", contentType = "bottom") { bottom() }
     }
 }

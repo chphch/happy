@@ -419,6 +419,35 @@ class AgentSession internal constructor(
         return (verdict as? IntentOutbox.Verdict.Refused)?.reason
     }
 
+    /**
+     * Adds a project from what New project was given ([ProjectEntry]), as
+     * desktop's Add project does for a Happy Agent: a folder registered as it
+     * is, its `~` spelled out from the home project's folder since the agent
+     * takes only absolute paths, or a GitHub repository the agent clones.
+     * Asked once, while the person waits, never kept for later. Null once the
+     * agent has it, its row coming with `project.created`; otherwise why not.
+     */
+    suspend fun addProject(text: String): ProjectAddFailure? {
+        val entry = ProjectEntry.parse(text) ?: return ProjectAddFailure.Unreadable
+        val (path, body) = ProjectEntry.request(entry, homeFolder(), AgentClient.newId(), AgentClient.newId())
+            ?: return ProjectAddFailure.HomeUnknown
+        return try {
+            client.send("POST", path, body)
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: AgentApiException) {
+            ProjectAddFailure.Refused(e.message.orEmpty())
+        } catch (_: Exception) {
+            ProjectAddFailure.Unreachable
+        }
+    }
+
+    /** The agent's home folder: its home project's path (desktop's `kind: "home"`, its avatar's kind); null until that is listed. */
+    private fun homeFolder(): String? = catalogState.value.projects.values
+        .firstOrNull { (it["avatar"] as? JsonObject)?.string("kind") == "home" }
+        ?.let { (it["compute"] as? JsonObject)?.string("path") }
+
     private fun of(kind: String) = buildJsonObject { put("kind", kind) }
 
     /**
