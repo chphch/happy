@@ -115,4 +115,5 @@
     <string name="conversation_role_read_only">You can read this conversation, but your role can\'t send messages.</string>
     <string name="conversation_message_undisplayable">Hey, this message failed to display.</string>
     <string name="conversation_report_bug">Report bug</string>
+    <string name="conversation_new_work_folder_note">The session starts in this folder.</string>
 </resources>

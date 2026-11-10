@@ -111,4 +111,5 @@
     <string name="conversation_role_read_only">Você pode ler esta conversa, mas sua função não pode enviar mensagens.</string>
     <string name="conversation_message_undisplayable">Ei, não foi possível mostrar esta mensagem.</string>
     <string name="conversation_report_bug">Reportar bug</string>
+    <string name="conversation_new_work_folder_note">A sessão começa nesta pasta.</string>
 </resources>
