@@ -52,6 +52,15 @@ sealed interface AgentFeedRow {
         override val key get() = "folder-$id"
     }
 
+    /**
+     * Home's New project, the projects card's last row where the person may
+     * add a project. Never derived with the feed: home's list puts it there
+     * ([com.slopus.happy.ui.connection.agentHomeItems]).
+     */
+    data object NewProject : AgentFeedRow {
+        override val key get() = "new-project"
+    }
+
     /** One conversation; its subtasks follow it, a level in. */
     data class Conversation(
         val agentId: String,
