@@ -112,4 +112,5 @@
     <string name="conversation_editor_collapse">Collapse</string>
     <string name="problem_forbidden">You don\'t have permission to do that.</string>
     <string name="conversation_role_read_only">You can read this conversation, but your role can\'t send messages.</string>
+    <string name="conversation_new_work_folder_note">The session starts in this folder.</string>
 </resources>

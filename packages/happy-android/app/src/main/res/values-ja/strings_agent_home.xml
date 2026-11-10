@@ -46,4 +46,5 @@
     <string name="agent_settings_revoked">Happy Agent から削除されました</string>
     <string name="agent_settings_update">アップデートが必要です</string>
     <string name="agent_settings_remove_message">Happy はこのスマートフォン上でこのエージェントを忘れます。Happy Agent 側でも削除するまで、スマートフォンは一覧に残ります。</string>
+    <string name="agent_home_new_session_in">%1$s で新しいセッション</string>
 </resources>

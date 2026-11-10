@@ -130,6 +130,8 @@ object AgentHomeTags {
     /** The square at a row's end its status mark is centred in ([AgentHomeSpec.statusSlot]). */
     const val ROW_STATUS = "agentHome.rowStatus"
     const val ROW_CHANGES = "agentHome.rowChanges"
+    /** A project's or worktree's "+": a press on its row starts a new session in it. */
+    const val ROW_NEW_SESSION = "agentHome.rowNewSession"
     /** A Surface row's held menu: Leave. */
     const val LEAVE = "agentHome.leave"
 }
@@ -174,6 +176,8 @@ object AgentHomeSpec {
      */
     val statusSlot = 14.dp
     val statusGap = 8.dp
+    /** A project's or worktree's "+", [cornerGap] after its name or counts: a tile's glyph. */
+    val newSessionGlyph = tileGlyph
     /** The bar's title, the agent's name: smaller than Material's large title. */
     val barTitle = happyTextStyle(fontSize = 18, lineHeight = 24, weight = FontWeight.SemiBold)
     /** The compose button's margin from the window's corner, and the room under the last card to scroll it clear. */
@@ -378,6 +382,8 @@ fun LazyListScope.agentHomeRows(
     onOpenFeed: () -> Unit = {},
     onOpenTodos: () -> Unit = {},
     onOpenPlugins: () -> Unit = {},
+    /** A project's or worktree's row starts a new session in it; null: those rows open nothing. */
+    onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
 ) {
     items(items, key = { it.key }, contentType = { (it as? AgentHomeItem.Row)?.row?.let { row -> row::class } ?: it::class }) { item ->
         val motion = if (reduceMotion) Modifier else Modifier.animateItem(
@@ -396,6 +402,7 @@ fun LazyListScope.agentHomeRows(
             is AgentHomeItem.Row -> AgentHomeCardRow(
                 item.drawn(), motion, selected != null && selected == item.row.panelKey(), AgentHomeTags.row(item.key),
                 onOpen, onOpenArtifacts, onOpenSurface, onLeaveSurface, onHold, onOpenFeed, onOpenTodos, onOpenPlugins,
+                onComposeIn = onComposeIn,
             )
         }
     }
@@ -420,6 +427,7 @@ internal fun AgentHomeCardRow(
     onOpenFeed: () -> Unit = {},
     onOpenTodos: () -> Unit = {},
     onOpenPlugins: () -> Unit = {},
+    onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
 ) {
     HomeCardRow(
         place = HomeCardPlace(item.first, item.last),
@@ -431,7 +439,7 @@ internal fun AgentHomeCardRow(
     ) {
         when (val row = item.row) {
             is AgentFeedRow.Conversation -> ConversationRow(row, onOpen, onHold)
-            is AgentFeedRow.Folder -> FolderRow(row)
+            is AgentFeedRow.Folder -> FolderRow(row, onComposeIn)
             AgentFeedRow.Artifacts -> PlaceRow(stringResource(R.string.artifacts_title), { TileMark(Ionicon.DocumentTextOutline, RowTile.Purple) }, onOpenArtifacts)
             AgentFeedRow.Plugins -> PlaceRow(stringResource(R.string.plugins_title), { TileMark(Ionicon.ExtensionPuzzleOutline, RowTile.Orange) }, onOpenPlugins)
             is AgentFeedRow.Feed -> FeedPlaceRow(row.unread, onOpenFeed)
@@ -668,15 +676,20 @@ private fun PlaceRow(name: String, mark: @Composable () -> Unit, onClick: () -> 
 /**
  * A project or a worktree: its name, shimmering while work runs inside it
  * and fading at its end where it runs out of room ([com.slopus.happy.ui.components.TitleFade]), and a
- * project's mark before it ([FolderMarkView]). It opens nothing.
+ * project's mark before it ([FolderMarkView]). With [onCompose] a press
+ * starts a new session in it, which an 18 "+"
+ * ([AgentHomeSpec.newSessionGlyph], secondary) [AgentHomeSpec.cornerGap]
+ * after the name or the counts shows; without, it opens nothing.
  */
 @Composable
-private fun FolderRow(row: AgentFeedRow.Folder) {
+private fun FolderRow(row: AgentFeedRow.Folder, onCompose: ((AgentFeedRow.Folder) -> Unit)? = null) {
     val colors = HappyTheme.colors
     val mark = row.mark
+    val composeLabel = onCompose?.let { stringResource(R.string.agent_home_new_session_in, row.name) }
     Row(
         modifier = Modifier
             .fillMaxSize()
+            .then(if (onCompose != null) Modifier.combinedClickable(role = Role.Button, onClickLabel = composeLabel, onClick = { onCompose(row) }) else Modifier)
             .semantics { heading() }
             .padding(start = AgentHomeSpec.markInset + AgentHomeSpec.indent * row.depth, end = AgentHomeSpec.paddingEnd),
         verticalAlignment = Alignment.CenterVertically,
@@ -701,6 +714,14 @@ private fun FolderRow(row: AgentFeedRow.Folder) {
             )
         }
         WorkspaceCounts(row.lineChanges)
+        if (onCompose != null) {
+            Icon(
+                Ionicon.Add,
+                AgentHomeSpec.newSessionGlyph,
+                colors.textSecondary,
+                Modifier.padding(start = AgentHomeSpec.cornerGap).testTag(AgentHomeTags.ROW_NEW_SESSION),
+            )
+        }
     }
 }
 
@@ -769,6 +790,8 @@ fun AgentHomeList(
     onOpenFeed: () -> Unit = {},
     onOpenTodos: () -> Unit = {},
     onOpenPlugins: () -> Unit = {},
+    /** A project's or worktree's row starts a new session in it; null: those rows open nothing. */
+    onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
 ) {
     val reduceMotion = rememberReduceMotion()
     // The call brings a conversation's row on screen here before it presses it ([VoiceTouch.rows]).
@@ -788,7 +811,7 @@ fun AgentHomeList(
         contentPadding = contentPadding,
     ) {
         header?.invoke(this)
-        agentHomeRows(items, reduceMotion, onOpen, onOpenArtifacts, onOpenSurface, onLeaveSurface, onHold, selected, onOpenFeed, onOpenTodos, onOpenPlugins)
+        agentHomeRows(items, reduceMotion, onOpen, onOpenArtifacts, onOpenSurface, onLeaveSurface, onHold, selected, onOpenFeed, onOpenTodos, onOpenPlugins, onComposeIn)
         item(key = "bottom", contentType = "bottom") { bottom() }
     }
 }

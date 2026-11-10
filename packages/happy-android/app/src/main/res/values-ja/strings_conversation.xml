@@ -108,4 +108,5 @@
     <string name="conversation_editor_collapse">折りたたむ</string>
     <string name="problem_forbidden">その操作を行う権限がありません。</string>
     <string name="conversation_role_read_only">この会話は読めますが、あなたのロールではメッセージを送信できません。</string>
+    <string name="conversation_new_work_folder_note">セッションはこのフォルダで始まります。</string>
 </resources>
