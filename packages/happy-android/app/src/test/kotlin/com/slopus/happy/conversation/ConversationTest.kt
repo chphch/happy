@@ -88,6 +88,8 @@ private class FakeAgent {
             (route == "/v0/tasks" || route == "/v0/bots") && refuseCreate != null -> TransportResponse(refuseCreate!!, body = """{"error":"Name already taken.","code":"conflict"}""".toByteArray())
             route == "/v0/bots" -> ok("""{"bot":{"id":${(body as JsonObject)["id"]},"agent":{"id":"${body["agentId"]!!.toString().trim('"')}","workspaceId":"w","status":"idle"}}}""")
             route == "/v0/tasks" -> ok("""{"task":{"id":${(body as JsonObject)["id"]},"agent":{"id":"${(body as JsonObject)["agentId"]!!.toString().trim('"')}","workspaceId":"w","status":"idle"}},"membership":{}}""")
+            // A session in a workspace that exists (a project's), answered 201 as the daemon does.
+            method == "POST" && route == "/v0/agents" -> TransportResponse(201, body = """{"agent":{"id":${(body as JsonObject)["id"]},"workspaceId":${body["workspaceId"]},"status":"idle"},"profiles":[],"slashCommands":[]}""".toByteArray())
             route.endsWith("/bootstrap") -> { beforeBootstrap(); ok(bootstrap) }
             method == "PUT" && route.startsWith("/v0/workspaces/") && route.endsWith("/file") -> {
                 val o = body as JsonObject
@@ -676,6 +678,35 @@ class ConversationTest {
         advanceUntilIdle()
         assertNull(chat.state.value.newWork)
         assertEquals(listOf("Ship it"), chat.state.value.rows.map { (it as ConversationRow.User).text })
+    }
+
+    @Test fun `a session in a project makes its agent in the project's workspace, then the message goes into it`() = runTest {
+        val agent = FakeAgent()
+        var made: JsonObject? = null
+        val folder = WorkFolder("p1", "happy")
+        val chat = conversation(agent, NewTask("t1", "w1", "a9", "m1"), WorkChoice(folder = folder)) { made = it }
+        advanceUntilIdle()
+        assertEquals(NewWork(WorkChoice(folder = folder)), chat.state.value.newWork)
+        // A Task or Bot pick that reaches it keeps the project.
+        chat.setChoice(WorkChoice(WorkKind.Bot, "Ignored"))
+        advanceUntilIdle()
+        assertEquals(folder, chat.state.value.newWork?.choice?.folder)
+        chat.send("Run the tests")
+        advanceUntilIdle()
+        val posts = agent.paths("POST").filter { it == "/v0/agents" || it.endsWith("/send") || it.startsWith("/v0/tasks") || it.startsWith("/v0/bots") }
+        assertEquals(listOf("/v0/agents", "/v0/agents/a9/send"), posts)
+        // Desktop's body exactly: the agent's own id, the project's workspace, the mutation; no task, no name.
+        val body = agent.requests.first { it.second == "/v0/agents" }.third!!
+        assertEquals(setOf("id", "workspaceId", "mutationId"), body.keys)
+        assertEquals("\"a9\"", body["id"].toString())
+        assertEquals("\"p1\"", body["workspaceId"].toString())
+        assertEquals("\"m1\"", body["mutationId"].toString())
+        assertEquals("a9", made!!["agent"]!!.jsonObject["id"].toString().trim('"'))
+        assertTrue(chat.state.value.created)
+        assertNull(chat.state.value.newWork)
+        // Neither task_created nor bot_created: the shared catalog has no event for a project's session.
+        assertTrue(recorded.none { it is AnalyticsEvent.TaskCreated || it is AnalyticsEvent.BotCreated })
+        assertEquals(listOf("Run the tests"), chat.state.value.rows.map { (it as ConversationRow.User).text })
     }
 
     @Test fun `a refused new work leaves its first message failed and Retry asks again under the same ids`() = runTest {

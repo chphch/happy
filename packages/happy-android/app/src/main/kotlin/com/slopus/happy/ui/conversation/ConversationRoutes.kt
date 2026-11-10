@@ -61,6 +61,7 @@ import com.slopus.happy.conversation.MediaItem
 import com.slopus.happy.conversation.NewTask
 import com.slopus.happy.conversation.UnsentWork
 import com.slopus.happy.conversation.WorkChoice
+import com.slopus.happy.conversation.WorkFolder
 import com.slopus.happy.conversation.WorkKind
 import com.slopus.happy.media.MediaPiece
 import kotlinx.serialization.json.JsonObject
@@ -99,6 +100,12 @@ import kotlinx.serialization.Serializable
     val prefill: String? = null,
     /** New work opens with "+"'s sheet up (search's "New task with a picture", happy-ios 7a605f6ce). */
     val attach: Boolean = false,
+    /**
+     * New work is a session of this project or worktree ([WorkFolder]),
+     * named [workspaceName] as home lists it, instead of a task or bot.
+     */
+    val workspaceId: String? = null,
+    val workspaceName: String? = null,
 )
 
 /** The connection's Chief of Staff chat, found when opened, with [prefix] waiting in its composer. */
@@ -170,16 +177,18 @@ fun NavHostController.openChiefOfStaff(connectionId: String, prefix: String) {
 
 /**
  * A new, empty chat: pushed from home; from a chat it replaces that chat
- * (animated by the NavHost's transition), so Back goes home.
+ * (animated by the NavHost's transition), so Back goes home. With a
+ * [folder] it is a session of that project or worktree.
  */
-fun NavHostController.composeConversation(connectionId: String, attach: Boolean = false) {
+fun NavHostController.composeConversation(connectionId: String, attach: Boolean = false, folder: WorkFolder? = null) {
+    val route = ConversationRoute(connectionId, attach = attach, workspaceId = folder?.workspaceId, workspaceName = folder?.name)
     val current = currentBackStackEntry
     if (current?.destination?.hasRoute<ConversationRoute>() == true) {
-        navigate(ConversationRoute(connectionId, attach = attach)) {
+        navigate(route) {
             popUpTo(current.destination.id) { inclusive = true }
         }
     } else {
-        navigate(ConversationRoute(connectionId, attach = attach))
+        navigate(route)
     }
 }
 
@@ -330,8 +339,10 @@ internal class ConversationHolder(
     private val task: NewTask?
 
     init {
-        // A new chat that is not this entry's own yet takes the work left unsent, if any.
-        val unsent = if (route.agentId == null && saved.get<String>(TASK) == null) session.unsentWork?.also { session.unsentWork = null } else null
+        // A new chat that is not this entry's own yet takes the work left unsent, if any. A project's session
+        // neither takes it nor leaves its own there: that is the next New task's.
+        val folder = route.workspaceId?.let { WorkFolder(it, route.workspaceName.orEmpty()) }
+        val unsent = if (route.agentId == null && folder == null && saved.get<String>(TASK) == null) session.unsentWork?.also { session.unsentWork = null } else null
         task = if (route.agentId != null) null else NewTask(
             saved.get<String>(TASK) ?: (unsent?.task?.taskId ?: ConversationApi.clientId()).also { saved[TASK] = it },
             saved.get<String>(WORKSPACE) ?: (unsent?.task?.workspaceId ?: ConversationApi.clientId()).also { saved[WORKSPACE] = it },
@@ -341,6 +352,7 @@ internal class ConversationHolder(
         val choice = unsent?.choice ?: WorkChoice(
             if (saved.get<String>(KIND) == WorkKind.Bot.name) WorkKind.Bot else WorkKind.Task,
             saved.get<String>(NAME).orEmpty(),
+            folder,
         )
         unsent?.let { setChoiceSaved(it.choice) }
         val agentId = route.agentId ?: task!!.agentId
@@ -377,8 +389,9 @@ internal class ConversationHolder(
     override fun onCleared() {
         val state = conversation.state.value
         val work = state.newWork
-        // Left unmade, its first message on its way or not: the next compose opens it as it was.
-        if (task != null && work != null && saved.get<Boolean>(CREATED) != true) {
+        // Left unmade, its first message on its way or not: the next compose opens it as it was. A project's
+        // session is opened from its project's row, so it leaves nothing for New task.
+        if (task != null && work != null && work.choice.folder == null && saved.get<Boolean>(CREATED) != true) {
             session.unsentWork = UnsentWork(task, work.choice, state.draft)
         }
         // Closed once nobody holds it, unless a send is in hand: then it finishes in this conversation (desktop 01659140).

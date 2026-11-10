@@ -55,9 +55,17 @@ enum class WorkKind { Task, Bot }
 /**
  * New work as chosen before its first send (iOS's `NewTask.Choice`): a task
  * unless a bot was picked, and the name given, blank for the computer to
- * name it from its first message.
+ * name it from its first message. With a [folder] it is neither: a
+ * session of that project or worktree, its kind and name unused.
  */
-data class WorkChoice(val kind: WorkKind = WorkKind.Task, val name: String = "")
+data class WorkChoice(val kind: WorkKind = WorkKind.Task, val name: String = "", val folder: WorkFolder? = null)
+
+/**
+ * A workspace that already exists, new work's place instead of a folder of
+ * its own: a project's ([workspaceId] is the project's id) or one of its
+ * worktrees', [name] as home lists it.
+ */
+data class WorkFolder(val workspaceId: String, val name: String)
 
 /** New work left before its first message, as it was left: compose again opens it. */
 data class UnsentWork(val task: NewTask, val choice: WorkChoice, val draft: String)
@@ -103,6 +111,23 @@ open class ConversationApi(
             choice.name.trim().takeIf { it.isNotEmpty() }?.let { put("name", it) }
         }
         return call("POST", "/v0/${owner}s", body).takeIf { it[owner].obj != null } ?: throw invalid()
+    }
+
+    /**
+     * A new chat in a workspace that already exists ([folder]), as desktop
+     * makes a new session in a project (`connectHappyAgent.ts`): `POST
+     * /v0/agents` with `{id, workspaceId, mutationId}`, answered
+     * `{agent, …}`. [task]'s agent id again is the
+     * same agent, so a retry makes no second one; its task and workspace ids
+     * go unused.
+     */
+    open suspend fun createAgent(task: NewTask, folder: WorkFolder): JsonObject {
+        val body = buildJsonObject {
+            put("id", task.agentId)
+            put("workspaceId", folder.workspaceId)
+            put("mutationId", task.mutationId)
+        }
+        return call("POST", "/v0/agents", body).takeIf { it["agent"].obj != null } ?: throw invalid()
     }
 
     /**

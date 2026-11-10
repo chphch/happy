@@ -1021,11 +1021,12 @@ class Conversation(
         return true
     }
 
-    /** A new chat's Task or Bot and name, as picked; fixed once its first message is in. */
+    /** A new chat's Task or Bot and name, as picked; fixed once its first message is in. A project's session keeps its folder. */
     fun setChoice(next: WorkChoice) {
         scope.launch(lane) {
-            if (created || locked || next == choice) return@launch
-            choice = next
+            val kept = choice.folder?.let { next.copy(folder = it) } ?: next
+            if (created || locked || kept == choice) return@launch
+            choice = kept
             publish()
         }
     }
@@ -1235,22 +1236,28 @@ class Conversation(
         send.skill = null
     }
 
-    /** The task or bot a new chat lives in, made once: a retry repeats the same ids, which is the same one. */
+    /**
+     * The task or bot a new chat lives in, or its agent in a project or
+     * worktree that already exists ([WorkChoice.folder]), made once: a retry
+     * repeats the same ids, which is the same one.
+     */
     private suspend fun ensureCreated() {
         val task = newTask ?: return
         val work = creating ?: scope.async(lane) {
+            val folder = choice.folder
             val made = try {
-                withRetries { api.createWork(task, choice) }
+                withRetries { if (folder != null) api.createAgent(task, folder) else api.createWork(task, choice) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                recordCreated(AnalyticsReasons.create(e))
+                // A project's session is neither `task_created` nor `bot_created`; the shared catalog has no event for it.
+                if (folder == null) recordCreated(AnalyticsReasons.create(e))
                 throw e
             }
-            recordCreated(null)
+            if (folder == null) recordCreated(null)
             newTask = null
             onTaskCreated(made)
-            (made["task"] ?: made["bot"]).obj?.get("agent")?.let(AgentInfo::parse)?.let { agent = it }
+            ((made["task"] ?: made["bot"]).obj?.get("agent") ?: made["agent"])?.let(AgentInfo::parse)?.let { agent = it }
             // The computer's skills were the new chat's; the agent's own catalog comes with its history.
             publish { it.copy(created = true, commands = emptyList()) }
             // Typed while it was made: that goes up now under the real agent.

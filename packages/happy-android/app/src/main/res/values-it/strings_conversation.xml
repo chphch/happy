@@ -108,4 +108,5 @@
     <string name="conversation_editor_collapse">Comprimi</string>
     <string name="problem_forbidden">Non hai il permesso di farlo.</string>
     <string name="conversation_role_read_only">Puoi leggere questa conversazione, ma il tuo ruolo non può inviare messaggi.</string>
+    <string name="conversation_new_work_folder_note">La sessione inizia in questa cartella.</string>
 </resources>

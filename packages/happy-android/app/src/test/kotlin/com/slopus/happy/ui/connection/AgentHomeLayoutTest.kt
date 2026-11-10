@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.captureToImage
@@ -181,6 +182,36 @@ class AgentHomeLayoutTest {
         assertDp("lock tile height", AgentHomeSpec.mark, mark.height)
         row.performClick()
         assertEquals(listOf(policy), surfaces)
+    }
+
+    @Test
+    fun aProjectRowStartsANewSessionInItAndSaysSoWithAPlusAtItsEnd() {
+        val started = mutableListOf<AgentFeedRow.Folder>()
+        val composing = AgentHomeActions(onOpenConversation = {}, onCompose = {}, onSettings = {}, onSettingsRow = {}, onSwitchAccount = {}, onAdd = {}, onComposeIn = { started += it })
+        val home = feed()
+        val project = home.rows.filterIsInstance<AgentFeedRow.Folder>().single { it.id == "p1" }
+        rule.setHappyContent { AgentHomeScreen("Studio", home, AgentLinkStatus.Connected, accounts, composing) }
+        val row = rule.node(AgentHomeTags.row(project.key))
+        assertDp("project row height", 48, row.bounds.height)
+        val inRow = hasAnyAncestor(hasTestTag(AgentHomeTags.row(project.key)))
+        val plus = rule.onNode(hasTestTag(AgentHomeTags.ROW_NEW_SESSION) and inRow, useUnmergedTree = true).bounds
+        val title = rule.onNode(hasTestTag(AgentHomeTags.ROW_TITLE) and inRow, useUnmergedTree = true).bounds
+        assertDp("a tile's glyph", AgentHomeSpec.newSessionGlyph, plus.width)
+        // The row's tag spans the list's width; its card stands the card inset in, its content the padding further.
+        assertDp("the plus ends the card's row, its padding in", row.bounds.right - AgentHomeSpec.cardInset - AgentHomeSpec.paddingEnd, plus.right)
+        assertDp("the corner's gap after the name", title.right + AgentHomeSpec.cornerGap, plus.left)
+        row.performClick()
+        assertEquals(listOf(project), started)
+    }
+
+    @Test
+    fun withoutNewSessionsAProjectRowHasNoPlusAndOpensNothing() {
+        val home = feed()
+        val project = home.rows.filterIsInstance<AgentFeedRow.Folder>().single { it.id == "p1" }
+        show(home)
+        rule.onAllNodesWithTag(AgentHomeTags.ROW_NEW_SESSION, useUnmergedTree = true).assertCountEquals(0)
+        rule.onAllNodes(hasClickAction() and hasTestTag(AgentHomeTags.row(project.key)), useUnmergedTree = true).assertCountEquals(0)
+        rule.onAllNodes(hasClickAction() and hasAnyAncestor(hasTestTag(AgentHomeTags.row(project.key))), useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test
