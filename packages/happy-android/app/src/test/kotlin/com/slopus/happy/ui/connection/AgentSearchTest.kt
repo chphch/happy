@@ -46,7 +46,7 @@ class AgentSearchTest {
             AgentFeedRow.Plugins -> "Plugins"
             is AgentFeedRow.Feed -> "Activity"
             AgentFeedRow.Todos -> "Todos"
-            is AgentFeedRow.Section -> null
+            is AgentFeedRow.Section, AgentFeedRow.NewProject -> null
         }
     }
 

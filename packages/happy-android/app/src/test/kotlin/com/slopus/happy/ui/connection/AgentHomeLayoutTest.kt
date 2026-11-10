@@ -18,8 +18,12 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import com.slopus.happy.agent.ProjectAddFailure
+import com.slopus.happy.ui.components.PromptTags
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
@@ -202,6 +206,49 @@ class AgentHomeLayoutTest {
         assertDp("the corner's gap after the name", title.right + AgentHomeSpec.cornerGap, plus.left)
         row.performClick()
         assertEquals(listOf(project), started)
+    }
+
+    @Test
+    fun theProjectsCardEndsWithNewProjectWhichAddsWhatIsTypedAndOffersEditWhenRefused() {
+        val asked = mutableListOf<String>()
+        var answer: ProjectAddFailure? = ProjectAddFailure.Refused("")
+        val adding = AgentHomeActions(onOpenConversation = {}, onCompose = {}, onSettings = {}, onSettingsRow = {}, onSwitchAccount = {}, onAdd = {}, onAddProject = { text -> asked += text; answer })
+        val home = feed()
+        // Last in the projects card, after the projects and their conversations.
+        val rows = agentHomeItems(home, newProject = true).filterIsInstance<AgentHomeItem.Row>()
+        val at = rows.indexOfFirst { it.row == AgentFeedRow.NewProject }
+        assertTrue(rows[at].last)
+        assertTrue(rows[at - 1].row is AgentFeedRow.Conversation || rows[at - 1].row is AgentFeedRow.Folder)
+        rule.setHappyContent { AgentHomeScreen("Studio", home, AgentLinkStatus.Connected, accounts, adding) }
+        val row = rule.node(AgentHomeTags.row(AgentFeedRow.NewProject.key))
+        assertDp("new project row height", 48, row.bounds.height)
+        rule.onNodeWithText("New project").assertExists()
+        row.performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(PromptTags.TITLE).assertTextEquals("New project")
+        rule.onNodeWithTag(PromptTags.INPUT).performTextInput("~/nope")
+        rule.onNodeWithTag(PromptTags.CONFIRM).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("~/nope"), asked)
+        // Refused without the agent's words: ours, and Edit opens the prompt again on what was typed.
+        rule.onNodeWithText("Couldn't add the project").assertExists()
+        rule.onNodeWithText("Happy Agent didn't add it.").assertExists()
+        rule.onNodeWithText("Edit").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag(PromptTags.INPUT).assert(hasText("~/nope"))
+        answer = null
+        rule.onNodeWithTag(PromptTags.CONFIRM).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("~/nope", "~/nope"), asked)
+        rule.onNodeWithText("Couldn't add the project").assertDoesNotExist()
+        rule.onNodeWithTag(PromptTags.INPUT).assertDoesNotExist()
+    }
+
+    @Test
+    fun withoutAddingProjectsTheProjectsCardEndsWithItsProjects() {
+        show(feed())
+        rule.onAllNodesWithTag(AgentHomeTags.row(AgentFeedRow.NewProject.key), useUnmergedTree = true).assertCountEquals(0)
+        assertTrue(agentHomeItems(feed()).none { (it as? AgentHomeItem.Row)?.row == AgentFeedRow.NewProject })
     }
 
     @Test
