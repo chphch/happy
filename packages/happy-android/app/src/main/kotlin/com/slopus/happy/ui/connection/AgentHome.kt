@@ -189,6 +189,8 @@ class AgentHomeActions(
     val providerAccountsAvailable: Boolean = false,
     /** Opens a team member's profile; null where there are none (any server but Happy Cloud's), and search finds no people. */
     val onOpenPerson: ((userId: String) -> Unit)? = null,
+    /** Opens a new chat in a project or worktree ([AgentFeedRow.Folder]) from its row; null: those rows open nothing. */
+    val onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
 )
 
 /** A Material icon button around one of the app's glyphs, at Material's 24. */
@@ -445,6 +447,7 @@ fun AgentHomeScreen(
                             onOpenSurface = actions.onOpenSurface,
                             onLeaveSurface = actions.onLeaveSurface?.let { { surface: AgentFeedRow.Surface -> confirmingLeave = surface } },
                             onHold = preview?.let { { row, source -> chatPreview.open(row, source) } },
+                            onComposeIn = actions.onComposeIn,
                             // The list starts under the glass bar and scrolls on beneath it.
                             contentPadding = PaddingValues(top = top),
                             // The notice is the list's first row (iOS ba0d7da0e): it comes and goes as a row does, the rows it
@@ -834,6 +837,8 @@ fun AgentHome(
     onOpenVaultItem: (surfaceId: String, itemId: String, folder: Boolean, name: String) -> Unit = { _, _, _, _ -> },
     /** Opens a team member's profile, which only a Happy Cloud server has. */
     onOpenPerson: (userId: String) -> Unit = {},
+    /** Opens a new session in a project or worktree, from its row. */
+    onComposeIn: (AgentFeedRow.Folder) -> Unit = {},
 ) {
     val agents by graph.agentConnections.accounts.collectAsStateWithLifecycle()
     val connection = agents.firstOrNull { it.id == id } ?: return
@@ -849,7 +854,7 @@ fun AgentHome(
         )
         return
     }
-    SignedInAgentHome(graph, id, agents, onOpenConversation, onCompose, onSettings, onSettingsRow, onComposeWithPicture, onOpenArtifacts, onOpenSurface, onOpenArtifact, onOpenFeed, onSignIn, onOpenTodos, onOpenPlugins, onOpenPipelines, onOpenVaultItem, onOpenPerson)
+    SignedInAgentHome(graph, id, agents, onOpenConversation, onCompose, onSettings, onSettingsRow, onComposeWithPicture, onOpenArtifacts, onOpenSurface, onOpenArtifact, onOpenFeed, onSignIn, onOpenTodos, onOpenPlugins, onOpenPipelines, onOpenVaultItem, onOpenPerson, onComposeIn)
 }
 
 /**
@@ -930,6 +935,7 @@ private fun SignedInAgentHome(
     onOpenPipelines: () -> Unit,
     onOpenVaultItem: (surfaceId: String, itemId: String, folder: Boolean, name: String) -> Unit,
     onOpenPerson: (userId: String) -> Unit,
+    onComposeIn: (AgentFeedRow.Folder) -> Unit,
 ) {
     val session = remember(id) { graph.agentSessions.session(id) } ?: return
     val people by session.team.users.collectAsStateWithLifecycle()
@@ -954,10 +960,12 @@ private fun SignedInAgentHome(
     val canCompose = permissions.canWrite
     val canAskChief = permissions.allows(com.slopus.happy.agent.Permission.BOTS_MANAGE)
     val providerSignIn by session.providerSignInAvailable.collectAsStateWithLifecycle()
-    val actions = remember(graph, session, onOpenConversation, onCompose, onComposeWithPicture, onSettings, onSettingsRow, onOpenArtifacts, onOpenSurface, onOpenArtifact, onOpenFeed, add, switchAccount, onSignIn, onOpenTodos, onOpenPlugins, onOpenPipelines, voice, onOpenVaultItem, onOpenPerson, canCompose, canAskChief, providerSignIn) {
+    val actions = remember(graph, session, onOpenConversation, onCompose, onComposeWithPicture, onSettings, onSettingsRow, onOpenArtifacts, onOpenSurface, onOpenArtifact, onOpenFeed, add, switchAccount, onSignIn, onOpenTodos, onOpenPlugins, onOpenPipelines, voice, onOpenVaultItem, onOpenPerson, canCompose, canAskChief, providerSignIn, onComposeIn) {
         AgentHomeActions(
             onOpenConversation = onOpenConversation,
             onCompose = onCompose,
+            // A project's session is new work too: whoever may start work may start one in a project.
+            onComposeIn = onComposeIn.takeIf { canCompose && !session.client.cloud },
             onComposeWithPicture = onComposeWithPicture,
             onSettings = onSettings,
             onSettingsRow = onSettingsRow,
