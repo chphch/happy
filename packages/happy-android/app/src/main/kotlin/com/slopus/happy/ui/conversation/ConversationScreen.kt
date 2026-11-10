@@ -81,6 +81,7 @@ import com.slopus.happy.conversation.Mode
 import com.slopus.happy.conversation.NewWork
 import com.slopus.happy.conversation.WorkChoice
 import com.slopus.happy.ui.chat.NewWorkChoicePanel
+import com.slopus.happy.ui.chat.NewWorkFolderPanel
 import com.slopus.happy.ui.chat.NewWorkRoom
 import com.slopus.happy.ui.chat.art
 import com.slopus.happy.ui.chat.MessageCallbacks
@@ -527,13 +528,20 @@ fun ConversationScreen(
                             TranscriptPhase.Rows -> Transcript(state, listState, bubble, rowActions, actions.onLoadOlder, top, dockHeight, glass, keyboard, flight, folds)
                         }
                     }
-                    // New work: Task or Bot and a name under the kind's picture, centred between the bar and the
-                    // composer, riding the keyboard with it; it fades once the work is made.
+                    // New work: Task or Bot and a name under the kind's picture, or the project it starts in,
+                    // centred between the bar and the composer, riding the keyboard with it; it fades once the
+                    // work is made.
                     // As last chosen, for the fade after it is made.
                     val last = remember { arrayOfNulls<NewWork>(1) }
                     (state.newWork?.also { last[0] = it } ?: last[0])?.let { shown ->
-                        NewWorkRoom(state.newWork != null, Modifier.riding(keyboard, 0.5f).padding(top = barFoot).keyboardPadding(keyboard, dockHeight), art = shown.choice.kind.art) {
-                            NewWorkChoicePanel(shown, onChange = actions.onChoiceChange, onReturn = { nameReturns++ })
+                        // A project's session is neither kind, so no picture stands over its folder.
+                        val folder = shown.choice.folder
+                        NewWorkRoom(state.newWork != null, Modifier.riding(keyboard, 0.5f).padding(top = barFoot).keyboardPadding(keyboard, dockHeight), art = shown.choice.kind.art.takeIf { folder == null }) {
+                            if (folder != null) {
+                                NewWorkFolderPanel(folder, locked = shown.locked)
+                            } else {
+                                NewWorkChoicePanel(shown, onChange = actions.onChoiceChange, onReturn = { nameReturns++ })
+                            }
                         }
                     }
                     // What scrolls under the dock goes soft and pale over the dock's top 48, full width. The fade

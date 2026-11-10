@@ -4,12 +4,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -25,6 +29,7 @@ import com.slopus.happy.conversation.ConversationState
 import com.slopus.happy.conversation.Delivery
 import com.slopus.happy.conversation.NewWork
 import com.slopus.happy.conversation.WorkChoice
+import com.slopus.happy.conversation.WorkFolder
 import com.slopus.happy.conversation.WorkKind
 import com.slopus.happy.ui.PHONE
 import com.slopus.happy.ui.assertDp
@@ -177,6 +182,29 @@ class NewWorkPanelTest {
         rule.node(NewWorkTags.NAME).performImeAction()
         rule.waitForIdle()
         rule.node(ConversationComposerTags.INPUT).assertIsFocused()
+    }
+
+    @Test fun `a project's session shows its folder where Task or Bot would be, and the folder takes no press`() {
+        state = state.copy(newWork = NewWork(WorkChoice(folder = WorkFolder("p1", "happy"))))
+        show()
+        // No Task or Bot and no name: where the work starts is decided.
+        rule.node(NewWorkTags.KIND).assertDoesNotExist()
+        rule.node(NewWorkTags.NAME).assertDoesNotExist()
+        val panel = rule.node(NewWorkTags.PANEL).bounds
+        assertDp("320 wide", 320, panel.width)
+        val bar = rule.node(ConversationScreenTags.BAR).bounds
+        val composer = rule.node(ConversationComposerTags.COMPOSER).bounds
+        assertEquals("centred between the bar and the composer", ((bar.bottom + composer.top) / 2).value, ((panel.top + panel.bottom) / 2).value, 1f)
+        val folder = rule.node(NewWorkTags.FOLDER).bounds
+        assertDp("the folder starts the block", panel.top, folder.top)
+        assertDp("folder full width", 320, folder.width)
+        assertDp("folder 44", 44, folder.height)
+        val note = rule.node(NewWorkTags.NOTE).bounds
+        assertDp("10 under the folder", folder.bottom + 10.dp, note.top)
+        assertDp("the note ends the block", panel.bottom, note.bottom)
+        rule.onNodeWithText("happy").assertExists()
+        rule.node(NewWorkTags.NOTE).assertTextEquals("The session starts in this folder.")
+        rule.onAllNodes(hasClickAction() and hasAnyAncestor(hasTestTag(NewWorkTags.FOLDER)), useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test fun `once a first message is in nothing changes the work and Send still goes`() {
