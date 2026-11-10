@@ -48,4 +48,5 @@
     <string name="agent_settings_revoked">Rimosso da Happy Agent</string>
     <string name="agent_settings_update">Aggiornamento necessario</string>
     <string name="agent_settings_remove_message">Happy dimentica questo agente su questo telefono. Happy Agent continua a mostrare il telefono finché non lo rimuovi anche lì.</string>
+    <string name="agent_home_new_session_in">Nuova sessione in %1$s</string>
 </resources>
