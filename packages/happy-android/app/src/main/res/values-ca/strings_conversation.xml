@@ -108,4 +108,5 @@
     <string name="conversation_editor_collapse">Redueix</string>
     <string name="problem_forbidden">No tens permís per fer això.</string>
     <string name="conversation_role_read_only">Pots llegir aquesta conversa, però el teu rol no pot enviar missatges.</string>
+    <string name="conversation_new_work_folder_note">La sessió comença en aquesta carpeta.</string>
 </resources>

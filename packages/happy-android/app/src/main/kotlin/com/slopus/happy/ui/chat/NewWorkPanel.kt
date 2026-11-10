@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import com.slopus.happy.R
 import com.slopus.happy.conversation.NewWork
 import com.slopus.happy.conversation.WorkChoice
+import com.slopus.happy.conversation.WorkFolder
 import com.slopus.happy.conversation.WorkKind
 import com.slopus.happy.ui.components.Icon
 import com.slopus.happy.ui.components.Ionicon
@@ -257,17 +258,42 @@ fun NewWorkChoicePanel(work: NewWork, onChange: (WorkChoice) -> Unit, onReturn: 
 }
 
 /**
+ * Happy Agent's new session in a project or worktree that already exists
+ * ([WorkFolder], from its row on home), where Task or Bot would be: the
+ * folder as a [NewWorkMenuRow] (a 44 capsule, a 16 folder glyph 8 before its
+ * name), which takes no press; 10 under it a line saying the session starts
+ * there (13/18 secondary, centred, wrapping). Dimmed once its first message
+ * is in ([locked]).
+ */
+@Composable
+fun NewWorkFolderPanel(folder: WorkFolder, locked: Boolean) {
+    val colors = HappyTheme.colors
+    Column(Modifier.fillMaxWidth().testTag(NewWorkTags.PANEL), horizontalAlignment = Alignment.CenterHorizontally) {
+        NewWorkMenuRow(Ionicon.FolderOutline, folder.name, enabled = !locked, onClick = null, modifier = Modifier.testTag(NewWorkTags.FOLDER))
+        Spacer(Modifier.height(NewWorkSpec.rowsToNote))
+        Text(
+            stringResource(R.string.conversation_new_work_folder_note),
+            style = NewWorkSpec.note,
+            color = colors.textSecondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().testTag(NewWorkTags.NOTE),
+        )
+    }
+}
+
+/**
  * One of a Happy account's rows (happy-ios NewWorkMenuRow): a 44 capsule on
  * the input ground, 16 in, a 16 glyph 8 before what is chosen (16, the
  * middle truncated), opening [menu] under it. Dimmed while fixed. The
  * computer's row wears its [status] as a chip on its top-right corner.
+ * Without [onClick] it only says what is chosen and takes no press.
  */
 @Composable
 fun NewWorkMenuRow(
     icon: Ionicon,
     title: String,
     enabled: Boolean,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     status: NewWorkStatus? = null,
     menu: @Composable () -> Unit = {},
@@ -280,7 +306,7 @@ fun NewWorkMenuRow(
                 .heightIn(min = NewWorkSpec.rowHeight)
                 .clip(CircleShape)
                 .background(colors.input.background)
-                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                .then(if (onClick != null) Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick) else Modifier)
                 .alpha(if (enabled) 1f else 0.5f)
                 .padding(horizontal = NewWorkSpec.rowInset),
             verticalAlignment = Alignment.CenterVertically,
