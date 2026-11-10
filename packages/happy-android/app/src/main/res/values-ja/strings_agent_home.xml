@@ -47,4 +47,13 @@
     <string name="agent_settings_update">アップデートが必要です</string>
     <string name="agent_settings_remove_message">Happy はこのスマートフォン上でこのエージェントを忘れます。Happy Agent 側でも削除するまで、スマートフォンは一覧に残ります。</string>
     <string name="agent_home_new_session_in">%1$s で新しいセッション</string>
+    <string name="agent_home_new_project">新しいプロジェクト</string>
+    <string name="agent_new_project_message">この Happy Agent が動いている場所にある既存のフォルダ（例: ~/Projects/app）、またはクローンする GitHub リポジトリ（例: owner/app）。</string>
+    <string name="agent_new_project_add">追加</string>
+    <string name="agent_new_project_failed">プロジェクトを追加できませんでした</string>
+    <string name="agent_new_project_edit">編集</string>
+    <string name="agent_new_project_unreadable">/ または ~ で始まるフォルダか、owner/name の形の GitHub リポジトリを入力してください。</string>
+    <string name="agent_new_project_home_unknown">この Happy Agent はまだホームフォルダを知らせていません。フォルダのフルパスを入力してください。</string>
+    <string name="agent_new_project_refused">Happy Agent はこれを追加しませんでした。</string>
+    <string name="agent_new_project_unreachable">Happy Agent に接続できませんでした。接続されたらもう一度お試しください。</string>
 </resources>
