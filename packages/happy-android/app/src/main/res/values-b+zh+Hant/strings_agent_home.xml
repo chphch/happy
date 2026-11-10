@@ -46,4 +46,5 @@
     <string name="agent_settings_revoked">已從 Happy Agent 中移除</string>
     <string name="agent_settings_update">需要更新</string>
     <string name="agent_settings_remove_message">Happy 會在此手機上忘記此代理程式。在你也從 Happy Agent 中移除之前，它會繼續列出此手機。</string>
+    <string name="agent_home_new_session_in">在 %1$s 中新建對話</string>
 </resources>
