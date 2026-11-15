@@ -376,21 +376,27 @@ fun dayTitleText(title: DayTitle): String = when (title) {
     is DayTitle.DaysAgo -> title.days.toInt().let { pluralResource(R.plurals.session_history_days_ago, it, it) }
 }
 
+/** A Happy CLI account's [ArchiveToggle]: the press shows or hides its archived chats. */
+@Composable
+fun ArchiveToggleRow(hidden: Boolean, banded: Boolean, callbacks: HomeListCallbacks, carded: Boolean = false) =
+    ArchiveToggle(hidden, { callbacks.onSetArchiveHidden(!hidden) }, banded = banded, carded = carded)
+
 /**
  * The archive's divider: hairlines either side of "Show archived" / "Hide
- * archived" (14, secondary), 12 apart, 24 in from the sides. Banded (the
- * flat list), it sits on the row colour with 24 above and 8 below; [carded],
- * it stands on the page between the cards, keeping the band's room.
+ * archived" (14, secondary), 12 apart, 24 in from the sides; a press is
+ * [onToggle]. Banded (the flat list), it sits on the row colour with 24
+ * above and 8 below; [carded], it stands on the page between the cards,
+ * keeping the band's room. Both homes' archive opens under it.
  */
 @Composable
-fun ArchiveToggleRow(hidden: Boolean, banded: Boolean, callbacks: HomeListCallbacks, carded: Boolean = false) {
+fun ArchiveToggle(hidden: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, banded: Boolean = false, carded: Boolean = false) {
     val colors = HappyTheme.colors
     Row(
-        modifier = Modifier
+        modifier = modifier
             .then(if (carded) Modifier.contentMaxWidth(LocalWindowLayout.current) else Modifier.fillMaxWidth())
             .testTag(HomeTags.ARCHIVE_TOGGLE)
             .then(if (banded && !carded) Modifier.background(flatListBackground(colors)) else Modifier)
-            .clickable(role = Role.Button) { callbacks.onSetArchiveHidden(!hidden) }
+            .clickable(role = Role.Button, onClick = onToggle)
             .semantics { selected = !hidden }
             .padding(
                 start = HomeSpec.sectionPaddingHorizontal,
