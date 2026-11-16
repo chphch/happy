@@ -56,4 +56,5 @@
     <string name="agent_new_project_home_unknown">此 Happy Agent 尚未提供它的主文件夹。请输入文件夹的完整路径。</string>
     <string name="agent_new_project_refused">Happy Agent 没有添加它。</string>
     <string name="agent_new_project_unreachable">无法连接到 Happy Agent。请在它连接后重试。</string>
+    <string name="agent_home_unarchive">取消归档</string>
 </resources>
