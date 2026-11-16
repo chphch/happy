@@ -532,6 +532,16 @@ private fun ConversationEntry(graph: AppGraph, nav: NavHostController, route: Co
     val self by remember(session) { session.catalog.map { it.userId }.distinctUntilChanged() }.collectAsStateWithLifecycle(session.catalog.value.userId)
     // Pipelines uninstalled for the account: a run's card is only read, opening nothing.
     val pipelinesOff by session.pipelinesTurnedOff.collectAsStateWithLifecycle()
+    // A project's archived chat comes back with Resume, as home's archive lists it ([com.slopus.happy.agent.AgentFeed.archived]);
+    // pressed, it waits until the computer has answered the unarchive.
+    val resumable by remember(session, conversation.agentId) {
+        session.feed.map { feed -> feed.archived.any { it.agentId == conversation.agentId } }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(false)
+    val resuming by remember(session, conversation.agentId) {
+        session.intents.pending.map { pending ->
+            pending.any { it.kind == com.slopus.happy.agent.Intent.UNARCHIVE && it.target == conversation.agentId }
+        }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(false)
     // A command's artwork is read and kept as the agent's other pictures are.
     ProvideLinks(links) { androidx.compose.runtime.CompositionLocalProvider(com.slopus.happy.ui.connection.LocalAgentPictures provides session.pictures) { com.slopus.happy.ui.references.ProvideBusyLinks(references, session.references) {
         ConversationScreen(
@@ -543,6 +553,8 @@ private fun ConversationEntry(graph: AppGraph, nav: NavHostController, route: Co
             viewers = { ViewersSlot(session, ViewerTarget.agent(conversation.agentId)) },
             people = people,
             self = self,
+            resumable = resumable,
+            resuming = resuming,
             link = link,
             usage = usage,
             onRefreshUsage = session.usage::refresh,
@@ -564,6 +576,7 @@ private fun ConversationEntry(graph: AppGraph, nav: NavHostController, route: Co
                     onRetryFailure = conversation::retryFailure,
                     onFailureShown = { row -> failureShown(row, ChatAddress.of(session.catalog.value, conversation.agentId)) },
                     onAnswer = conversation::answer,
+                    onResume = { session.unarchive(conversation.agentId) },
                     onLoadOlder = { retry -> conversation.loadOlder(retry) },
                     onOpenArtifact = { row -> nav.openArtifact(route.connectionId, row.ref) },
                     // A Happy URL a page followed opens in the app; any other its own browser.
