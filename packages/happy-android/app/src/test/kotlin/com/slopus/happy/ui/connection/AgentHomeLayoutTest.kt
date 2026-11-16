@@ -333,7 +333,8 @@ class AgentHomeLayoutTest {
         // Its press opens it; swiped left it uncovers Unarchive, which brings it back.
         row.performClick()
         assertEquals(listOf("old1"), opened)
-        row.performTouchInput { swipeLeft() }
+        // From inside the card, as a finger would: the row's tag spans the page's margin too, which no swipe reaches.
+        row.performTouchInput { swipeLeft(startX = right - (AgentHomeSpec.cardInset * 2).toPx(), endX = left + AgentHomeSpec.cardInset.toPx()) }
         rule.waitForIdle()
         rule.onNode(hasTestTag(FlatRowTags.ARCHIVE_ACTION) and inRow, useUnmergedTree = true).performClick()
         rule.waitForIdle()
