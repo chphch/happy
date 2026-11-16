@@ -61,4 +61,7 @@
     <string name="agent_new_project_refused">Happy Agent no l\'ha afegit.</string>
     <string name="agent_new_project_unreachable">No s\'ha pogut connectar amb Happy Agent. Torna-ho a provar quan estigui connectat.</string>
     <string name="agent_home_unarchive">Desarxiva</string>
+    <string name="agent_home_archive_workspace">Arxiva l’espai</string>
+    <string name="agent_home_archive_workspace_title">Vols arxivar «%1$s»?</string>
+    <string name="agent_home_archive_workspace_message">Els xats que conté també s’arxiven i el que s’hi executa s’atura. La seva carpeta s’esborra i un espai arxivat no es pot recuperar.</string>
 </resources>

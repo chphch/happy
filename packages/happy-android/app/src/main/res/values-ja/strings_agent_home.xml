@@ -59,4 +59,7 @@
     <string name="agent_new_project_refused">Happy Agent はこれを追加しませんでした。</string>
     <string name="agent_new_project_unreachable">Happy Agent に接続できませんでした。接続されたらもう一度お試しください。</string>
     <string name="agent_home_unarchive">アーカイブ解除</string>
+    <string name="agent_home_archive_workspace">ワークスペースをアーカイブ</string>
+    <string name="agent_home_archive_workspace_title">「%1$s」をアーカイブしますか？</string>
+    <string name="agent_home_archive_workspace_message">中のチャットも一緒にアーカイブされ、実行中の作業は止まります。フォルダは削除され、アーカイブしたワークスペースは元に戻せません。</string>
 </resources>
