@@ -200,8 +200,9 @@ class ConversationTest {
         // An older computer unless a test says otherwise: pictures inline, files in the workspace.
         route: AttachmentRoute = AttachmentRoute().apply { markMissing() },
         kept: MutableMap<String, java.io.File> = HashMap(),
-        created: (JsonObject) -> Unit = {},
         restore: (suspend (String) -> String?)? = null,
+        // Last, so a test's trailing lambda is still this.
+        created: (JsonObject) -> Unit = {},
     ) = Conversation(
         api = ConversationApi(null, agent.request, fileRequest = agent.fileRequest),
         signals = signals,
