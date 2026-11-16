@@ -6,7 +6,10 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,10 +20,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -47,6 +52,8 @@ object MermaidSpec {
 
 object MermaidTags {
     const val DIAGRAM = "markdown.mermaid"
+    const val EXPAND = "markdown.mermaid.expand"
+    const val FULL = "markdown.mermaid.full"
 }
 
 /**
@@ -63,9 +70,13 @@ private fun mermaidWebViewAvailable(): Boolean =
  * MermaidRenderer.tsx's native path: mermaid@11 from jsdelivr in a WebView
  * on the theme's surfaceHighest, the diagram centred and no wider than the
  * view. Spec: full width, 8 above and below; the box radius 8 on
- * surfaceHighest, 200 high until the page reports its height, then the
- * tallest height reported, capped at 600 (the page scrolls inside). A
- * syntax error shows inside the page, as "Diagram error: …" in red mono.
+ * surfaceHighest, 200 high until the page reports its diagram's height,
+ * then that height, down as well as up, at most 600 (the page scrolls
+ * inside past it); the height kept while the app runs, so a row scrolled
+ * away and back returns at it. An expand button (a page's, top right)
+ * opens the diagram full screen, zoomable ([WebViewScreen]). A link tapped
+ * in it opens as a chat link does. A syntax error shows inside the page,
+ * as "Diagram error: …" in red mono.
  */
 @Composable
 fun MermaidView(content: String, modifier: Modifier = Modifier, fallback: @Composable () -> Unit) {
@@ -76,8 +87,13 @@ fun MermaidView(content: String, modifier: Modifier = Modifier, fallback: @Compo
     val colors = HappyTheme.colors
     val background = colors.surfaceHighest
     val html = remember(content, colors.dark, background) { mermaidHtml(content, colors.dark, background) }
-    var height by remember(html) { mutableIntStateOf(MermaidSpec.INITIAL_HEIGHT) }
-    val onHeight by rememberUpdatedState<(Int) -> Unit>({ reported -> height = maxOf(height, reported) })
+    var height by remember(content) { mutableIntStateOf(PageHeights["mermaid:$content"]?.toInt() ?: MermaidSpec.INITIAL_HEIGHT) }
+    var full by remember { mutableStateOf(false) }
+    val open = rememberWebLinkOpener()
+    val onHeight by rememberUpdatedState<(Int) -> Unit>({ reported ->
+        PageHeights["mermaid:$content"] = reported.toFloat()
+        height = reported
+    })
     Box(
         modifier = modifier
             .padding(vertical = MermaidSpec.marginVertical)
@@ -88,26 +104,59 @@ fun MermaidView(content: String, modifier: Modifier = Modifier, fallback: @Compo
             .testTag(MermaidTags.DIAGRAM),
     ) {
         AndroidView(
-            factory = { context -> mermaidWebView(context, background, colors.dark) { onHeight(it) } },
-            update = { view ->
-                if (view.tag != html) {
-                    view.tag = html
-                    view.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
-                }
-            },
+            factory = { context -> mermaidWebView(context, background, colors.dark, onOpen = { open(it) }) { onHeight(it) } },
+            update = { view -> view.showDiagram(html) },
             onRelease = WebView::destroy,
             modifier = Modifier.fillMaxSize(),
+        )
+        ExpandButton(onClick = { full = true }, tag = MermaidTags.EXPAND, modifier = Modifier.align(Alignment.TopEnd))
+    }
+    if (full) {
+        WebViewScreen(
+            onClose = { full = false },
+            tag = MermaidTags.FULL,
+            create = { context -> mermaidWebView(context, background, colors.dark, onOpen = { open(it) }, zoom = true) {} },
+            show = { view -> view.showDiagram(html) },
         )
     }
 }
 
+/** [html] loaded unless it is the one shown. */
+private fun WebView.showDiagram(html: String) {
+    if (tag == html) return
+    tag = html
+    loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+}
+
 @SuppressLint("SetJavaScriptEnabled")
-private fun mermaidWebView(context: Context, background: Color, dark: Boolean, onHeight: (Int) -> Unit) = themedWebView(context, background, dark).apply {
+private fun mermaidWebView(
+    context: Context,
+    background: Color,
+    dark: Boolean,
+    onOpen: (String) -> Unit,
+    zoom: Boolean = false,
+    onHeight: (Int) -> Unit,
+) = themedWebView(context, background, dark).apply {
     settings.javaScriptEnabled = true
     settings.allowFileAccess = false
     settings.allowContentAccess = false
+    if (zoom) {
+        settings.builtInZoomControls = true
+        settings.displayZoomControls = false
+    }
     // The page calls window.ReactNativeWebView.postMessage, as in happy-app.
     addJavascriptInterface(MermaidBridge(onHeight), "ReactNativeWebView")
+    webViewClient = MermaidClient(onOpen)
+}
+
+/** A diagram's client: a link tapped in it opens as a chat link does and the diagram stays; a renderer gone takes only this view. */
+private class MermaidClient(private val onOpen: (String) -> Unit) : WebViewClient() {
+    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+        if (request.isForMainFrame && request.hasGesture()) onOpen(request.url.toString())
+        return true
+    }
+
+    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean = true
 }
 
 /** The page's messages: `{type: "dimensions", height}` in CSS px (dp). Delivered on the main thread. */
@@ -153,7 +202,8 @@ fun mermaidHtml(content: String, dark: Boolean, background: Color): String {
             <div id="mermaid-container"></div>
             <script>
                 function reportHeight() {
-                    const height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+                    // The diagram's own height and the body's padding, not the document's, which is never below the view's.
+                    const height = Math.ceil(document.getElementById('mermaid-container').getBoundingClientRect().height + 32);
                     if (window.ReactNativeWebView) {
                         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'dimensions', height: height }));
                     }

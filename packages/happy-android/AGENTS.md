@@ -2321,7 +2321,10 @@ once per density, so neither is redone as rows enter or a list scrolls.
 `ui/components/MermaidView.kt` renders ```` ```mermaid ```` blocks the way
 happy-app's native MermaidRenderer does: a WebView loading mermaid@11 from
 jsdelivr, its height posted back through a `ReactNativeWebView` JS
-interface (200 until reported, capped at 600). Where there is no WebView
+interface: the diagram's own height plus the page's padding, down as well
+as up (200 until reported, capped at 600), kept while the app runs so a
+row scrolled back returns at it (`PageHeights`). An expand button opens
+the diagram full screen and zoomable (`WebViewScreen`). Where there is no WebView
 (Robolectric, devices without a provider) `LocalMermaidWebView` is false and
 MarkdownView's code block shows instead; layout tests see the code block
 unless they provide `true`.
