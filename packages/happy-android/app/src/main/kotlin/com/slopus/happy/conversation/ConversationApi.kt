@@ -63,9 +63,12 @@ data class WorkChoice(val kind: WorkKind = WorkKind.Task, val name: String = "",
 /**
  * A workspace that already exists, new work's place instead of a folder of
  * its own: a project's ([workspaceId] is the project's id) or one of its
- * worktrees', [name] as home lists it.
+ * worktrees', [name] as home lists it. With [newWorkspace] the place is a
+ * new workspace (a Git worktree on its own branch) made under the project
+ * [workspaceId] names at the first send, as desktop's New workspace makes
+ * one; [name] is then the project's.
  */
-data class WorkFolder(val workspaceId: String, val name: String)
+data class WorkFolder(val workspaceId: String, val name: String, val newWorkspace: Boolean = false)
 
 /** New work left before its first message, as it was left: compose again opens it. */
 data class UnsentWork(val task: NewTask, val choice: WorkChoice, val draft: String)
@@ -129,6 +132,31 @@ open class ConversationApi(
         }
         return call("POST", "/v0/agents", body).takeIf { it["agent"].obj != null } ?: throw invalid()
     }
+
+    /**
+     * A new workspace under the project [parentId] names, as desktop's New
+     * workspace makes one (`connectHappyAgent.ts` `createWorkspace`): `POST
+     * /v0/workspaces` with a placeholder [name] the first chat replaces
+     * (`nameConfigured: false`), no base, so the computer forks the
+     * project's trunk, answered `202 {workspace}` while the checkout is
+     * still being made. Its id is [task]'s workspace id and its mutation id
+     * [task]'s task id, both unused by a chat in a workspace, so a retry
+     * makes no second one.
+     */
+    open suspend fun createWorkspace(task: NewTask, parentId: String, name: String): JsonObject {
+        val body = buildJsonObject {
+            put("id", task.workspaceId)
+            put("parentId", parentId)
+            put("name", name)
+            put("nameConfigured", false)
+            put("mutationId", task.taskId)
+        }
+        return call("POST", "/v0/workspaces", body)["workspace"].obj ?: throw invalid()
+    }
+
+    /** One workspace as it stands (`GET /v0/workspaces/:id`), its checkout's progress in `initialization`. */
+    open suspend fun workspace(workspaceId: String): JsonObject =
+        call("GET", "/v0/workspaces/${escape(workspaceId)}")["workspace"].obj ?: throw invalid()
 
     /**
      * The agent of this computer's Chief of Staff: the active bot whose

@@ -50,7 +50,16 @@ sealed interface AgentFeedRow {
      * it and none waits on a question (desktop's project and workspace
      * `activity`).
      */
-    data class Folder(val id: String, val name: String, val depth: Int, val mark: FolderMark? = null, val running: Boolean = false, val lineChanges: WorkspaceLineChanges? = null) : AgentFeedRow {
+    data class Folder(
+        val id: String,
+        val name: String,
+        val depth: Int,
+        val mark: FolderMark? = null,
+        val running: Boolean = false,
+        val lineChanges: WorkspaceLineChanges? = null,
+        /** A project whose folder can hold workspaces (`worktreeSupport: "supported"`, API.md "Projects"): new ones are made under it. */
+        val workspaces: Boolean = false,
+    ) : AgentFeedRow {
         override val key get() = "folder-$id"
     }
 
@@ -378,7 +387,10 @@ data class AgentFeed(
                 catalog.projects.values.filter(::active).sortedWith(byOrderKey).forEach { project ->
                     val id = project.string("id") ?: return@forEach
                     val projectAt = rows.size
-                    rows += AgentFeedRow.Folder(id, project.string("name").orEmpty(), 0, FolderMark.of(id, project), lineChanges = git[id]?.takeIf { it.visible })
+                    rows += AgentFeedRow.Folder(
+                        id, project.string("name").orEmpty(), 0, FolderMark.of(id, project), lineChanges = git[id]?.takeIf { it.visible },
+                        workspaces = project.string("worktreeSupport") == "supported",
+                    )
                     fun series(owner: JsonObject, depth: Int) {
                         val listed = (owner["agents"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>()
                         // A chat brought back here stands in its own place before the computer lists it again.
