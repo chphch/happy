@@ -347,7 +347,8 @@ class IntentOutbox(
  * The connection's pending intents as home lays them over what the
  * computer last said (iOS's `IntentOverlay`): a chat read here has no dot,
  * a task, bot, subtask or Surface archived or left is gone with what nests
- * under it, a task or bot renamed wears its new name.
+ * under it, a task or bot renamed wears its new name, a chat brought back
+ * from the archive is in its project again.
  */
 data class IntentOverlay(
     /** Chats (agent IDs) read here that the computer may still call unread. */
@@ -356,6 +357,8 @@ data class IntentOverlay(
     val removed: Set<String> = emptySet(),
     /** Names given here, by task or bot ID. */
     val titles: Map<String, String> = emptyMap(),
+    /** Chats (agent IDs) brought back from the archive here, before the computer has them back. */
+    val restored: Set<String> = emptySet(),
 ) {
     companion object {
         fun of(intents: List<Intent>): IntentOverlay {
@@ -363,12 +366,14 @@ data class IntentOverlay(
             val read = HashSet<String>()
             val removed = HashSet<String>()
             val titles = HashMap<String, String>()
+            val restored = HashSet<String>()
             for (intent in intents) when (intent.kind) {
                 Intent.READ -> read += intent.target
                 Intent.ARCHIVE, Intent.LEAVE, Intent.DELETE -> removed += intent.target
+                Intent.UNARCHIVE -> restored += intent.target
                 Intent.RENAME -> (intent.value["title"] as? JsonPrimitive)?.contentOrNull?.let { titles[intent.target] = it }
             }
-            return IntentOverlay(read, removed, titles)
+            return IntentOverlay(read, removed, titles, restored)
         }
     }
 }
