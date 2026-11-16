@@ -66,4 +66,5 @@
     <string name="agent_new_project_refused">Happy Agent didn\'t add it.</string>
     <string name="agent_new_project_unreachable">Happy Agent couldn\'t be reached. Try again once it\'s connected.</string>
     <string name="agent_new_project_placeholder" translatable="false">~/Projects/app</string>
+    <string name="agent_home_unarchive">Unarchive</string>
 </resources>
