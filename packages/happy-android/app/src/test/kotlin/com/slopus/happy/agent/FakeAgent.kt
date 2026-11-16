@@ -47,8 +47,9 @@ object Wire {
     fun membership(taskId: String, orderKey: String) = buildJsonObject { put("taskId", taskId); put("orderKey", orderKey) }
 
     /** [avatar] is the wire's project `avatar` (API.md "Projects"): `image` with [thumbhash], `home`, or null for none. */
-    fun project(id: String, name: String, agents: List<JsonObject>, orderKey: String = "1", version: String = "01", avatar: String? = null, thumbhash: String? = null) = buildJsonObject {
+    fun project(id: String, name: String, agents: List<JsonObject>, orderKey: String = "1", version: String = "01", avatar: String? = null, thumbhash: String? = null, worktreeSupport: String? = null) = buildJsonObject {
         put("id", id); put("name", name); put("version", version); put("orderKey", orderKey); put("status", "active")
+        worktreeSupport?.let { put("worktreeSupport", it) }
         put("agents", JsonArray(agents))
         put("avatar", avatar?.let { kind -> buildJsonObject { put("kind", kind); if (kind == "image") { put("thumbhash", thumbhash); put("source", "user") } } } ?: kotlinx.serialization.json.JsonNull)
     }

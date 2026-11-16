@@ -112,4 +112,5 @@
     <string name="conversation_message_undisplayable">這則訊息無法顯示。</string>
     <string name="conversation_report_bug">回報錯誤</string>
     <string name="conversation_new_work_folder_note">對話會在這個資料夾中開始。</string>
+    <string name="conversation_new_work_workspace_note">傳送時會從此專案新增一個工作區(獨立的 Git 分支),由第一個聊天為它命名。</string>
 </resources>
