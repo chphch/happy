@@ -47,7 +47,7 @@ class AgentSearchTest {
             AgentFeedRow.Pipelines -> "Pipelines"
             is AgentFeedRow.Feed -> "Activity"
             AgentFeedRow.Todos -> "Todos"
-            is AgentFeedRow.Section, AgentFeedRow.NewProject -> null
+            is AgentFeedRow.Section, AgentFeedRow.NewProject, is AgentFeedRow.Archived -> null
         }
     }
 

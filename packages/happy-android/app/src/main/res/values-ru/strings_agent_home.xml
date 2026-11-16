@@ -59,4 +59,5 @@
     <string name="agent_new_project_home_unknown">Этот Happy Agent ещё не сообщил свою домашнюю папку. Введите полный путь к папке.</string>
     <string name="agent_new_project_refused">Happy Agent не добавил его.</string>
     <string name="agent_new_project_unreachable">Не удалось связаться с Happy Agent. Попробуйте снова, когда он подключится.</string>
+    <string name="agent_home_unarchive">Разархивировать</string>
 </resources>
