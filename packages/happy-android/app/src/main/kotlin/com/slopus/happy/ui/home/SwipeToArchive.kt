@@ -42,7 +42,9 @@ import kotlinx.coroutines.launch
  * button (error red, white archive glyph over "Archive Session") and stops
  * there; it never overshoots. Releasing past half way leaves it open.
  * With [leave] it leaves a task instead: an exit glyph over "Leave task"
- * (happy-ios 36b11c5bf, as Happy Desktop's row control does).
+ * (happy-ios 36b11c5bf, as Happy Desktop's row control does). With
+ * [unarchive] it brings an archived chat back: an undo glyph over
+ * "Unarchive" on the link colour, as nothing is lost.
  */
 @Composable
 internal fun SwipeToArchive(
@@ -50,6 +52,7 @@ internal fun SwipeToArchive(
     onArchive: () -> Unit,
     modifier: Modifier = Modifier,
     leave: Boolean = false,
+    unarchive: Boolean = false,
     content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit,
 ) {
     val colors = HappyTheme.colors
@@ -64,7 +67,7 @@ internal fun SwipeToArchive(
                     .width(FlatRowSpec.swipeAction)
                     .fillMaxHeight()
                     .testTag(FlatRowTags.ARCHIVE_ACTION)
-                    .background(colors.status.error)
+                    .background(if (unarchive) colors.textLink else colors.status.error)
                     .clickable(enabled = enabled) {
                         scope.launch { offset.animateTo(0f) }
                         onArchive()
@@ -72,9 +75,23 @@ internal fun SwipeToArchive(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Icon(if (leave) Ionicon.ExitOutline else Ionicon.ArchiveOutline, size = FlatRowSpec.swipeIcon, color = Color.White)
+                Icon(
+                    when {
+                        unarchive -> Ionicon.ArrowUndoOutline
+                        leave -> Ionicon.ExitOutline
+                        else -> Ionicon.ArchiveOutline
+                    },
+                    size = FlatRowSpec.swipeIcon,
+                    color = Color.White,
+                )
                 Text(
-                    text = stringResource(if (leave) R.string.task_leave else R.string.session_info_archive_session),
+                    text = stringResource(
+                        when {
+                            unarchive -> R.string.agent_home_unarchive
+                            leave -> R.string.task_leave
+                            else -> R.string.session_info_archive_session
+                        },
+                    ),
                     style = FlatRowSpec.swipeText,
                     color = Color.White,
                     textAlign = TextAlign.Center,

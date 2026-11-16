@@ -24,6 +24,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -59,6 +60,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
@@ -95,8 +97,11 @@ import com.slopus.happy.ui.components.StatusDot
 import com.slopus.happy.ui.components.avatar.PlaceholderAvatar
 import com.slopus.happy.ui.components.rememberReduceMotion
 import com.slopus.happy.ui.components.rememberThumbHash
+import com.slopus.happy.ui.home.ArchiveToggle
 import com.slopus.happy.ui.home.BlockedDotColor
+import com.slopus.happy.ui.home.HomeTags
 import com.slopus.happy.ui.home.LocalHomeRowObserver
+import com.slopus.happy.ui.home.ProjectListSpec
 import com.slopus.happy.ui.home.SwipeToArchive
 import com.slopus.happy.ui.home.UnreadDotColor
 import com.slopus.happy.ui.layout.LocalWindowLayout
@@ -133,6 +138,10 @@ object AgentHomeTags {
     const val ROW_CHANGES = "agentHome.rowChanges"
     /** A project's or worktree's "+": a press on its row starts a new session in it. */
     const val ROW_NEW_SESSION = "agentHome.rowNewSession"
+    /** An archived chat's second line: where it was. */
+    const val ROW_PLACE = "agentHome.rowPlace"
+    /** Show archived / Hide archived, under the last card where the projects have an archive. */
+    const val ARCHIVE_TOGGLE = HomeTags.ARCHIVE_TOGGLE
     /** A Surface row's held menu: Leave. */
     const val LEAVE = "agentHome.leave"
 }
@@ -210,6 +219,8 @@ object AgentHomeSpec {
      */
     fun hasMark(kind: ConversationKind): Boolean = kind == ConversationKind.Bot || kind == ConversationKind.Task
 
+    /** An archived chat's row, as the Happy CLI home's archived rows. */
+    const val ARCHIVED_ALPHA = ProjectListSpec.ARCHIVED_ALPHA
 }
 
 /**
@@ -349,15 +360,22 @@ sealed interface AgentHomeItem {
         /** As its line draws it ([AgentFeedRow.Conversation.drawn]). */
         fun drawn(): Row = (row as? AgentFeedRow.Conversation)?.drawn()?.takeIf { it !== row }?.let { copy(row = it) } ?: this
     }
+
+    /** Show archived ([shown] false) or Hide archived, on the page under the last card. */
+    data class ArchiveToggle(val shown: Boolean) : AgentHomeItem {
+        override val key get() = "archive-toggle"
+    }
 }
 
 /**
  * The feed's rows, each knowing where it stands in its section's card. With
  * [newProject] the projects card ends with New project
  * ([AgentFeedRow.NewProject]); a home whose projects are hidden has no such
- * card, and so no New project either.
+ * card, and so no New project either. Where the projects have an archive
+ * ([AgentFeed.archived]), its toggle follows the last card, and while
+ * [archiveShown] the archive is one card under it, as the Happy CLI home's.
  */
-fun agentHomeItems(feed: AgentFeed, newProject: Boolean = false): List<AgentHomeItem> {
+fun agentHomeItems(feed: AgentFeed, newProject: Boolean = false, archiveShown: Boolean = false): List<AgentHomeItem> {
     val out = ArrayList<AgentHomeItem>(feed.rows.size + 1)
     var section: AgentFeedSection? = null
     fun endSection() {
@@ -376,6 +394,10 @@ fun agentHomeItems(feed: AgentFeed, newProject: Boolean = false): List<AgentHome
         }
     }
     endSection()
+    if (feed.archived.isNotEmpty()) {
+        out += AgentHomeItem.ArchiveToggle(archiveShown)
+        if (archiveShown) feed.archived.forEach { row -> out += AgentHomeItem.Row(row, first = out.lastOrNull() !is AgentHomeItem.Row, last = false) }
+    }
     for (index in out.indices) {
         val item = out[index] as? AgentHomeItem.Row ?: continue
         if (out.getOrNull(index + 1) !is AgentHomeItem.Row) out[index] = item.copy(last = true)
@@ -406,6 +428,10 @@ fun LazyListScope.agentHomeRows(
     onNewProject: () -> Unit = {},
     /** A conversation row's swipe archives what its [AgentFeedRow.Conversation.archive] names; null offers no swipe. */
     onArchive: ((AgentFeedRow.Conversation) -> Unit)? = null,
+    /** The archive's toggle shows the archive (true) or hides it. */
+    onArchiveShown: (Boolean) -> Unit = {},
+    /** An archived chat's swipe brings it back to its project; null offers no swipe. */
+    onUnarchive: ((AgentFeedRow.Archived) -> Unit)? = null,
 ) {
     items(items, key = { it.key }, contentType = { (it as? AgentHomeItem.Row)?.row?.let { row -> row::class } ?: it::class }) { item ->
         val motion = if (reduceMotion) Modifier else Modifier.animateItem(
@@ -427,6 +453,13 @@ fun LazyListScope.agentHomeRows(
                 onComposeIn = onComposeIn,
                 onNewProject = onNewProject,
                 onArchive = onArchive,
+                onUnarchive = onUnarchive,
+            )
+            is AgentHomeItem.ArchiveToggle -> ArchiveToggle(
+                hidden = !item.shown,
+                onToggle = { onArchiveShown(!item.shown) },
+                modifier = motion,
+                carded = true,
             )
         }
     }
@@ -455,10 +488,13 @@ internal fun AgentHomeCardRow(
     onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
     onNewProject: () -> Unit = {},
     onArchive: ((AgentFeedRow.Conversation) -> Unit)? = null,
+    onUnarchive: ((AgentFeedRow.Archived) -> Unit)? = null,
 ) {
+    // An archived chat's place is a line under its title.
+    val detailed = item.row is AgentFeedRow.Archived
     HomeCardRow(
         place = HomeCardPlace(item.first, item.last),
-        height = AgentHomeSpec.rowHeight(),
+        height = if (detailed) AgentHomeSpec.detailRowHeight() else AgentHomeSpec.rowHeight(),
         dividerStart = titleStart(item.row),
         modifier = modifier,
         tag = tag,
@@ -479,6 +515,13 @@ internal fun AgentHomeCardRow(
             AgentFeedRow.Todos -> PlaceRow(stringResource(R.string.agent_search_todos), { TileMark(Ionicon.CheckboxOutline, RowTile.Green) }, onOpenTodos)
             is AgentFeedRow.Surface -> SurfaceRow(row, { onOpenSurface(row) }, onLeaveSurface)
             AgentFeedRow.NewProject -> PlaceRow(stringResource(R.string.agent_home_new_project), { TileMark(Ionicon.Add, RowTile.Blue) }, onNewProject)
+            // Swiped left, an archived chat uncovers Unarchive, as a live one uncovers Archive.
+            is AgentFeedRow.Archived -> SwipeToArchive(
+                enabled = onUnarchive != null,
+                onArchive = { onUnarchive?.invoke(row) },
+                modifier = Modifier.fillMaxSize(),
+                unarchive = true,
+            ) { ArchivedRow(row, onOpen) }
             is AgentFeedRow.Section -> Unit
         }
     }
@@ -542,6 +585,7 @@ internal fun AgentSearchEntryRow(
 /** What a row opens, as the tablet's main panel names its root. */
 internal fun AgentFeedRow.panelKey(): String? = when (val row = this) {
     is AgentFeedRow.Conversation -> MainPanelKey.conversation(row.agentId)
+    is AgentFeedRow.Archived -> MainPanelKey.conversation(row.agentId)
     is AgentFeedRow.Surface -> MainPanelKey.surface(row.id)
     AgentFeedRow.Artifacts -> MainPanelKey.ARTIFACTS
     AgentFeedRow.Plugins -> MainPanelKey.PLUGINS
@@ -557,6 +601,7 @@ private fun titleStart(row: AgentFeedRow): Dp {
         is AgentFeedRow.Conversation -> row.depth to AgentHomeSpec.hasMark(row.kind)
         is AgentFeedRow.Folder -> row.depth to (row.mark != null)
         AgentFeedRow.Artifacts, AgentFeedRow.Plugins, AgentFeedRow.Pipelines, is AgentFeedRow.Feed, AgentFeedRow.Todos, is AgentFeedRow.Surface, AgentFeedRow.NewProject -> 0 to true
+        is AgentFeedRow.Archived -> 0 to false
         is AgentFeedRow.Section -> return 0.dp
     }
     return AgentHomeSpec.markInset + AgentHomeSpec.indent * depth + if (marked) AgentHomeSpec.mark + AgentHomeSpec.markGap else 0.dp
@@ -623,6 +668,47 @@ private fun ConversationRow(row: AgentFeedRow.Conversation, onOpen: (String) -> 
         }
         WorkspaceCounts(row.lineChanges)
         Corner(row.blocked, row.unread)
+    }
+}
+
+/**
+ * A chat in the archive, in a [AgentHomeSpec.detailRowHeight] row: its
+ * title 17/22 (cut fading at its end, [com.slopus.happy.ui.components.TitleFade])
+ * over where it was, 13/18 secondary ([AgentFeedRow.Archived.place]), both
+ * at [AgentHomeSpec.ARCHIVED_ALPHA] as the Happy CLI home's archived rows,
+ * from the card's 16 with no mark. No dot, no time. The whole row opens
+ * it, read-only.
+ */
+@Composable
+private fun ArchivedRow(row: AgentFeedRow.Archived, onOpen: (String) -> Unit) {
+    val colors = HappyTheme.colors
+    val archived = stringResource(R.string.member_profile_archived)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(role = Role.Button) { onOpen(row.agentId) }
+            .semantics { stateDescription = archived }
+            .padding(start = AgentHomeSpec.markInset, end = AgentHomeSpec.paddingEnd)
+            .alpha(AgentHomeSpec.ARCHIVED_ALPHA),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        ShimmerText(
+            text = row.title ?: stringResource(R.string.session_new_chat),
+            style = AgentHomeSpec.title,
+            baseColor = colors.text,
+            highlightColor = ShimmerSpec.sheen(colors.text, colors.surfaceHigh),
+            shimmering = false,
+            fade = true,
+            modifier = Modifier.testTag(AgentHomeTags.ROW_TITLE),
+        )
+        Text(
+            row.place,
+            style = AgentHomeSpec.detail,
+            color = colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag(AgentHomeTags.ROW_PLACE),
+        )
     }
 }
 
@@ -827,6 +913,10 @@ fun AgentHomeList(
     /** The projects card's New project, where [agentHomeItems] put one. */
     onNewProject: () -> Unit = {},
     onArchive: ((AgentFeedRow.Conversation) -> Unit)? = null,
+    /** The archive's toggle shows the archive (true) or hides it. */
+    onArchiveShown: (Boolean) -> Unit = {},
+    /** An archived chat's swipe brings it back to its project; null offers no swipe. */
+    onUnarchive: ((AgentFeedRow.Archived) -> Unit)? = null,
 ) {
     val reduceMotion = rememberReduceMotion()
     // The call brings a conversation's row on screen here before it presses it ([VoiceTouch.rows]).
@@ -846,7 +936,11 @@ fun AgentHomeList(
         contentPadding = contentPadding,
     ) {
         header?.invoke(this)
-        agentHomeRows(items, reduceMotion, onOpen, onOpenArtifacts, onOpenSurface, onLeaveSurface, onHold, selected, onOpenFeed, onOpenTodos, onOpenPlugins, onOpenPipelines, onComposeIn, onNewProject, onArchive)
+        agentHomeRows(
+            items, reduceMotion, onOpen, onOpenArtifacts, onOpenSurface, onLeaveSurface, onHold, selected, onOpenFeed, onOpenTodos, onOpenPlugins, onOpenPipelines, onComposeIn, onNewProject, onArchive,
+            onArchiveShown = onArchiveShown,
+            onUnarchive = onUnarchive,
+        )
         item(key = "bottom", contentType = "bottom") { bottom() }
     }
 }

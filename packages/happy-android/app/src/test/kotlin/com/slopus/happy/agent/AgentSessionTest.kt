@@ -1602,6 +1602,33 @@ class AgentSessionTest {
     }
 
     @Test
+    fun anArchivedChatComesBackToItsProjectAndOneArchivedHereGoesToTheArchive(): Unit = runBlocking {
+        agent.bootstrap = Wire.bootstrap(
+            projects = listOf(Wire.project("p1", "rig", listOf(Wire.agent("ap1", workspaceId = "p1", title = "Live", orderKey = "2")))),
+            archivedAgents = listOf(Wire.agent("old", workspaceId = "p1", title = "Old chat", archivedAt = 10, orderKey = "1")),
+        )
+        // The computer's answers: each chat as it stands afterwards.
+        agent.resources["/v0/agents/old/unarchive"] = buildJsonObject { put("agent", Wire.agent("old", workspaceId = "p1", title = "Old chat", version = "02", orderKey = "1")) }
+        agent.resources["/v0/agents/ap1/archive"] = buildJsonObject { put("agent", Wire.agent("ap1", workspaceId = "p1", title = "Live", version = "02", orderKey = "2", archivedAt = 30)) }
+        val session = sessions().session(id)!!
+        agent.frames.send(Wire.hello("c0"))
+        eventually({ session.feed.value.archived.map { it.agentId } }) { it == listOf("old") }
+
+        // Out of the archive and in its place at once, and still there once the computer has it back.
+        session.unarchive("old")
+        eventually({ session.feed.value }) { feed -> feed.archived.isEmpty() && feed.conversations.map { it.agentId } == listOf("old", "ap1") }
+        eventually({ session.intents.pending.value }) { it.isEmpty() }
+        assertTrue("POST /v0/agents/old/unarchive" in agent.calls)
+        assertEquals(listOf("old", "ap1"), session.feed.value.conversations.map { it.agentId })
+
+        // Archived here, it goes to the archive rather than out of sight.
+        session.archive("agent", "ap1")
+        eventually({ session.intents.pending.value }) { it.isEmpty() }
+        eventually({ session.feed.value }) { feed -> feed.archived.map { it.agentId } == listOf("ap1") && feed.conversations.map { it.agentId } == listOf("old") }
+        assertTrue("POST /v0/agents/ap1/archive" in agent.calls)
+    }
+
+    @Test
     fun aNewProjectRegistersItsFolderWithHomeSpelledOutClonesARepositoryAndSaysWhyNot(): Unit = runBlocking {
         val home = Wire.project("ph", "Home", emptyList(), avatar = "home").with("compute", buildJsonObject { put("type", "host"); put("path", "/Users/me/") })
         agent.bootstrap = Wire.bootstrap(projects = listOf(home))
