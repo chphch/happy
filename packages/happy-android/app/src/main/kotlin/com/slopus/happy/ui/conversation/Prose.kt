@@ -207,8 +207,12 @@ internal fun proseSpans(spans: List<MarkdownSpan>): AnnotatedString = buildAnnot
     for (span in spans) {
         val style = ComposeSpanStyle(
             fontWeight = if (SpanStyle.Bold in span.styles || SpanStyle.Semibold in span.styles) FontWeight.SemiBold else null,
-            fontStyle = if (SpanStyle.Italic in span.styles) FontStyle.Italic else null,
-            fontFamily = if (SpanStyle.Code in span.styles) AppMono else null,
+            fontStyle = if (SpanStyle.Italic in span.styles || SpanStyle.Math in span.styles) FontStyle.Italic else null,
+            fontFamily = when {
+                SpanStyle.Code in span.styles -> AppMono
+                SpanStyle.Math in span.styles -> FontFamily.Serif
+                else -> null
+            },
         )
         val url = span.url
         if (url != null && HappyReferences.mention(url)) {
@@ -331,7 +335,7 @@ internal class ProseBuilder(resolver: FontFamily.Resolver) {
             val line = geometry.px(1.dp)
             ProsePart(block, null, emptyList(), intArrayOf(margin, line), available, margin + line + margin)
         }
-        is MarkdownBlock.CodeBlock, is MarkdownBlock.Mermaid, is MarkdownBlock.HtmlPage, is MarkdownBlock.Options, is MarkdownBlock.Table, is MarkdownBlock.Image, is MarkdownBlock.Buttons -> null
+        is MarkdownBlock.CodeBlock, is MarkdownBlock.Mermaid, is MarkdownBlock.HtmlPage, is MarkdownBlock.Math, is MarkdownBlock.Options, is MarkdownBlock.Table, is MarkdownBlock.Image, is MarkdownBlock.Buttons -> null
     }
 
     /**

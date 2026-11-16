@@ -9,7 +9,8 @@ import com.slopus.happy.agent.HappyUrls
 // markdown, the one the chat renders. Pure Kotlin; rows parse off the main
 // thread and hand the blocks to Compose.
 
-enum class SpanStyle { Italic, Bold, Semibold, Code }
+/** [Math]: math inside a sentence, its TeX shown as symbols ([TexText]) in the math face. */
+enum class SpanStyle { Italic, Bold, Semibold, Code, Math }
 
 /** [button]: a link whose title is exactly `button` (API.md, "Buttons"); only a Happy link is ever shown as one. */
 @Immutable
@@ -31,6 +32,8 @@ sealed interface MarkdownBlock {
      * While its closing fence hasn't arrived it is a [CodeBlock].
      */
     data class HtmlPage(val html: String) : MarkdownBlock
+    /** Display math: `$$…$$` or `\[…\]` on its own line, or on lines of its own around it. Its TeX, drawn with KaTeX. */
+    data class Math(val tex: String) : MarkdownBlock
     data object HorizontalRule : MarkdownBlock
     /** `<options>` the agent offers; tapping one sends it as the next message. */
     data class Options(val items: List<String>) : MarkdownBlock
@@ -40,7 +43,16 @@ sealed interface MarkdownBlock {
     data class Buttons(val links: List<MarkdownSpan>) : MarkdownBlock
 }
 
-private val SPAN_PATTERN = Regex("""(\*\*(.*?)(?:\*\*|$))|(\*(.*?)(?:\*|$))|(\[([^\]]*)\](?:\(((?:[^()]|\([^()]*\))+)\))?)|(`(.*?)(?:`|$))""")
+/**
+ * Bold, italic, links and code, then inline math: `$…$` that neither opens
+ * on a space nor closes after one or before a digit (so "$5 and $10" stays
+ * prices, as desktop's remark-math has it), and `\(…\)`.
+ */
+private val SPAN_PATTERN = Regex(
+    """(\*\*(.*?)(?:\*\*|$))|(\*(.*?)(?:\*|$))|(\[([^\]]*)\](?:\(((?:[^()]|\([^()]*\))+)\))?)|(`(.*?)(?:`|$))""" +
+        """|((?<![\\$])\$(?=[^\s$])((?:\\.|[^$\\\n])*?[^\s\\$])\$(?![\d$]))|(\\\((.+?)\\\))""",
+)
+private val DISPLAY_MATH = Regex("""^\$\$(.+)\$\$$|^\\\[(.+)\\\]$""")
 private val URL_PATTERN = Regex("""https?://[^\s<]+""")
 private val TRAILING_PUNCTUATION = Regex("""[),.;:!?]$""")
 private val TABLE_SEPARATOR = Regex("""^[|\s\-:=]*$""")
@@ -156,11 +168,17 @@ private fun MutableList<MarkdownSpan>.addSpans(markdown: String, header: Boolean
                 else pushTextWithAutoLinks("[${g[6]!!.value}]", styles)
             }
             g[8] != null -> add(MarkdownSpan(styles + SpanStyle.Code, g[9]?.value.orEmpty()))
+            g[10] != null -> add(inlineMath(g[11]!!.value, g[10]!!.value, styles))
+            g[12] != null -> add(inlineMath(g[13]!!.value, g[12]!!.value, styles))
         }
         lastIndex = match.range.last + 1
     }
     if (lastIndex < markdown.length) pushTextWithAutoLinks(markdown.substring(lastIndex), styles)
 }
+
+/** Math inside a sentence as symbols in the math face ([TexText]); as [written] when it has no such text. */
+private fun inlineMath(tex: String, written: String, styles: Set<SpanStyle>): MarkdownSpan =
+    TexText.of(tex)?.let { MarkdownSpan(styles + SpanStyle.Math, it) } ?: MarkdownSpan(styles, written)
 
 /**
  * `[text](target)` as a span in [styles]. A Happy link titled `button` is
@@ -311,6 +329,26 @@ fun parseMarkdownBlocks(markdown: String): List<MarkdownBlock> {
             }
             if (items.isNotEmpty()) blocks.add(MarkdownBlock.Options(items))
             continue
+        }
+
+        DISPLAY_MATH.matchEntire(trimmed)?.let { match ->
+            val tex = (match.groups[1] ?: match.groups[2])!!.value.trim()
+            if (tex.isNotEmpty()) {
+                blocks.add(MarkdownBlock.Math(tex))
+                continue@outer
+            }
+        }
+
+        if (trimmed == "\$\$" || trimmed == "\\[") {
+            val close = if (trimmed == "\$\$") "\$\$" else "\\]"
+            var end = index
+            while (end < lines.size && lines[end].trim() != close && lines[end].isNotBlank()) end++
+            // Closed, and no blank line inside (happy-app's rule); otherwise these lines are text.
+            if (end < lines.size && end > index && lines[end].trim() == close) {
+                blocks.add(MarkdownBlock.Math(lines.subList(index, end).joinToString("\n").trim()))
+                index = end + 1
+                continue
+            }
         }
 
         IMAGE.find(trimmed)?.let { match ->
