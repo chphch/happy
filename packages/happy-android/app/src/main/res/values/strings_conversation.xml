@@ -114,4 +114,5 @@
     <string name="problem_forbidden">You don\'t have permission to do that.</string>
     <string name="conversation_role_read_only">You can read this conversation, but your role can\'t send messages.</string>
     <string name="conversation_new_work_folder_note">The session starts in this folder.</string>
+    <string name="conversation_new_work_workspace_note">A new workspace, a Git branch of its own, is made from this project when you send. Its first chat names it.</string>
 </resources>
