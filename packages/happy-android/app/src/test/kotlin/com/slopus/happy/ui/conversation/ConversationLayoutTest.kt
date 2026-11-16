@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
@@ -410,6 +411,47 @@ class ConversationLayoutTest {
         show(ConversationState(created = true, loaded = true, rows = history, agent = agent.copy(parentAgentId = "p")))
         rule.node(ConversationScreenTags.READ_ONLY).assertIsDisplayed()
         rule.node(ConversationComposerTags.COMPOSER).assertDoesNotExist()
+    }
+
+    @Test fun `an archived project chat offers Resume Session under its line, which asks to bring it back`() {
+        var asked = 0
+        rule.setHappyContent {
+            ConversationScreen(
+                ConversationState(created = true, loaded = true, rows = history, agent = agent.copy(archivedAt = 1_755_500_000_000)),
+                ConversationScreenActions(onResume = { asked++ }),
+                resumable = true,
+            )
+        }
+        rule.onNodeWithText("This conversation is archived.").assertIsDisplayed()
+        rule.node(ConversationComposerTags.COMPOSER).assertDoesNotExist()
+        val line = rule.node(ConversationScreenTags.READ_ONLY).bounds
+        val resume = rule.node(ConversationScreenTags.RESUME)
+        resume.assertIsDisplayed()
+        rule.onNodeWithText("Resume Session").assertIsDisplayed()
+        // Under the line, centred on it.
+        assertTrue(resume.bounds.top >= line.bottom)
+        assertDp("centred under the line", (line.left + line.right) / 2, (resume.bounds.left + resume.bounds.right) / 2)
+        shot("archived-resume")
+        resume.performClick()
+        rule.waitForIdle()
+        assertEquals(1, asked)
+    }
+
+    @Test fun `Resume waits while the computer is asked, and an archived chat it can't bring back has none`() {
+        var resuming by mutableStateOf(true)
+        rule.setHappyContent {
+            ConversationScreen(
+                ConversationState(created = true, loaded = true, rows = history, agent = agent.copy(archivedAt = 1_755_500_000_000)),
+                ConversationScreenActions(),
+                resuming = resuming,
+            )
+        }
+        rule.node(ConversationScreenTags.RESUME).assertIsNotEnabled()
+        // Not in home's archive (a subtask, a bot's or a task's chat): only the line.
+        resuming = false
+        rule.waitForIdle()
+        rule.node(ConversationScreenTags.RESUME).assertDoesNotExist()
+        rule.node(ConversationScreenTags.READ_ONLY).assertIsDisplayed()
     }
 
     @Test fun `a role that only reads gets a line saying so in the composer's place, in a new chat too`() {
