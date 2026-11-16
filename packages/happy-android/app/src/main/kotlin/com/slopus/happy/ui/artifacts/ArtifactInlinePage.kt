@@ -241,7 +241,7 @@ fun ArtifactInlinePage(artifactId: String, title: String, page: References.Page,
 }
 
 /** The height messages: plain numbers, nothing else a page can call. */
-private class Heights(private val measured: (Float) -> Unit) {
+internal class Heights(private val measured: (Float) -> Unit) {
     @JavascriptInterface
     fun height(value: Double) {
         if (value.isFinite() && value > 0) measured(value.toFloat())
@@ -302,7 +302,7 @@ private class InlinePageClient(
     override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean = true
 }
 
-private const val HEIGHT_BRIDGE = "happyPageHeight"
+internal const val HEIGHT_BRIDGE = "happyPageHeight"
 
 /** [url]'s origin, for a script WebView runs in it alone. */
 private fun origin(url: String): String = Uri.parse(url).let { "${it.scheme}://${it.authority}" }
@@ -351,7 +351,7 @@ internal fun hostScript(colors: HappyColors): String {
  * the bottom of the body's last box and the body's own padding and margin,
  * which holds whether or not the page sizes its root to the frame. Once per document.
  */
-private const val MEASURE_SCRIPT = """(() => {
+internal const val MEASURE_SCRIPT = """(() => {
   if (window.__happyMeasure) { window.__happyMeasure(); return; }
   let last = 0;
   const height = () => {
