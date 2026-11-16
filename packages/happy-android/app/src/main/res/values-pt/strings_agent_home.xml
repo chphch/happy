@@ -61,4 +61,7 @@
     <string name="agent_new_project_refused">Happy Agent não o adicionou.</string>
     <string name="agent_new_project_unreachable">Não foi possível conectar ao Happy Agent. Tente de novo quando ele estiver conectado.</string>
     <string name="agent_home_unarchive">Desarquivar</string>
+    <string name="agent_home_archive_workspace">Arquivar espaço</string>
+    <string name="agent_home_archive_workspace_title">Arquivar “%1$s”?</string>
+    <string name="agent_home_archive_workspace_message">Os chats dele também são arquivados e o que estiver em execução nele para. A pasta dele é apagada, e um espaço arquivado não pode ser recuperado.</string>
 </resources>

@@ -69,4 +69,7 @@
     <string name="agent_new_project_unreachable">Happy Agent couldn\'t be reached. Try again once it\'s connected.</string>
     <string name="agent_new_project_placeholder" translatable="false">~/Projects/app</string>
     <string name="agent_home_unarchive">Unarchive</string>
+    <string name="agent_home_archive_workspace">Archive workspace</string>
+    <string name="agent_home_archive_workspace_title">Archive “%1$s”?</string>
+    <string name="agent_home_archive_workspace_message">Its chats are archived with it and anything running in it stops. Its folder is deleted, and an archived workspace can’t be brought back.</string>
 </resources>
