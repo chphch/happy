@@ -449,6 +449,8 @@ fun LazyListScope.agentHomeRows(
     onArchiveShown: (Boolean) -> Unit = {},
     /** An archived chat's swipe brings it back to its project; null offers no swipe. */
     onUnarchive: ((AgentFeedRow.Archived) -> Unit)? = null,
+    /** A worktree workspace row's swipe asks to archive what its [AgentFeedRow.Folder.archive] names; null offers no swipe. */
+    onArchiveWorkspace: ((AgentFeedRow.Folder) -> Unit)? = null,
 ) {
     items(items, key = { it.key }, contentType = { (it as? AgentHomeItem.Row)?.row?.let { row -> row::class } ?: it::class }) { item ->
         val motion = if (reduceMotion) Modifier else Modifier.animateItem(
@@ -471,6 +473,7 @@ fun LazyListScope.agentHomeRows(
                 onNewProject = onNewProject,
                 onArchive = onArchive,
                 onUnarchive = onUnarchive,
+                onArchiveWorkspace = onArchiveWorkspace,
             )
             is AgentHomeItem.ArchiveToggle -> ArchiveToggle(
                 hidden = !item.shown,
@@ -506,6 +509,7 @@ internal fun AgentHomeCardRow(
     onNewProject: () -> Unit = {},
     onArchive: ((AgentFeedRow.Conversation) -> Unit)? = null,
     onUnarchive: ((AgentFeedRow.Archived) -> Unit)? = null,
+    onArchiveWorkspace: ((AgentFeedRow.Folder) -> Unit)? = null,
 ) {
     // An archived chat's place is a line under its title.
     val detailed = item.row is AgentFeedRow.Archived
@@ -524,7 +528,13 @@ internal fun AgentHomeCardRow(
                 onArchive = { onArchive?.invoke(row) },
                 modifier = Modifier.fillMaxSize(),
             ) { ConversationRow(row, onOpen, onHold) }
-            is AgentFeedRow.Folder -> FolderRow(row, onComposeIn)
+            // Swiped left, a worktree's workspace uncovers Archive workspace, which asks before it archives (AgentHome).
+            is AgentFeedRow.Folder -> if (row.archive == null) FolderRow(row, onComposeIn) else SwipeToArchive(
+                enabled = onArchiveWorkspace != null,
+                onArchive = { onArchiveWorkspace?.invoke(row) },
+                modifier = Modifier.fillMaxSize(),
+                workspace = true,
+            ) { FolderRow(row, onComposeIn) }
             AgentFeedRow.Artifacts -> PlaceRow(stringResource(R.string.artifacts_title), { TileMark(Ionicon.DocumentTextOutline, RowTile.Purple) }, onOpenArtifacts)
             AgentFeedRow.Plugins -> PlaceRow(stringResource(R.string.plugins_title), { TileMark(Ionicon.ExtensionPuzzleOutline, RowTile.Orange) }, onOpenPlugins)
             AgentFeedRow.Pipelines -> PlaceRow(stringResource(R.string.pipelines_title), { TileMark(Ionicon.GitNetworkOutline, RowTile.Teal) }, onOpenPipelines)
@@ -977,6 +987,8 @@ fun AgentHomeList(
     onArchiveShown: (Boolean) -> Unit = {},
     /** An archived chat's swipe brings it back to its project; null offers no swipe. */
     onUnarchive: ((AgentFeedRow.Archived) -> Unit)? = null,
+    /** A worktree workspace row's swipe asks to archive it; null offers no swipe. */
+    onArchiveWorkspace: ((AgentFeedRow.Folder) -> Unit)? = null,
 ) {
     val reduceMotion = rememberReduceMotion()
     // The call brings a conversation's row on screen here before it presses it ([VoiceTouch.rows]).
@@ -1000,6 +1012,7 @@ fun AgentHomeList(
             items, reduceMotion, onOpen, onOpenArtifacts, onOpenSurface, onLeaveSurface, onHold, selected, onOpenFeed, onOpenTodos, onOpenPlugins, onOpenPipelines, onComposeIn, onNewProject, onArchive,
             onArchiveShown = onArchiveShown,
             onUnarchive = onUnarchive,
+            onArchiveWorkspace = onArchiveWorkspace,
         )
         item(key = "bottom", contentType = "bottom") { bottom() }
     }
