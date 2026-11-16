@@ -129,6 +129,7 @@ data class MarkdownDiff(val blocks: List<Entry>) {
                 is MarkdownBlock.CodeBlock -> "code:${block.language}:" + block.content
                 is MarkdownBlock.Mermaid -> "mermaid:" + block.content
                 is MarkdownBlock.HtmlPage -> "page:" + block.html
+                is MarkdownBlock.Math -> "math:" + block.tex
                 MarkdownBlock.HorizontalRule -> "hr"
                 is MarkdownBlock.Options -> "options:" + block.items.joinToString("\u0000")
                 is MarkdownBlock.Table -> "table:" + (listOf(block.headers) + block.rows).joinToString("\n") { row -> row.joinToString("|") { styled(it) } }
