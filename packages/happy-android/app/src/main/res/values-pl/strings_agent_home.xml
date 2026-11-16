@@ -62,4 +62,7 @@
     <string name="agent_new_project_refused">Happy Agent go nie dodał.</string>
     <string name="agent_new_project_unreachable">Nie udało się połączyć z Happy Agent. Spróbuj ponownie, gdy będzie połączony.</string>
     <string name="agent_home_unarchive">Przywróć</string>
+    <string name="agent_home_archive_workspace">Zarchiwizuj przestrzeń</string>
+    <string name="agent_home_archive_workspace_title">Zarchiwizować „%1$s”?</string>
+    <string name="agent_home_archive_workspace_message">Jej czaty też zostaną zarchiwizowane, a to, co w niej działa, zostanie zatrzymane. Jej folder zostanie usunięty, a zarchiwizowanej przestrzeni nie można przywrócić.</string>
 </resources>

@@ -183,12 +183,12 @@ data class AgentCatalog(
     }
 
     /**
-     * A task left or archived, a bot archived or a conversation ([kind]
-     * `agent`: a project's chat or a subtask) archived here and taken by the
-     * computer: out of home until a snapshot says otherwise, so it doesn't
-     * come back between the answer and the event that says so. A
-     * conversation stays, archived since [at], so home's archive lists it
-     * at once.
+     * A task left or archived, a bot or a worktree's workspace archived or a
+     * conversation ([kind] `agent`: a project's chat or a subtask) archived
+     * here and taken by the computer: out of home until a snapshot says
+     * otherwise, so it doesn't come back between the answer and the event
+     * that says so. A conversation stays, archived since [at], so home's
+     * archive lists it at once.
      */
     fun withoutListed(kind: String, id: String, at: Long = System.currentTimeMillis()): AgentCatalog = when (kind) {
         "task" -> if (id in memberships || id in tasks) copy(tasks = tasks - id, memberships = memberships - id) else this
@@ -196,6 +196,7 @@ data class AgentCatalog(
         "agent" -> agents[id]?.takeIf { it["archivedAt"].isNullish() }
             ?.let { copy(agents = agents + (id to JsonObject(it + ("archivedAt" to JsonPrimitive(at))))) } ?: this
         "surface" -> withoutSurface(id)
+        "workspace" -> if (id in workspaces) copy(workspaces = workspaces - id) else this
         else -> this
     }
 

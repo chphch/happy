@@ -179,6 +179,13 @@ class AgentHomeActions(
      */
     val onArchive: (suspend (AgentFeedRow.Conversation) -> Unit)? = null,
     /**
+     * Archives the worktree's workspace a folder row names
+     * ([AgentFeedRow.Folder.archive], [com.slopus.happy.agent.AgentSession.archive]),
+     * once the person confirms: its row and chats go at once and come back if
+     * the computer refuses. Null offers no Archive workspace.
+     */
+    val onArchiveWorkspace: (suspend (AgentFeedRow.Folder) -> Unit)? = null,
+    /**
      * Brings an archived chat back to its project
      * ([com.slopus.happy.agent.AgentSession.unarchive]): it leaves the
      * archive at once and comes back if the computer refuses. Null offers no Unarchive.
@@ -323,6 +330,8 @@ fun AgentHomeScreen(
     val scope = rememberCoroutineScope()
     // The Surface whose Leave waits on the confirm, and a refused one's name and the agent's reason.
     var confirmingLeave by remember { mutableStateOf<AgentFeedRow.Surface?>(null) }
+    // The workspace whose Archive waits on the confirm: archiving one removes its folder for good.
+    var confirmingArchive by remember { mutableStateOf<AgentFeedRow.Folder?>(null) }
     var leaveRefused by remember { mutableStateOf<Pair<String, String>?>(null) }
     // New project's prompt, open on what it holds; then an entry the agent didn't add, and why.
     var newProject by rememberSaveable { mutableStateOf<String?>(null) }
@@ -504,6 +513,7 @@ fun AgentHomeScreen(
                             onArchive = archive,
                             onArchiveShown = onArchiveShown,
                             onUnarchive = unarchive,
+                            onArchiveWorkspace = actions.onArchiveWorkspace?.let { { folder: AgentFeedRow.Folder -> confirmingArchive = folder } },
                             // The list starts under the glass bar and scrolls on beneath it.
                             contentPadding = PaddingValues(top = top),
                             // The notice is the list's first row (iOS ba0d7da0e): it comes and goes as a row does, the rows it
@@ -625,6 +635,11 @@ fun AgentHomeScreen(
         onDismissConfirm = { confirmingLeave = null },
         onDismissRefused = { leaveRefused = null },
     )
+    ArchiveWorkspaceDialog(
+        confirming = confirmingArchive,
+        onConfirm = { folder -> actions.onArchiveWorkspace?.let { archive -> scope.launch { archive(folder) } } },
+        onDismiss = { confirmingArchive = null },
+    )
     NewProjectDialogs(
         draft = newProject,
         refused = projectRefused,
@@ -733,6 +748,34 @@ private fun LeaveSurfaceDialogs(
             onDismiss = onDismissRefused,
         )
     }
+}
+
+/**
+ * Archiving a worktree's workspace, after its row's Archive workspace:
+ * "Archive “name”?" with what that does (its chats archived with it, the work
+ * in it stopped, its folder deleted, and no way back), Cancel or Archive in
+ * the error colour; the row and its chats then go at once (API.md,
+ * `POST /v0/workspaces/:workspaceId/archive`).
+ */
+@Composable
+private fun ArchiveWorkspaceDialog(
+    confirming: AgentFeedRow.Folder?,
+    onConfirm: (AgentFeedRow.Folder) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (confirming == null) return
+    HappyAlert(
+        Alert(
+            title = stringResource(R.string.agent_home_archive_workspace_title, confirming.name),
+            message = stringResource(R.string.agent_home_archive_workspace_message),
+            buttons = listOf(
+                AlertButton(stringResource(R.string.common_cancel)),
+                AlertButton(stringResource(R.string.session_archive_action), destructive = true) { onConfirm(confirming) },
+            ),
+            cancelable = false,
+        ),
+        onDismiss = onDismiss,
+    )
 }
 
 /** What home's page shows under the bar. */
@@ -1093,6 +1136,8 @@ private fun SignedInAgentHome(
             onLeaveSurface = { session.leaveSurface(it.id) },
             // Whoever may start work may archive it, as on desktop; a viewer's home has no Archive.
             onArchive = if (canCompose) { row -> row.archive?.let { session.archive(it.kind, it.id) } } else null,
+            // A workspace too, after its confirm (desktop archives one from its sidebar row).
+            onArchiveWorkspace = if (canCompose) { row -> row.archive?.let { session.archive(it.kind, it.id) } } else null,
             // And bring it back, as desktop's Chats menu does.
             onUnarchive = if (canCompose) { row -> session.unarchive(row.agentId) } else null,
             onSignIn = { graph.agentConnections.accounts.value.firstOrNull { it.id == id }?.server?.let(onSignIn) },
