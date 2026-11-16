@@ -57,6 +57,7 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -76,6 +77,7 @@ import com.slopus.happy.diff.syntax.DiffSyntax
 import com.slopus.happy.ui.components.HtmlPageView
 import com.slopus.happy.ui.components.Icon
 import com.slopus.happy.ui.components.Ionicon
+import com.slopus.happy.ui.components.MathView
 import com.slopus.happy.ui.components.MarkdownImage
 import com.slopus.happy.ui.components.MermaidView
 import com.slopus.happy.ui.browser.LocalLinkOpener
@@ -188,6 +190,9 @@ object MarkdownSpec {
  *   there is no WebView to use.
  * - A closed ```` ```artifact ```` fence: its static page ([HtmlPageView]);
  *   the code block where there is no WebView to use.
+ * - Display math: KaTeX in a WebView ([MathView]); a "latex" code block
+ *   where there is none. Math inside a sentence is its symbols in the
+ *   italic serif ([com.slopus.happy.chat.markdown.TexText]), or as written.
  * - Rule: 1 high, divider colour, 8 above and below.
  * - Options: a column 8 apart, 8 above and below; each a surfaceHighest row,
  *   radius 12, padding 12/8, 16/24 text; pressing sends it.
@@ -263,6 +268,7 @@ internal fun MarkdownBlockView(
         is MarkdownBlock.CodeBlock -> CodeBlock(block.content, block.language)
         is MarkdownBlock.Mermaid -> MermaidView(block.content) { CodeBlock(block.content, "mermaid") }
         is MarkdownBlock.HtmlPage -> HtmlPageView(block.html) { CodeBlock(block.html, "artifact") }
+        is MarkdownBlock.Math -> MathView(block.tex) { CodeBlock(block.tex, "latex") }
         MarkdownBlock.HorizontalRule -> Box(
             Modifier
                 .padding(vertical = MarkdownSpec.ruleMargin)
@@ -358,8 +364,13 @@ fun spansToAnnotatedString(spans: List<MarkdownSpan>, onLink: ((String) -> Unit)
     for (span in spans) {
         val style = ComposeSpanStyle(
             fontWeight = if (SpanStyle.Bold in span.styles || SpanStyle.Semibold in span.styles) FontWeight.SemiBold else null,
-            fontStyle = if (SpanStyle.Italic in span.styles) FontStyle.Italic else null,
-            fontFamily = if (SpanStyle.Code in span.styles) AppMono else null,
+            fontStyle = if (SpanStyle.Italic in span.styles || SpanStyle.Math in span.styles) FontStyle.Italic else null,
+            fontFamily = when {
+                SpanStyle.Code in span.styles -> AppMono
+                // Math inside a sentence: KaTeX's own face is a serif.
+                SpanStyle.Math in span.styles -> FontFamily.Serif
+                else -> null
+            },
         )
         val url = span.url
         if (url != null && com.slopus.happy.references.HappyReferences.mention(url)) {

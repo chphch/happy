@@ -149,6 +149,40 @@ class MarkdownParserTest {
         assertEquals(listOf(MarkdownBlock.CodeBlock("artifact html", "<p>x</p>")), parseMarkdown("```artifact html\n<p>x</p>\n```"))
     }
 
+    @Test fun `display math on its own lines`() {
+        assertEquals(listOf(MarkdownBlock.Math("E = mc^2")), parseMarkdown("\$\$ E = mc^2 \$\$"))
+        assertEquals(listOf(MarkdownBlock.Math("a^2 + b^2 = c^2")), parseMarkdown("\\[a^2 + b^2 = c^2\\]"))
+        assertEquals(
+            listOf(MarkdownBlock.Text(spans("Then")), MarkdownBlock.Math("\\sum_i x_i\n= 1"), MarkdownBlock.Text(spans("done"))),
+            parseMarkdown("Then\n\$\$\n\\sum_i x_i\n= 1\n\$\$\ndone"),
+        )
+        assertEquals(listOf(MarkdownBlock.Math("x")), parseMarkdown("\\[\nx\n\\]"))
+        // Not closed yet (still streaming in), or a blank line inside: its lines are text.
+        assertEquals(listOf(MarkdownBlock.Text(spans("\$\$")), MarkdownBlock.Text(spans("x"))), parseMarkdown("\$\$\nx"))
+        assertEquals(
+            listOf(MarkdownBlock.Text(spans("\$\$")), MarkdownBlock.Text(spans("x")), MarkdownBlock.Text(spans("\$\$"))),
+            parseMarkdown("\$\$\nx\n\n\$\$"),
+        )
+    }
+
+    @Test fun `math inside a sentence becomes symbols, prices and code stay as they are`() {
+        val math = setOf(SpanStyle.Math)
+        assertEquals(
+            listOf(plain("so "), MarkdownSpan(math, "x²"), plain(" grows")),
+            (parseMarkdown("so \$x^2\$ grows").single() as MarkdownBlock.Text).content,
+        )
+        assertEquals(listOf(MarkdownSpan(math, "α ≤ β")), (parseMarkdown("\\(\\alpha \\le \\beta\\)").single() as MarkdownBlock.Text).content)
+        assertEquals(listOf(plain("It costs \$5 and \$10.")), (parseMarkdown("It costs \$5 and \$10.").single() as MarkdownBlock.Text).content)
+        assertEquals(listOf(plain("a \$ b \$ c")), (parseMarkdown("a \$ b \$ c").single() as MarkdownBlock.Text).content)
+        // Math it can't write shows as written.
+        assertEquals(
+            listOf(plain("see "), plain("\$\\begin{pmatrix}a\\end{pmatrix}\$")),
+            (parseMarkdown("see \$\\begin{pmatrix}a\\end{pmatrix}\$").single() as MarkdownBlock.Text).content,
+        )
+        assertEquals(listOf(MarkdownSpan(setOf(SpanStyle.Code), "\$x\$")), (parseMarkdown("`\$x\$`").single() as MarkdownBlock.Text).content)
+        assertEquals(listOf(MarkdownSpan(setOf(SpanStyle.Bold, SpanStyle.Math), "π")), (parseMarkdown("**\$\\pi\$**").single() as MarkdownBlock.Text).content)
+    }
+
     private fun button(text: String, url: String) = MarkdownSpan(emptySet(), text, url, button = true)
 
     @Test fun `a link's title is not its address`() {
