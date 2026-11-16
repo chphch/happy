@@ -56,4 +56,5 @@
     <string name="agent_new_project_home_unknown">この Happy Agent はまだホームフォルダを知らせていません。フォルダのフルパスを入力してください。</string>
     <string name="agent_new_project_refused">Happy Agent はこれを追加しませんでした。</string>
     <string name="agent_new_project_unreachable">Happy Agent に接続できませんでした。接続されたらもう一度お試しください。</string>
+    <string name="agent_home_unarchive">アーカイブ解除</string>
 </resources>
