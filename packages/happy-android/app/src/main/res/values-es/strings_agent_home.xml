@@ -49,6 +49,8 @@
     <string name="agent_settings_update">Requiere actualización</string>
     <string name="agent_settings_remove_message">Happy olvida este agente en este teléfono. Happy Agent seguirá mostrando el teléfono hasta que también lo quites allí.</string>
     <string name="agent_home_new_session_in">Nueva sesión en %1$s</string>
+    <string name="agent_home_new_workspace">Espacio</string>
+    <string name="agent_home_new_workspace_in">Nuevo espacio de trabajo en %1$s</string>
     <string name="agent_home_new_project">Nuevo proyecto</string>
     <string name="agent_new_project_message">Una carpeta que ya exista donde se ejecuta este Happy Agent, como ~/Projects/app, o un repositorio de GitHub para clonar, como owner/app.</string>
     <string name="agent_new_project_add">Añadir</string>

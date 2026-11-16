@@ -110,4 +110,5 @@
     <string name="problem_forbidden">その操作を行う権限がありません。</string>
     <string name="conversation_role_read_only">この会話は読めますが、あなたのロールではメッセージを送信できません。</string>
     <string name="conversation_new_work_folder_note">セッションはこのフォルダで始まります。</string>
+    <string name="conversation_new_work_workspace_note">送信すると、このプロジェクトから新しいワークスペース(専用の Git ブランチ)が作られます。名前は最初のチャットで付きます。</string>
 </resources>

@@ -293,7 +293,9 @@ fun NewWorkChoicePanel(work: NewWork, onChange: (WorkChoice) -> Unit, onReturn: 
  * folder as a [NewWorkMenuRow] (a 44 capsule, a 16 folder glyph 8 before its
  * name), which takes no press; 10 under it a line saying the session starts
  * there (13/18 secondary, centred, wrapping). Dimmed once its first message
- * is in ([locked]).
+ * is in ([locked]). A new workspace of a project ([WorkFolder.newWorkspace])
+ * wears a branch glyph instead, and its line says the workspace is made
+ * at the first send.
  */
 @Composable
 fun NewWorkFolderPanel(folder: WorkFolder, locked: Boolean) {
@@ -301,7 +303,7 @@ fun NewWorkFolderPanel(folder: WorkFolder, locked: Boolean) {
     Column(Modifier.fillMaxWidth().testTag(NewWorkTags.PANEL), horizontalAlignment = Alignment.CenterHorizontally) {
         // No label beside the glyph: the label column is the glyph alone.
         NewWorkMenuRow(
-            Ionicon.FolderOutline,
+            if (folder.newWorkspace) Ionicon.GitBranchOutline else Ionicon.FolderOutline,
             folder.name,
             enabled = !locked,
             onClick = null,
@@ -310,7 +312,7 @@ fun NewWorkFolderPanel(folder: WorkFolder, locked: Boolean) {
         )
         Spacer(Modifier.height(NewWorkSpec.rowsToNote))
         Text(
-            stringResource(R.string.conversation_new_work_folder_note),
+            stringResource(if (folder.newWorkspace) R.string.conversation_new_work_workspace_note else R.string.conversation_new_work_folder_note),
             style = NewWorkSpec.note,
             color = colors.textSecondary,
             textAlign = TextAlign.Center,
