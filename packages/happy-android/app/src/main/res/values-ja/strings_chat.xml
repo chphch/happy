@@ -12,6 +12,7 @@
     <string name="chat_voice">音声</string>
     <string name="chat_send">送信</string>
     <string name="chat_markdown_image">Markdown の画像</string>
+    <string name="chat_markdown_page">HTML ページ</string>
     <string name="chat_remove_image">%1$s を削除</string>
     <string name="chat_add_photo">写真を追加</string>
     <string name="diff_badge_new">新規</string>

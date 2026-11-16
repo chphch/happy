@@ -73,6 +73,7 @@ import com.slopus.happy.chat.markdown.SyntaxTokenType
 import com.slopus.happy.chat.markdown.isHttpMarkdownLink
 import com.slopus.happy.chat.markdown.tokenizeCode
 import com.slopus.happy.diff.syntax.DiffSyntax
+import com.slopus.happy.ui.components.HtmlPageView
 import com.slopus.happy.ui.components.Icon
 import com.slopus.happy.ui.components.Ionicon
 import com.slopus.happy.ui.components.MarkdownImage
@@ -185,6 +186,8 @@ object MarkdownSpec {
  *   green and reads "Copied" for 1.5 s (happy-app alerts instead).
  * - Mermaid: a diagram in a WebView (see MermaidView); the code block where
  *   there is no WebView to use.
+ * - A closed ```` ```artifact ```` fence: its static page ([HtmlPageView]);
+ *   the code block where there is no WebView to use.
  * - Rule: 1 high, divider colour, 8 above and below.
  * - Options: a column 8 apart, 8 above and below; each a surfaceHighest row,
  *   radius 12, padding 12/8, 16/24 text; pressing sends it.
@@ -259,6 +262,7 @@ internal fun MarkdownBlockView(
         is MarkdownBlock.NumberedList -> ListBlock(block.items.map { Triple("${it.number}.", it.depth, it.spans) })
         is MarkdownBlock.CodeBlock -> CodeBlock(block.content, block.language)
         is MarkdownBlock.Mermaid -> MermaidView(block.content) { CodeBlock(block.content, "mermaid") }
+        is MarkdownBlock.HtmlPage -> HtmlPageView(block.html) { CodeBlock(block.html, "artifact") }
         MarkdownBlock.HorizontalRule -> Box(
             Modifier
                 .padding(vertical = MarkdownSpec.ruleMargin)

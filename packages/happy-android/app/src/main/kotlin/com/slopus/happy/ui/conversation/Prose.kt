@@ -331,7 +331,7 @@ internal class ProseBuilder(resolver: FontFamily.Resolver) {
             val line = geometry.px(1.dp)
             ProsePart(block, null, emptyList(), intArrayOf(margin, line), available, margin + line + margin)
         }
-        is MarkdownBlock.CodeBlock, is MarkdownBlock.Mermaid, is MarkdownBlock.Options, is MarkdownBlock.Table, is MarkdownBlock.Image, is MarkdownBlock.Buttons -> null
+        is MarkdownBlock.CodeBlock, is MarkdownBlock.Mermaid, is MarkdownBlock.HtmlPage, is MarkdownBlock.Options, is MarkdownBlock.Table, is MarkdownBlock.Image, is MarkdownBlock.Buttons -> null
     }
 
     /**

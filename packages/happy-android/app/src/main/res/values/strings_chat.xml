@@ -14,6 +14,7 @@
     <string name="chat_voice">Voice</string>
     <string name="chat_send">Send</string>
     <string name="chat_markdown_image">Markdown image</string>
+    <string name="chat_markdown_page">HTML page</string>
     <string name="chat_remove_image">Remove %1$s</string>
     <string name="chat_add_photo">Add photo</string>
     <!-- DiffFileHeader's badges. -->
