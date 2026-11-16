@@ -555,6 +555,8 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     // Animated covers in Feed posts (AnimatedImageDecoder, API 28+), asked for per request.
     implementation(libs.coil.gif)
+    // SVG pictures in chat Markdown, decoded by the shared loader.
+    implementation(libs.coil.svg)
     implementation(libs.play.billing)
 
     testImplementation(libs.junit)

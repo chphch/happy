@@ -36,6 +36,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.serviceLoaderEnabled
+import coil3.svg.SvgDecoder
 import com.slopus.happy.ui.attach.GalleryThumbFetcher
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -65,6 +66,8 @@ object HappyImageLoader {
             .serviceLoaderEnabled(false)
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { client }))
+                // Markdown pictures that are SVG. AndroidSVG runs no script and reads nothing outside the file.
+                add(SvgDecoder.Factory())
                 // The attachment sheet's grid: the system's thumbnails of the gallery.
                 add(GalleryThumbFetcher.Factory())
                 add(GalleryThumbFetcher.Key())
