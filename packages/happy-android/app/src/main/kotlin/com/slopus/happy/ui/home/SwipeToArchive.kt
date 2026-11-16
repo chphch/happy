@@ -44,7 +44,9 @@ import kotlinx.coroutines.launch
  * With [leave] it leaves a task instead: an exit glyph over "Leave task"
  * (happy-ios 36b11c5bf, as Happy Desktop's row control does). With
  * [unarchive] it brings an archived chat back: an undo glyph over
- * "Unarchive" on the link colour, as nothing is lost.
+ * "Unarchive" on the link colour, as nothing is lost. With [workspace] it
+ * archives a worktree's workspace: the archive glyph over "Archive
+ * workspace".
  */
 @Composable
 internal fun SwipeToArchive(
@@ -53,6 +55,7 @@ internal fun SwipeToArchive(
     modifier: Modifier = Modifier,
     leave: Boolean = false,
     unarchive: Boolean = false,
+    workspace: Boolean = false,
     content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit,
 ) {
     val colors = HappyTheme.colors
@@ -89,6 +92,7 @@ internal fun SwipeToArchive(
                         when {
                             unarchive -> R.string.agent_home_unarchive
                             leave -> R.string.task_leave
+                            workspace -> R.string.agent_home_archive_workspace
                             else -> R.string.session_info_archive_session
                         },
                     ),
