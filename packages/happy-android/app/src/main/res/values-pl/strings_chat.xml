@@ -12,6 +12,7 @@
     <string name="chat_voice">Głos</string>
     <string name="chat_send">Wyślij</string>
     <string name="chat_markdown_image">Obraz Markdown</string>
+    <string name="chat_markdown_page">Strona HTML</string>
     <string name="chat_remove_image">Usuń %1$s</string>
     <string name="chat_add_photo">Dodaj zdjęcie</string>
     <string name="diff_badge_new">NOWY</string>
