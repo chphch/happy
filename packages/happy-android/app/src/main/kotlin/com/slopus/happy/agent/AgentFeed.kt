@@ -113,6 +113,16 @@ sealed interface AgentFeedRow {
          */
         val running: Boolean get() = !blocked && (delegating || (working && !waiting))
     }
+
+    /**
+     * A project's or worktree's chat in the archive ([AgentFeed.archived]):
+     * its title, or null before it had one, and where it was, as desktop's
+     * `groupMeta` says it ([place]: the project, and the worktree after a
+     * slash). It opens read-only, as an archived chat takes no messages.
+     */
+    data class Archived(val agentId: String, val title: String?, val place: String) : AgentFeedRow {
+        override val key get() = "archived-$agentId"
+    }
 }
 
 enum class ConversationKind { Bot, Task, Project, Subtask }
@@ -161,9 +171,17 @@ sealed interface FolderMark {
 
 enum class AgentFeedSection(val key: String) { Places("places"), Bots("bots"), Tasks("tasks"), Projects("projects") }
 
-/** What home shows for an agent connection. [loaded] is false until a snapshot (cached or read) is in. */
+/**
+ * What home shows for an agent connection. [loaded] is false until a
+ * snapshot (cached or read) is in. [archived] is the projects' archive,
+ * apart from [rows], so search and the chime never count it.
+ */
 @Immutable
-data class AgentFeed(val loaded: Boolean = false, val rows: List<AgentFeedRow> = emptyList()) {
+data class AgentFeed(
+    val loaded: Boolean = false,
+    val rows: List<AgentFeedRow> = emptyList(),
+    val archived: List<AgentFeedRow.Archived> = emptyList(),
+) {
     val conversations: List<AgentFeedRow.Conversation> get() = rows.filterIsInstance<AgentFeedRow.Conversation>()
 
     /** The name home shows for [agentId]'s row; null if home has no row for it or the row has no name yet. */
@@ -190,7 +208,13 @@ data class AgentFeed(val loaded: Boolean = false, val rows: List<AgentFeedRow> =
          * ([leaving]), gone at once while the agent is asked. What this
          * phone has on its way ([intents]) shows already: a chat read has
          * no dot, a task, bot, subtask or Surface archived or left is gone,
-         * a task or bot renamed wears its new name.
+         * a task or bot renamed wears its new name, a chat brought back from
+         * the archive stands in its project at its own order key.
+         *
+         * Apart from the rows, the projects' archive ([AgentFeed.archived]):
+         * their top-level chats archived on the computer or here, newest
+         * first and at most [ARCHIVED_LIMIT], one archived here before the
+         * computer dated it the newest of all. Left out with the projects.
          */
         fun derive(
             catalog: AgentCatalog,
@@ -227,7 +251,7 @@ data class AgentFeed(val loaded: Boolean = false, val rows: List<AgentFeedRow> =
                 if (agentId in removed) return false
                 val agent = catalog.agents[agentId] ?: return false
                 val wire = AgentCatalog.decodeAgent(agent) ?: return false
-                if (wire.archivedAt != null || !wire.visible || !shown.add(agentId)) return false
+                if ((wire.archivedAt != null && agentId !in intents.restored) || !wire.visible || !shown.add(agentId)) return false
                 val at = rows.size
                 rows += AgentFeedRow.Conversation(
                     agentId = agentId,
@@ -356,8 +380,14 @@ data class AgentFeed(val loaded: Boolean = false, val rows: List<AgentFeedRow> =
                     val projectAt = rows.size
                     rows += AgentFeedRow.Folder(id, project.string("name").orEmpty(), 0, FolderMark.of(id, project), lineChanges = git[id]?.takeIf { it.visible })
                     fun series(owner: JsonObject, depth: Int) {
-                        (owner["agents"] as? JsonArray).orEmpty().forEach { embedded ->
-                            val agentId = (embedded as? JsonObject)?.string("id") ?: return@forEach
+                        val listed = (owner["agents"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>()
+                        // A chat brought back here stands in its own place before the computer lists it again.
+                        val ownerId = owner.string("id")
+                        val back = intents.restored.mapNotNull { restored ->
+                            catalog.agents[restored]?.takeIf { it.string("workspaceId") == ownerId && listed.none { l -> l.string("id") == restored } }
+                        }
+                        back.fold(listed) { series, agent -> AgentCatalog.inOrder(series, agent) }.forEach { embedded ->
+                            val agentId = embedded.string("id") ?: return@forEach
                             // A workspace-bound subtask shows under the work that made it.
                             if (catalog.agents[agentId]?.get("subtask")?.toString() == "true") return@forEach
                             agentRows(agentId, null, ConversationKind.Project, depth, archive = ArchiveTarget("agent", agentId), subtasksArchivable = true)
@@ -376,8 +406,37 @@ data class AgentFeed(val loaded: Boolean = false, val rows: List<AgentFeedRow> =
                     folderActivity(projectAt)
                 }
             }
-            return AgentFeed(loaded = true, rows = rows)
+            val archived = if (catalog.projectsHidden) emptyList() else {
+                // Where each place's chats were: a project's name, a worktree's after its project's and a slash.
+                val places = HashMap<String, String>()
+                catalog.projects.values.filter(::active).forEach { project ->
+                    val id = project.string("id") ?: return@forEach
+                    val name = project.string("name").orEmpty()
+                    places[id] = name
+                    catalog.workspaces.values
+                        .filter { it.string("projectId") == id && it.string("id") != id && active(it) && it.string("id") !in owned }
+                        .forEach { workspace -> workspace.string("id")?.let { places[it] = "$name / ${workspace.string("name").orEmpty()}" } }
+                }
+                catalog.agents.values.asSequence()
+                    // Read only what can be in the archive: an archived chat, or one archiving here, of a listed place.
+                    .filter { agent ->
+                        val id = agent.string("id")
+                        id != null && id !in intents.restored && (!agent["archivedAt"].isNullish() || id in removed) &&
+                            agent.string("workspaceId") in places
+                    }
+                    .mapNotNull(AgentCatalog::decodeAgent)
+                    // A subtask is opened by the work that made it, never on its own (desktop's palette).
+                    .filter { it.parentAgentId == null && !it.subtask && it.visible }
+                    .sortedWith(compareByDescending<WireAgent> { it.archivedAt ?: Long.MAX_VALUE }.thenBy { it.id })
+                    .take(ARCHIVED_LIMIT)
+                    .map { AgentFeedRow.Archived(it.id, it.title?.takeIf(String::isNotBlank), places.getValue(it.workspaceId)) }
+                    .toList()
+            }
+            return AgentFeed(loaded = true, rows = rows, archived = archived)
         }
+
+        /** How many of the newest archived chats home lists: the computer's own bound on `archivedAgents`. */
+        const val ARCHIVED_LIMIT = 200
 
         private val byOrderKey = compareBy<JsonObject>({ it.string("orderKey") ?: "\uFFFF" }, { it.string("id") ?: it.string("taskId") })
 
@@ -386,7 +445,11 @@ data class AgentFeed(val loaded: Boolean = false, val rows: List<AgentFeedRow> =
             if (previous == null) return next
             if (previous == next) return previous
             val old = previous.rows.associateBy { it.key }
-            return next.copy(rows = next.rows.map { row -> old[row.key]?.takeIf { it == row } ?: row })
+            val archived = if (next.archived == previous.archived) previous.archived else {
+                val kept = previous.archived.associateBy { it.key }
+                next.archived.map { row -> kept[row.key]?.takeIf { it == row } ?: row }
+            }
+            return next.copy(rows = next.rows.map { row -> old[row.key]?.takeIf { it == row } ?: row }, archived = archived)
         }
     }
 }

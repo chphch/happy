@@ -574,6 +574,13 @@ class AgentSession internal constructor(
     /** Archives a task, bot (`kind`) or subtask (`agent`): its row goes at once, with what nests under it, and comes back only if the computer refuses. */
     suspend fun archive(kind: String, id: String): Intent = intents.enqueue(Intent.ARCHIVE, id, of(kind))
 
+    /**
+     * Brings a project's archived chat back (desktop's restore): it leaves
+     * home's archive for its project at once, and goes back only if the
+     * computer refuses. An unarchive replaces an archive still on its way.
+     */
+    suspend fun unarchive(agentId: String): Intent = intents.enqueue(Intent.UNARCHIVE, agentId, of("agent"))
+
     /** Leaves a task or Surface (`kind`): out of this person's list at once. */
     suspend fun leave(kind: String, id: String): Intent = intents.enqueue(Intent.LEAVE, id, of(kind))
 
@@ -653,6 +660,11 @@ class AgentSession internal constructor(
                     "agent" -> client.send("POST", "/v0/agents/$id/archive", mutation)
                     "bot" -> archiveAt("/v0/bots/$id", "bot")
                     else -> archiveAt("/v0/tasks/$id", "task")
+                }
+                // Back in its project as the computer answered, before the owner's event lists it.
+                Intent.UNARCHIVE -> {
+                    val body = client.decode<JsonObject>("POST", "/v0/agents/$id/unarchive", mutation)
+                    (body["agent"] as? JsonObject)?.let { agent -> catalogLock.withLock { catalogState.update { it.withRestored(agent) } } }
                 }
                 Intent.RENAME -> {
                     val title = (intent.value["title"] as? JsonPrimitive)?.contentOrNull ?: return
@@ -823,7 +835,7 @@ class AgentSession internal constructor(
     init {
         scope.coroutineContext[Job]!!.invokeOnCompletion { stopHealth(closing = true) }
         scope.coroutineContext[Job]?.invokeOnCompletion { chatStarting.value = false }
-        intents.handle(setOf(Intent.READ, Intent.ARCHIVE, Intent.LEAVE, Intent.RENAME, SURFACE_JOIN), ::deliver)
+        intents.handle(setOf(Intent.READ, Intent.ARCHIVE, Intent.UNARCHIVE, Intent.LEAVE, Intent.RENAME, SURFACE_JOIN), ::deliver)
         feedLibrary.start()
         // Disk and journal here; startSecondary owns the once-per-connect catalog read.
         artifacts.start(events, verified = flowOf(false))
