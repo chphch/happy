@@ -3,7 +3,6 @@ package com.slopus.happy.ui.components
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
-import android.util.LruCache
 import android.view.View
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
@@ -11,18 +10,11 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,25 +29,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.DialogProperties
 import com.slopus.happy.R
 import com.slopus.happy.ui.artifacts.HEIGHT_BRIDGE
 import com.slopus.happy.ui.artifacts.Heights
 import com.slopus.happy.ui.artifacts.MEASURE_SCRIPT
 import com.slopus.happy.ui.artifacts.hostScript
-import com.slopus.happy.ui.browser.LocalLinkOpener
 import com.slopus.happy.ui.theme.HappyTheme
 import java.io.ByteArrayInputStream
 import kotlin.math.abs
@@ -69,18 +54,6 @@ object HtmlPageSpec {
     const val MAX_HEIGHT = 8000f
     val marginVertical = 8.dp
     val radius = 8.dp
-
-    /** The expand button: a code block's quiet copy button's box, radius, inset, glyph and reach. */
-    val expandBox = 24.dp
-    val expandRadius = 6.dp
-    val expandInset = 6.dp
-    val expandIcon = 14.dp
-    val expandReach = 40.dp
-
-    /** Full screen's close button: the picture viewer's, 44 round, 8 in from the safe area's top right. */
-    val closeSize = 44.dp
-    val closeIcon = 24.dp
-    val closeInset = 8.dp
 }
 
 object HtmlPageTags {
@@ -88,7 +61,6 @@ object HtmlPageTags {
     const val WEB = "markdown.page.web"
     const val EXPAND = "markdown.page.expand"
     const val FULL = "markdown.page.full"
-    const val CLOSE = "markdown.page.close"
 
     /** The page's state description once its document has loaded. */
     const val LOADED = "loaded"
@@ -113,7 +85,7 @@ private fun webViewAvailable(): Boolean =
  * life so a row scrolled away and back returns at it. An expand button,
  * a 24 box radius 6 on surfaceHighest 6 in from the top right with a 14
  * expand glyph in textSecondary, reached 40 around, opens the page full
- * screen ([HtmlPageScreen]). A link tapped in the page opens as a chat link
+ * screen, scrolling and zoomable ([WebViewScreen]). A link tapped in the page opens as a chat link
  * does and the page stays where it is. A theme change loads the page again
  * in the new scheme. Where there is no WebView, [fallback] shows instead.
  */
@@ -127,13 +99,13 @@ fun HtmlPageView(html: String, modifier: Modifier = Modifier, fallback: @Composa
     val colors = HappyTheme.colors
     val background = colors.surfaceHighest
     val document = remember(html, colors.dark, background, colors.text) { htmlPageDocument(html, colors.dark, colors.text, background) }
-    var height by remember(html) { mutableFloatStateOf(HtmlPageHeights[html] ?: HtmlPageSpec.initialHeight.value) }
+    var height by remember(html) { mutableFloatStateOf(PageHeights["page:$html"] ?: HtmlPageSpec.initialHeight.value) }
     var loaded by remember(document) { mutableStateOf(false) }
     var full by remember { mutableStateOf(false) }
-    val open = rememberPageLinkOpener()
+    val open = rememberWebLinkOpener()
     val measured by rememberUpdatedState<(Float) -> Unit>({ reported ->
         val rounded = ceil(reported).coerceIn(1f, HtmlPageSpec.MAX_HEIGHT)
-        HtmlPageHeights[html] = rounded
+        PageHeights["page:$html"] = rounded
         if (abs(rounded - height) >= 1f) height = rounded
     })
     val onLoaded by rememberUpdatedState<(WebView) -> Unit>({ view ->
@@ -168,108 +140,17 @@ fun HtmlPageView(html: String, modifier: Modifier = Modifier, fallback: @Composa
             },
             modifier = Modifier.fillMaxSize().testTag(HtmlPageTags.WEB),
         )
-        ExpandButton(onClick = { full = true }, modifier = Modifier.align(Alignment.TopEnd))
+        ExpandButton(onClick = { full = true }, tag = HtmlPageTags.EXPAND, modifier = Modifier.align(Alignment.TopEnd))
     }
-    if (full) HtmlPageScreen(document, onClose = { full = false })
-}
-
-/**
- * A page full screen on surfaceHighest, edge to edge with its content
- * inside the safe area, scrolling and pinch-zoomable; a close button, 44
- * round on the surface with a 24 close glyph, 8 in from the safe area's
- * top right. Back or the button leaves.
- */
-@Composable
-private fun HtmlPageScreen(document: String, onClose: () -> Unit) {
-    val colors = HappyTheme.colors
-    val open = rememberPageLinkOpener()
-    PageDialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Box(Modifier.fillMaxSize().background(colors.surfaceHighest).testTag(HtmlPageTags.FULL)) {
-            AndroidView(
-                factory = { context ->
-                    htmlPageWebView(context, colors.surfaceHighest, colors.dark, full = true, onLoaded = { it.evaluateJavascript(hostScript(colors), null) }, onOpen = { open(it) })
-                },
-                update = { view -> view.show(document) },
-                onRelease = { view ->
-                    view.stopLoading()
-                    view.destroy()
-                },
-                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
-            )
-            val label = stringResource(R.string.browser_close)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(HtmlPageSpec.closeInset)
-                    .size(HtmlPageSpec.closeSize)
-                    .clip(CircleShape)
-                    .background(colors.surface)
-                    .clickable(role = Role.Button, onClick = onClose)
-                    .clearAndSetSemantics {
-                        contentDescription = label
-                        role = Role.Button
-                        testTag = HtmlPageTags.CLOSE
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Ionicon.Close, HtmlPageSpec.closeIcon, colors.text)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExpandButton(onClick: () -> Unit, modifier: Modifier) {
-    val colors = HappyTheme.colors
-    val label = stringResource(R.string.side_chat_expand)
-    Box(
-        modifier = modifier
-            .size(HtmlPageSpec.expandReach)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .clearAndSetSemantics {
-                contentDescription = label
-                role = Role.Button
-                testTag = HtmlPageTags.EXPAND
+    if (full) {
+        WebViewScreen(
+            onClose = { full = false },
+            tag = HtmlPageTags.FULL,
+            create = { context ->
+                htmlPageWebView(context, colors.surfaceHighest, colors.dark, full = true, onLoaded = { it.evaluateJavascript(hostScript(colors), null) }, onOpen = { open(it) })
             },
-    ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = HtmlPageSpec.expandInset, end = HtmlPageSpec.expandInset)
-                .size(HtmlPageSpec.expandBox)
-                .clip(RoundedCornerShape(HtmlPageSpec.expandRadius))
-                .background(colors.surfaceHighest),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Ionicon.ExpandOutline, HtmlPageSpec.expandIcon, colors.textSecondary)
-        }
-    }
-}
-
-/** Where a link tapped in a page goes: where a chat link would ([LocalLinkOpener]), else the system. */
-@Composable
-private fun rememberPageLinkOpener(): (String) -> Unit {
-    val opener = LocalLinkOpener.current
-    val system = LocalUriHandler.current
-    return remember(opener, system) {
-        { url ->
-            if (opener != null) opener.open(url) else runCatching { system.openUri(url) }
-            Unit
-        }
-    }
-}
-
-/** Pages' measured heights while the app runs, so a row scrolled away and back returns at its height. */
-internal object HtmlPageHeights {
-    private val heights = LruCache<String, Float>(128)
-
-    private fun key(html: String) = "${html.length}:${html.hashCode()}"
-
-    operator fun get(html: String): Float? = heights.get(key(html))
-
-    operator fun set(html: String, height: Float) {
-        heights.put(key(html), height)
+            show = { view -> view.show(document) },
+        )
     }
 }
 
