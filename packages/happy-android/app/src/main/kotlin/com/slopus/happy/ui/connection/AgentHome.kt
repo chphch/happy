@@ -201,8 +201,11 @@ class AgentHomeActions(
     val notificationsAvailable: Boolean = false,
     /** Opens a team member's profile; null where there are none (any server but Happy Cloud's), and search finds no people. */
     val onOpenPerson: ((userId: String) -> Unit)? = null,
-    /** Opens a new chat in a project or worktree ([AgentFeedRow.Folder]) from its row; null: those rows open nothing. */
-    val onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
+    /**
+     * Opens a new chat in a project or worktree ([AgentFeedRow.Folder]) from its row, or with
+     * `newWorkspace` in a new workspace of that project, from the row's Workspace button; null: those rows open nothing.
+     */
+    val onComposeIn: ((AgentFeedRow.Folder, newWorkspace: Boolean) -> Unit)? = null,
     /**
      * Adds a project from what New project was given
      * ([com.slopus.happy.agent.AgentSession.addProject]): null once the agent
@@ -940,8 +943,8 @@ fun AgentHome(
     onOpenVaultItem: (surfaceId: String, itemId: String, folder: Boolean, name: String) -> Unit = { _, _, _, _ -> },
     /** Opens a team member's profile, which only a Happy Cloud server has. */
     onOpenPerson: (userId: String) -> Unit = {},
-    /** Opens a new session in a project or worktree, from its row. */
-    onComposeIn: (AgentFeedRow.Folder) -> Unit = {},
+    /** Opens a new session in a project or worktree, from its row; with `newWorkspace`, in a new workspace of that project. */
+    onComposeIn: (AgentFeedRow.Folder, newWorkspace: Boolean) -> Unit = { _, _ -> },
 ) {
     val agents by graph.agentConnections.accounts.collectAsStateWithLifecycle()
     val connection = agents.firstOrNull { it.id == id } ?: return
@@ -1038,7 +1041,7 @@ private fun SignedInAgentHome(
     onOpenPipelines: () -> Unit,
     onOpenVaultItem: (surfaceId: String, itemId: String, folder: Boolean, name: String) -> Unit,
     onOpenPerson: (userId: String) -> Unit,
-    onComposeIn: (AgentFeedRow.Folder) -> Unit,
+    onComposeIn: (AgentFeedRow.Folder, newWorkspace: Boolean) -> Unit,
 ) {
     val session = remember(id) { graph.agentSessions.session(id) } ?: return
     val people by session.team.users.collectAsStateWithLifecycle()

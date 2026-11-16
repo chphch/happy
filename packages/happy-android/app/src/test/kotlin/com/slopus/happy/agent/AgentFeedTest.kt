@@ -52,6 +52,20 @@ class AgentFeedTest {
     )
 
     @Test
+    fun onlyAProjectWhoseFolderCanHoldWorkspacesOffersNewOnes() {
+        fun folders(support: String?) = AgentFeed.derive(catalog(Wire.bootstrap(
+            projects = listOf(Wire.project("p1", "rig", emptyList(), worktreeSupport = support)),
+            workspaces = listOf(Wire.workspace("w1", "p1", "fix-login", emptyList())),
+        ))).rows.filterIsInstance<AgentFeedRow.Folder>().associate { it.id to it.workspaces }
+        // The project, never its worktree: desktop makes them under the project.
+        assertEquals(mapOf("p1" to true, "w1" to false), folders("supported"))
+        assertEquals(mapOf("p1" to false, "w1" to false), folders("unsupported"))
+        assertEquals(mapOf("p1" to false, "w1" to false), folders("unknown"))
+        // A computer that doesn't say.
+        assertEquals(mapOf("p1" to false, "w1" to false), folders(null))
+    }
+
+    @Test
     fun rowsNameWhatTheirArchiveArchivesAsDesktopDoes() {
         val rows = AgentFeed.derive(catalog(sample)).conversations.associate { it.agentId to it.archive }
         // Never a bot; its subtasks one conversation at a time.
