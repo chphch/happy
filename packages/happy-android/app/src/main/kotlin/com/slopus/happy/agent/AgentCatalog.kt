@@ -101,7 +101,13 @@ data class AgentCatalog(
         val index = HashMap<String, JsonObject>()
         fun owners(list: List<JsonObject>) = list.mapNotNull { owner -> owner.string("id")?.let { it to indexOwner(owner, index) } }.toMap()
         // Agents read anew win over older cached copies, never over newer ones a live event left.
-        agents.forEach { (id, agent) -> index[id] = agent }
+        // An archived top-level chat stays only while the snapshot still sends it (desktop's
+        // archivedAgentsMerge): one it no longer sends was deleted, or its project went, so it
+        // leaves home's archive. A bot's or task's own chat comes back with its owner below.
+        val stillArchived = bootstrap.archivedAgents.mapNotNullTo(HashSet()) { it.string("id") }
+        agents.forEach { (id, agent) ->
+            if (agent["archivedAt"].isNullish() || agent.string("parentAgentId") != null || id in stillArchived) index[id] = agent
+        }
         // The archived conversations come apart from their owners, which list only the active ones.
         bootstrap.archivedAgents.forEach { putAgent(it, index) }
         return AgentCatalog(

@@ -168,6 +168,18 @@ class AgentFeedTest {
     }
 
     @Test
+    fun theNextSnapshotSaysWhichArchivedChatsTheComputerStillHas() {
+        val kept = catalog(archive)
+        // Deleted on the computer: the next snapshot no longer sends "old" among the archived ones, so it leaves the archive.
+        val sent = (archive["archivedAgents"] as JsonArray).filter { (it as JsonObject).string("id") != "old" }
+        val next = kept.withBootstrap(AgentClient.json.decodeFromJsonElement(WireDesktopBootstrap.serializer(), archive.with("archivedAgents", JsonArray(sent))))
+        assertEquals(listOf("new", "untitled"), AgentFeed.derive(next).archived.map { it.agentId })
+        assertFalse("old" in next.agents)
+        // The live chat is still there, from its project.
+        assertTrue(AgentFeed.derive(next).conversations.any { it.agentId == "ap1" })
+    }
+
+    @Test
     fun desktopsHideProjectsLeavesTheProjectsOutLiveAndTheNewerVersionWins() {
         val keys = { catalog: AgentCatalog -> AgentFeed.derive(catalog).rows.map { it.key } }
         val shown = catalog(sample)
