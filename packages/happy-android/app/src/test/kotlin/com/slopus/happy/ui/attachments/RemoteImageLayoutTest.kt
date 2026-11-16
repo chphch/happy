@@ -182,7 +182,10 @@ class RemoteImageLayoutTest {
             }
         }
         rule.waitUntil(5_000) { rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot().let { it.bottom - it.top } < 300.dp }
-        assertBox("capped", rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot(), 0.dp, 8.dp, 520.dp, 260.dp)
+        // The 700 wide box sits centred on the phone, so only its size is the picture's own.
+        val capped = rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot()
+        assertEquals(520f, (capped.right - capped.left).value, 0.34f)
+        assertEquals(260f, (capped.bottom - capped.top).value, 0.34f)
         rule.node(MarkdownImageTags.CAPTION).assertDoesNotExist()
     }
 
@@ -212,12 +215,16 @@ class RemoteImageLayoutTest {
 
     @Test
     fun aPicturesBox() {
-        assertEquals(411f to 308.25f, markdownImageBox(411f, null))
-        assertEquals(520f to 390f, markdownImageBox(700f, null))
+        fun box(expected: Pair<Float, Float>, actual: Pair<Float, Float>) {
+            assertEquals(expected.first, actual.first, 0.01f)
+            assertEquals(expected.second, actual.second, 0.01f)
+        }
+        box(411f to 308.25f, markdownImageBox(411f, null))
+        box(520f to 390f, markdownImageBox(700f, null))
         // Whole: its pixels one to one, at most the column; scaled down when decoded: all the column.
-        assertEquals(64f to 32f, markdownImageBox(411f, MarkdownPicture(64, 32, whole = true)))
-        assertEquals(411f to 822f, markdownImageBox(411f, MarkdownPicture(500, 1000, whole = true)))
-        assertEquals(411f to 102.75f, markdownImageBox(411f, MarkdownPicture(1079, 270, whole = false)))
+        box(64f to 32f, markdownImageBox(411f, MarkdownPicture(64, 32, whole = true)))
+        box(411f to 822f, markdownImageBox(411f, MarkdownPicture(500, 1000, whole = true)))
+        box(411f to 411f * 270 / 1079, markdownImageBox(411f, MarkdownPicture(1079, 270, whole = false)))
     }
 
     private fun pictureWidth() = rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot().let { it.right - it.left }
