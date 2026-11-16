@@ -10,6 +10,7 @@
     <string name="conversation_empty">还没有消息。</string>
     <string name="conversation_read_only">此对话由另一个智能体驱动，无法接收消息。</string>
     <string name="conversation_archived">此对话已归档。</string>
+    <string name="conversation_archived_send">此对话已归档。发送消息即可恢复。</string>
     <string name="conversation_activity_awaiting_answer">等待你的回答</string>
     <string name="conversation_activity_waiting_for_model">等待模型…</string>
     <string name="conversation_activity_thinking">思考中…</string>
