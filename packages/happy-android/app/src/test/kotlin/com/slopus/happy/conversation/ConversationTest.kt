@@ -84,6 +84,8 @@ private class FakeAgent {
             }
         }
     }
+    /** What a new workspace's checkout says to each `GET /v0/workspaces/:id`, in turn; the last one stays. */
+    val workspaceStates = mutableListOf("ready")
     /** What `GET /v0/config` answers. */
     var config = CONFIG
     var commandsAfter = """[{"name":"compact","hasArguments":false,"description":"Summarize.","kind":"compaction"}]"""
@@ -102,6 +104,14 @@ private class FakeAgent {
             route == "/v0/tasks" -> ok("""{"task":{"id":${(body as JsonObject)["id"]},"agent":{"id":"${(body as JsonObject)["agentId"]!!.toString().trim('"')}","workspaceId":"w","status":"idle"}},"membership":{}}""")
             // A session in a workspace that exists (a project's), answered 201 as the daemon does.
             method == "POST" && route == "/v0/agents" -> TransportResponse(201, body = """{"agent":{"id":${(body as JsonObject)["id"]},"workspaceId":${body["workspaceId"]},"status":"idle"},"profiles":[],"slashCommands":[]}""".toByteArray())
+            // A new workspace, answered 202 while its checkout is still being made, as the daemon does.
+            method == "POST" && route == "/v0/workspaces" ->
+                TransportResponse(202, body = """{"workspace":{"id":${(body as JsonObject)["id"]},"name":${body["name"]},"initialization":{"status":"initializing","attempt":0,"error":null}}}""".toByteArray())
+            method == "GET" && route.startsWith("/v0/workspaces/") && route.count { it == '/' } == 3 -> {
+                val status = if (workspaceStates.size > 1) workspaceStates.removeAt(0) else workspaceStates.single()
+                val error = if (status == "failed") "\"Not a Git repository.\"" else "null"
+                ok("""{"workspace":{"id":"${route.substringAfterLast('/')}","name":"Lisbon","initialization":{"status":"$status","attempt":0,"error":$error}}}""")
+            }
             route.endsWith("/bootstrap") -> { beforeBootstrap(); ok(bootstrap) }
             method == "PUT" && route.startsWith("/v0/workspaces/") && route.endsWith("/file") -> {
                 beforeWrite()
@@ -775,6 +785,48 @@ class ConversationTest {
         // Neither task_created nor bot_created: the shared catalog has no event for a project's session.
         assertTrue(recorded.none { it is AnalyticsEvent.TaskCreated || it is AnalyticsEvent.BotCreated })
         assertEquals(listOf("Run the tests"), chat.state.value.rows.map { (it as ConversationRow.User).text })
+    }
+
+    @Test fun `a session in a new workspace makes the workspace, waits for its checkout, then makes its agent there`() = runTest {
+        val agent = FakeAgent()
+        agent.workspaceStates.apply { clear(); addAll(listOf("initializing", "ready")) }
+        val folder = WorkFolder("p1", "happy", newWorkspace = true)
+        val chat = conversation(agent, NewTask("t1", "w1", "a9", "m1"), WorkChoice(folder = folder))
+        advanceUntilIdle()
+        assertEquals(folder, chat.state.value.newWork?.choice?.folder)
+        chat.send("Fix the login")
+        advanceUntilIdle()
+        val calls = agent.requests.map { "${it.first} ${it.second}" }.filter { "/v0/workspaces" in it || it == "POST /v0/agents" || it.endsWith("/send") }
+        // The agent is asked for only once the checkout is ready: the computer refuses one in a workspace still being made.
+        assertEquals(
+            listOf("POST /v0/workspaces", "GET /v0/workspaces/w1", "GET /v0/workspaces/w1", "POST /v0/agents", "POST /v0/agents/a9/send"),
+            calls,
+        )
+        // Desktop's body: the new chat's workspace id, under the project, a placeholder its first chat replaces.
+        val workspace = agent.requests.first { it.second == "/v0/workspaces" }.third!!
+        assertEquals(setOf("id", "parentId", "name", "nameConfigured", "mutationId"), workspace.keys)
+        assertEquals("\"w1\"", workspace["id"].toString())
+        assertEquals("\"p1\"", workspace["parentId"].toString())
+        assertEquals("false", workspace["nameConfigured"].toString())
+        // Not the agent's mutation id: the computer would answer the agent's create with the workspace.
+        assertEquals("\"t1\"", workspace["mutationId"].toString())
+        assertTrue(workspace["name"].toString().trim('"') in WorkspaceNames.cities)
+        assertEquals("\"w1\"", agent.requests.first { it.second == "/v0/agents" }.third!!["workspaceId"].toString())
+        assertTrue(chat.state.value.created)
+        assertEquals(listOf("Fix the login"), chat.state.value.rows.map { (it as ConversationRow.User).text })
+    }
+
+    @Test fun `a new workspace whose checkout fails leaves the first message failed with the computer's words`() = runTest {
+        val agent = FakeAgent()
+        agent.workspaceStates.apply { clear(); add("failed") }
+        val chat = conversation(agent, NewTask("t1", "w1", "a9", "m1"), WorkChoice(folder = WorkFolder("p1", "happy", newWorkspace = true)))
+        advanceUntilIdle()
+        chat.send("Fix the login")
+        advanceUntilIdle()
+        assertFalse(chat.state.value.created)
+        val row = chat.state.value.rows.single() as ConversationRow.User
+        assertEquals(Delivery.Failed(Problem.Said("Not a Git repository.")), row.delivery)
+        assertTrue(agent.paths("POST").none { it == "/v0/agents" || it.endsWith("/send") })
     }
 
     @Test fun `a refused new work leaves its first message failed and Retry asks again under the same ids`() = runTest {

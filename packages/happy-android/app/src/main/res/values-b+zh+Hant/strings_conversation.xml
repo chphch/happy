@@ -110,4 +110,5 @@
     <string name="problem_forbidden">你沒有執行此操作的權限。</string>
     <string name="conversation_role_read_only">你可以閱讀此對話，但你的角色無法傳送訊息。</string>
     <string name="conversation_new_work_folder_note">對話會在這個資料夾中開始。</string>
+    <string name="conversation_new_work_workspace_note">傳送時會從此專案新增一個工作區(獨立的 Git 分支),由第一個聊天為它命名。</string>
 </resources>

@@ -29,7 +29,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,6 +40,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,6 +63,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -136,8 +140,10 @@ object AgentHomeTags {
     /** The square at a row's end its status mark is centred in ([AgentHomeSpec.statusSlot]). */
     const val ROW_STATUS = "agentHome.rowStatus"
     const val ROW_CHANGES = "agentHome.rowChanges"
-    /** A project's or worktree's "+": a press on its row starts a new session in it. */
+    /** A project's or worktree's new-chat glyph: a press on its row starts a new session in it. */
     const val ROW_NEW_SESSION = "agentHome.rowNewSession"
+    /** A project's Workspace button: a new workspace of the project, and a new session in it. */
+    const val ROW_NEW_WORKSPACE = "agentHome.rowNewWorkspace"
     /** An archived chat's second line: where it was. */
     const val ROW_PLACE = "agentHome.rowPlace"
     /** Show archived / Hide archived, under the last card where the projects have an archive. */
@@ -186,8 +192,19 @@ object AgentHomeSpec {
      */
     val statusSlot = 14.dp
     val statusGap = 8.dp
-    /** A project's or worktree's "+", [cornerGap] after its name or counts: a tile's glyph. */
+    /** A project's or worktree's new-chat glyph (compose's), [cornerGap] after its name or counts: a tile's glyph. */
     val newSessionGlyph = tileGlyph
+    /**
+     * A project's Workspace button, [workspaceGap] after the new-chat glyph: a
+     * capsule as tall as a mark on the input ground, [workspaceInset] in, a
+     * [workspaceGlyph] branch glyph [workspaceGlyphGap] before its word
+     * ([detail]); it takes presses over the row's whole height.
+     */
+    val workspaceGap = 8.dp
+    val workspaceHeight = mark
+    val workspaceInset = 10.dp
+    val workspaceGlyph = 14.dp
+    val workspaceGlyphGap = 4.dp
     /** The bar's title, the agent's name: smaller than Material's large title. */
     val barTitle = happyTextStyle(fontSize = 18, lineHeight = 24, weight = FontWeight.SemiBold)
     /** The compose button's margin from the window's corner, and the room under the last card to scroll it clear. */
@@ -422,8 +439,8 @@ fun LazyListScope.agentHomeRows(
     onOpenTodos: () -> Unit = {},
     onOpenPlugins: () -> Unit = {},
     onOpenPipelines: () -> Unit = {},
-    /** A project's or worktree's row starts a new session in it; null: those rows open nothing. */
-    onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
+    /** A project's or worktree's row starts a new session in it, a project's Workspace button one in a new workspace; null: those rows open nothing. */
+    onComposeIn: ((AgentFeedRow.Folder, newWorkspace: Boolean) -> Unit)? = null,
     /** The projects card's New project, where [agentHomeItems] put one. */
     onNewProject: () -> Unit = {},
     /** A conversation row's swipe archives what its [AgentFeedRow.Conversation.archive] names; null offers no swipe. */
@@ -485,7 +502,7 @@ internal fun AgentHomeCardRow(
     onOpenTodos: () -> Unit = {},
     onOpenPlugins: () -> Unit = {},
     onOpenPipelines: () -> Unit = {},
-    onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
+    onComposeIn: ((AgentFeedRow.Folder, newWorkspace: Boolean) -> Unit)? = null,
     onNewProject: () -> Unit = {},
     onArchive: ((AgentFeedRow.Conversation) -> Unit)? = null,
     onUnarchive: ((AgentFeedRow.Archived) -> Unit)? = null,
@@ -794,19 +811,22 @@ private fun PlaceRow(name: String, mark: @Composable () -> Unit, onClick: () -> 
  * A project or a worktree: its name, shimmering while work runs inside it
  * and fading at its end where it runs out of room ([com.slopus.happy.ui.components.TitleFade]), and a
  * project's mark before it ([FolderMarkView]). With [onCompose] a press
- * starts a new session in it, which an 18 "+"
- * ([AgentHomeSpec.newSessionGlyph], secondary) [AgentHomeSpec.cornerGap]
- * after the name or the counts shows; without, it opens nothing.
+ * starts a new session in it, which an 18 new-chat glyph (compose's,
+ * [AgentHomeSpec.newSessionGlyph], secondary) [AgentHomeSpec.cornerGap]
+ * after the name or the counts shows; without, it opens nothing. A project
+ * that can hold workspaces ([AgentFeedRow.Folder.workspaces]) ends with
+ * its Workspace button ([WorkspaceButton]), a press of its own: a new
+ * session in a new workspace of the project, as desktop's project "+".
  */
 @Composable
-private fun FolderRow(row: AgentFeedRow.Folder, onCompose: ((AgentFeedRow.Folder) -> Unit)? = null) {
+private fun FolderRow(row: AgentFeedRow.Folder, onCompose: ((AgentFeedRow.Folder, newWorkspace: Boolean) -> Unit)? = null) {
     val colors = HappyTheme.colors
     val mark = row.mark
     val composeLabel = onCompose?.let { stringResource(R.string.agent_home_new_session_in, row.name) }
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .then(if (onCompose != null) Modifier.combinedClickable(role = Role.Button, onClickLabel = composeLabel, onClick = { onCompose(row) }) else Modifier)
+            .then(if (onCompose != null) Modifier.combinedClickable(role = Role.Button, onClickLabel = composeLabel, onClick = { onCompose(row, false) }) else Modifier)
             .semantics { heading() }
             .padding(start = AgentHomeSpec.markInset + AgentHomeSpec.indent * row.depth, end = AgentHomeSpec.paddingEnd),
         verticalAlignment = Alignment.CenterVertically,
@@ -833,10 +853,50 @@ private fun FolderRow(row: AgentFeedRow.Folder, onCompose: ((AgentFeedRow.Folder
         WorkspaceCounts(row.lineChanges)
         if (onCompose != null) {
             Icon(
-                Ionicon.Add,
+                Ionicon.CreateOutline,
                 AgentHomeSpec.newSessionGlyph,
                 colors.textSecondary,
                 Modifier.padding(start = AgentHomeSpec.cornerGap).testTag(AgentHomeTags.ROW_NEW_SESSION),
+            )
+            if (row.workspaces && row.depth == 0) WorkspaceButton(row.name) { onCompose(row, true) }
+        }
+    }
+}
+
+/**
+ * A project's Workspace button ([AgentHomeSpec.workspaceHeight] capsule on
+ * the input ground, a branch glyph and "Workspace" in the text colour), so it
+ * reads as a button apart from the row's own press, which is a new chat.
+ * Its press covers the row's height.
+ */
+@Composable
+private fun WorkspaceButton(project: String, onClick: () -> Unit) {
+    val colors = HappyTheme.colors
+    val label = stringResource(R.string.agent_home_new_workspace_in, project)
+    Box(
+        modifier = Modifier
+            .fillMaxHeight()
+            .testTag(AgentHomeTags.ROW_NEW_WORKSPACE)
+            .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+            .clearAndSetSemantics { contentDescription = label; role = Role.Button }
+            .padding(start = AgentHomeSpec.workspaceGap),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier
+                .heightIn(min = AgentHomeSpec.workspaceHeight)
+                .clip(CircleShape)
+                .background(colors.input.background)
+                .padding(horizontal = AgentHomeSpec.workspaceInset),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Ionicon.GitBranchOutline, AgentHomeSpec.workspaceGlyph, colors.text)
+            Text(
+                stringResource(R.string.agent_home_new_workspace),
+                style = AgentHomeSpec.detail,
+                color = colors.text,
+                maxLines = 1,
+                modifier = Modifier.padding(start = AgentHomeSpec.workspaceGlyphGap),
             )
         }
     }
@@ -908,8 +968,8 @@ fun AgentHomeList(
     onOpenTodos: () -> Unit = {},
     onOpenPlugins: () -> Unit = {},
     onOpenPipelines: () -> Unit = {},
-    /** A project's or worktree's row starts a new session in it; null: those rows open nothing. */
-    onComposeIn: ((AgentFeedRow.Folder) -> Unit)? = null,
+    /** A project's or worktree's row starts a new session in it, a project's Workspace button one in a new workspace; null: those rows open nothing. */
+    onComposeIn: ((AgentFeedRow.Folder, newWorkspace: Boolean) -> Unit)? = null,
     /** The projects card's New project, where [agentHomeItems] put one. */
     onNewProject: () -> Unit = {},
     onArchive: ((AgentFeedRow.Conversation) -> Unit)? = null,
