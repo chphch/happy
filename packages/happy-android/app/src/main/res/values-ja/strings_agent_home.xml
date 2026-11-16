@@ -47,6 +47,8 @@
     <string name="agent_settings_update">アップデートが必要です</string>
     <string name="agent_settings_remove_message">Happy はこのスマートフォン上でこのエージェントを忘れます。Happy Agent 側でも削除するまで、スマートフォンは一覧に残ります。</string>
     <string name="agent_home_new_session_in">%1$s で新しいセッション</string>
+    <string name="agent_home_new_workspace">ワークスペース</string>
+    <string name="agent_home_new_workspace_in">%1$s に新しいワークスペース</string>
     <string name="agent_home_new_project">新しいプロジェクト</string>
     <string name="agent_new_project_message">この Happy Agent が動いている場所にある既存のフォルダ（例: ~/Projects/app）、またはクローンする GitHub リポジトリ（例: owner/app）。</string>
     <string name="agent_new_project_add">追加</string>
