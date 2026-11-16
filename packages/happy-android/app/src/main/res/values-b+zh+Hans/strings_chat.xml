@@ -12,6 +12,7 @@
     <string name="chat_voice">语音</string>
     <string name="chat_send">发送</string>
     <string name="chat_markdown_image">Markdown 图片</string>
+    <string name="chat_markdown_page">HTML 页面</string>
     <string name="chat_remove_image">移除 %1$s</string>
     <string name="chat_add_photo">添加照片</string>
     <string name="diff_badge_new">新增</string>
