@@ -2094,7 +2094,12 @@ into our OkHttp; Glide is View-first with an annotation processor, and a
 hand-rolled loader would re-implement caching and downsampling. The
 loader uses its own OkHttp client without Happy headers (these URLs are
 third-party). Tests swap it through `LocalImageLoader` with coil-test's
-`FakeImageLoaderEngine`.
+`FakeImageLoaderEngine`. SVG decodes through coil-svg's `SvgDecoder`
+(AndroidSVG: no script runs and nothing outside the file is read).
+
+A markdown picture holds 4:3 of its column until its pixels are known,
+then takes its own shape, never wider than its pixels one to one, and a
+tap opens it in the viewer (`MarkdownImage`, happy-app's sizing).
 
 A picture with a thumbhash shows it from its first frame (iOS 5ebfc1c0b).
 `rememberThumbHash` decodes in place as the view is composed, from one
