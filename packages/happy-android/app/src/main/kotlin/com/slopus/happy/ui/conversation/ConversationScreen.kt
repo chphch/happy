@@ -126,6 +126,7 @@ import com.slopus.happy.ui.components.glassSource
 import com.slopus.happy.ui.components.rememberGlassBlur
 import com.slopus.happy.ui.components.rememberGlassSource
 import java.io.File
+import kotlinx.coroutines.launch
 
 object ConversationScreenTags {
     const val SCREEN = "conversation.screen"
@@ -141,6 +142,8 @@ object ConversationScreenTags {
     const val EMPTY = "conversation.empty"
     const val ERROR = "conversation.error"
     const val READ_ONLY = "conversation.readOnly"
+    /** An archived project chat's Resume Session, under its line. */
+    const val RESUME = "conversation.resume"
     const val OLDER = "conversation.older"
     const val OLDER_FAILED = "conversation.older.failed"
     const val OLDER_RETRY = "conversation.older.retry"
@@ -217,6 +220,8 @@ class ConversationScreenActions(
     val onOpenPipelineRun: ((com.slopus.happy.pipelines.PipelineRunNotice) -> Unit)? = null,
     /** How a workspace's folders read, for naming one of its files from the attach sheet; null where they can't. */
     val workspace: ((workspaceId: String) -> com.slopus.happy.ui.files.WorkspaceSource)? = null,
+    /** Brings an archived chat back ([com.slopus.happy.agent.AgentSession.unarchive]); its composer returns once the computer has it back. */
+    val onResume: suspend () -> Unit = {},
 )
 
 /**
@@ -228,7 +233,9 @@ class ConversationScreenActions(
  * compose, then a three-dot menu for permissions and chat details), the transcript newest at
  * the bottom, and the dock above the keyboard and navigation bar: the open
  * question ([ConversationQuestionCard]), then [ConversationComposer]. A
- * subagent or archived chat has a line saying so instead. Past the oldest
+ * subagent or archived chat has a line saying so instead; under an archived
+ * chat's line one that is [resumable] has Resume Session, a text button
+ * like Retry's, centred, which [resuming] disables. Past the oldest
  * row a 32 slot: a spinner while a page loads; after a failed page
  * "Couldn't load earlier messages." and a Retry text button, and nothing
  * asks again until Retry. Away from the newest message, [ConversationJump]
@@ -259,6 +266,10 @@ fun ConversationScreen(
     place: TranscriptPlace? = null,
     /** Who else is on the chat, at the head of the bar's actions ([com.slopus.happy.ui.viewers.ViewersSlot]). */
     viewers: @Composable () -> Unit = {},
+    /** An archived chat [ConversationScreenActions.onResume] can bring back: a project's own, as home's archive lists it. */
+    resumable: Boolean = false,
+    /** Its Resume was pressed and the computer is being asked: the button waits, disabled. */
+    resuming: Boolean = false,
 ) {
     RecomposeProbe.mark(ConversationScreenTags.PROBE_SCREEN)
     val colors = HappyTheme.colors
@@ -297,6 +308,7 @@ fun ConversationScreen(
     }
     val answerScope = rememberCoroutineScope()
     val onAnswer by rememberUpdatedState(actions.onAnswer)
+    val onResume by rememberUpdatedState(actions.onResume)
     val asks = remember { AskActions(answerScope) { id, answers -> onAnswer(id, answers) } }
     LaunchedEffect(state.question?.id) { asks.keepOnly(state.question?.id) }
     val pictures = rememberPictureViewer()
@@ -608,6 +620,19 @@ fun ConversationScreen(
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.contentMaxWidth(LocalWindowLayout.current).padding(16.dp).testTag(ConversationScreenTags.READ_ONLY),
                             )
+                            // A project's archived chat comes back from here as from home's archive; then its composer returns.
+                            if (state.created && state.agent?.archivedAt != null && roleCanSend && (resumable || resuming)) {
+                                TextButton(
+                                    onClick = { answerScope.launch { onResume() } },
+                                    enabled = !resuming,
+                                    modifier = Modifier
+                                        .align(Alignment.CenterHorizontally)
+                                        .padding(bottom = 8.dp)
+                                        .testTag(ConversationScreenTags.RESUME),
+                                ) {
+                                    Text(stringResource(R.string.session_info_resume_session))
+                                }
+                            }
                         } else {
                             ConversationComposer(
                                 state = state,
