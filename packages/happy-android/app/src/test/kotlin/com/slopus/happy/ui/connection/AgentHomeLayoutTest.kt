@@ -26,6 +26,7 @@ import com.slopus.happy.agent.ProjectAddFailure
 import com.slopus.happy.ui.components.PromptTags
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.sp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -45,6 +47,7 @@ import com.slopus.happy.agent.AgentPictures
 import com.slopus.happy.ui.components.avatar.AvatarPlaceholder
 import com.slopus.happy.ui.components.avatar.PlaceholderIndexKey
 import com.slopus.happy.agent.Wire
+import com.slopus.happy.agent.with
 import com.slopus.happy.agent.WireDesktopBootstrap
 import com.slopus.happy.ui.PHONE
 import com.slopus.happy.ui.assertBox
@@ -55,8 +58,10 @@ import androidx.compose.ui.unit.width
 import com.slopus.happy.ui.home.AccountMenu
 import com.slopus.happy.ui.home.AccountMenuEntry
 import com.slopus.happy.ui.home.AccountMenuTags
+import com.slopus.happy.ui.home.FlatRowTags
 import com.slopus.happy.ui.node
 import com.slopus.happy.ui.setHappyContent
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -280,6 +285,60 @@ class AgentHomeLayoutTest {
         assertDp("folder row height", 48, rule.node(AgentHomeTags.row("folder-p1")).bounds.height)
         // No text field anywhere on home.
         rule.onAllNodesWithTag(AgentSearchTags.FIELD, useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun theProjectsArchiveOpensUnderItsToggleAsOneCardOfTwoLineRowsThatOpenAndComeBack() {
+        val unarchived = mutableListOf<String>()
+        val acting = AgentHomeActions(
+            onOpenConversation = { opened += it }, onCompose = {}, onSettings = {}, onSettingsRow = {}, onSwitchAccount = {}, onAdd = {},
+            onUnarchive = { unarchived += it.agentId },
+        )
+        val home = feed(sample.with("archivedAgents", JsonArray(listOf(
+            Wire.agent("old1", workspaceId = "p1", title = "Old idea", archivedAt = NOW - 86_400_000),
+            Wire.agent("old2", workspaceId = "w1", title = "Scroll fix, first try", archivedAt = NOW - 2 * 86_400_000),
+        ))))
+        // Under the last card, after the projects card's last row; open, one card, newest first.
+        val items = agentHomeItems(home, archiveShown = true)
+        val toggleAt = items.indexOfFirst { it is AgentHomeItem.ArchiveToggle }
+        assertTrue((items[toggleAt - 1] as AgentHomeItem.Row).last)
+        assertEquals(
+            listOf("archived-old1" to (true to false), "archived-old2" to (false to true)),
+            items.drop(toggleAt + 1).map { (it as AgentHomeItem.Row).let { row -> row.key to (row.first to row.last) } },
+        )
+        assertEquals(toggleAt + 1, agentHomeItems(home).size)
+
+        var shown by mutableStateOf(false)
+        rule.setHappyContent { AgentHomeScreen("Studio", home, AgentLinkStatus.Connected, accounts, acting, archiveShown = shown, onArchiveShown = { shown = it }) }
+        val list = rule.onNode(hasTestTag(AgentHomeTags.LIST))
+        list.performScrollToNode(hasTestTag(AgentHomeTags.ARCHIVE_TOGGLE))
+        rule.onNodeWithText("Show archived", useUnmergedTree = true).assertExists()
+        rule.onAllNodesWithTag(AgentHomeTags.row("archived-old1"), useUnmergedTree = true).assertCountEquals(0)
+        rule.node(AgentHomeTags.ARCHIVE_TOGGLE).performClick()
+        rule.waitForIdle()
+        assertTrue(shown)
+        rule.onNodeWithText("Hide archived", useUnmergedTree = true).assertExists()
+
+        list.performScrollToNode(hasTestTag(AgentHomeTags.row("archived-old2")))
+        val rowTag = AgentHomeTags.row("archived-old1")
+        val row = rule.node(rowTag)
+        val inRow = hasAnyAncestor(hasTestTag(rowTag))
+        val title = rule.onNode(hasTestTag(AgentHomeTags.ROW_TITLE) and inRow, useUnmergedTree = true).bounds
+        val place = rule.onNode(hasTestTag(AgentHomeTags.ROW_PLACE) and inRow, useUnmergedTree = true).bounds
+        assertDp("a title and its place: 13 + 22 + 18 + 13", 66, row.bounds.height)
+        assertDp("the title from the card's 16, no mark", row.bounds.left + AgentHomeSpec.cardInset + AgentHomeSpec.markInset, title.left)
+        assertDp("where it was right under its title", title.bottom, place.top)
+        rule.onNode(hasText("happy / fix-scroll"), useUnmergedTree = true).assertExists()
+
+        // Its press opens it; swiped left it uncovers Unarchive, which brings it back.
+        row.performClick()
+        assertEquals(listOf("old1"), opened)
+        // From inside the card, as a finger would: the row's tag spans the page's margin too, which no swipe reaches.
+        row.performTouchInput { swipeLeft(startX = right - (AgentHomeSpec.cardInset * 2).toPx(), endX = left + AgentHomeSpec.cardInset.toPx()) }
+        rule.waitForIdle()
+        rule.onNode(hasTestTag(FlatRowTags.ARCHIVE_ACTION) and inRow, useUnmergedTree = true).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("old1"), unarchived)
     }
 
     @Test
