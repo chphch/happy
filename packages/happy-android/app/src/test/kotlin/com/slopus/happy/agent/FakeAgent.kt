@@ -72,6 +72,8 @@ object Wire {
         projects: List<JsonObject> = emptyList(), workspaces: List<JsonObject> = emptyList(), bots: List<JsonObject> = emptyList(),
         tasks: List<JsonObject> = emptyList(), memberships: List<JsonObject> = emptyList(), cursor: String = "c0",
         surfaces: List<JsonObject>? = null, userSettings: List<JsonObject>? = null,
+        /** The projects' and workspaces' archived conversations, as the daemon sends them apart. */
+        archivedAgents: List<JsonObject>? = null,
     ) = buildJsonObject {
         put("health", buildJsonObject { put("ready", true); put("version", buildJsonObject { put("protocol", 30); put("daemon", "1.0") }) })
         put("config", buildJsonObject { put("node", buildJsonObject { put("name", "Studio"); put("avatar", kotlinx.serialization.json.JsonNull) }) })
@@ -79,6 +81,7 @@ object Wire {
         put("tasks", JsonArray(tasks)); put("taskMemberships", JsonArray(memberships)); put("cursor", cursor)
         if (surfaces != null) put("surfaces", JsonArray(surfaces))
         if (userSettings != null) put("userSettings", JsonArray(userSettings))
+        if (archivedAgents != null) put("archivedAgents", JsonArray(archivedAgents))
         put("profile", buildJsonObject { put("userId", USER) })
     }
 

@@ -56,6 +56,10 @@ class IntentOutboxTest {
         box.enqueue(Intent.ARCHIVE, "t1")
         box.enqueue(Intent.UNARCHIVE, "t1")
         assertEquals(listOf(Intent.UNARCHIVE), box.pending.value.filter { it.target == "t1" && it.kind != Intent.RENAME }.map { it.kind })
+        // Home shows it coming back, no longer leaving.
+        val overlay = IntentOverlay.of(box.pending.value)
+        assertEquals(setOf("t1"), overlay.restored)
+        assertTrue("t1" !in overlay.removed)
     }
 
     @Test

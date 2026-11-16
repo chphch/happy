@@ -58,4 +58,5 @@
     <string name="agent_new_project_home_unknown">Este Happy Agent aún no ha compartido su carpeta personal. Escribe la ruta completa de la carpeta.</string>
     <string name="agent_new_project_refused">Happy Agent no lo añadió.</string>
     <string name="agent_new_project_unreachable">No se pudo conectar con Happy Agent. Vuelve a intentarlo cuando esté conectado.</string>
+    <string name="agent_home_unarchive">Desarchivar</string>
 </resources>
