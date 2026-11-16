@@ -130,8 +130,8 @@ class HtmlPageLayoutTest {
         rule.node(HtmlPageTags.EXPAND).performClick()
         rule.waitForIdle()
         rule.node(HtmlPageTags.FULL).assertExists()
-        assertEquals(44f, rule.node(HtmlPageTags.CLOSE).bounds.let { (it.right - it.left).value }, 0.34f)
-        rule.node(HtmlPageTags.CLOSE).performClick()
+        assertEquals(44f, rule.node(WebViewScreenTags.CLOSE).bounds.let { (it.right - it.left).value }, 0.34f)
+        rule.node(WebViewScreenTags.CLOSE).performClick()
         rule.waitForIdle()
         rule.node(HtmlPageTags.FULL).assertDoesNotExist()
     }
