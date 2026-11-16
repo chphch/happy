@@ -101,7 +101,15 @@ data class AgentCatalog(
         val index = HashMap<String, JsonObject>()
         fun owners(list: List<JsonObject>) = list.mapNotNull { owner -> owner.string("id")?.let { it to indexOwner(owner, index) } }.toMap()
         // Agents read anew win over older cached copies, never over newer ones a live event left.
-        agents.forEach { (id, agent) -> index[id] = agent }
+        // An archived top-level chat stays only while the snapshot still sends it (desktop's
+        // archivedAgentsMerge): one it no longer sends was deleted, or its project went, so it
+        // leaves home's archive. A bot's or task's own chat comes back with its owner below.
+        val stillArchived = bootstrap.archivedAgents.mapNotNullTo(HashSet()) { it.string("id") }
+        agents.forEach { (id, agent) ->
+            if (agent["archivedAt"].isNullish() || agent.string("parentAgentId") != null || id in stillArchived) index[id] = agent
+        }
+        // The archived conversations come apart from their owners, which list only the active ones.
+        bootstrap.archivedAgents.forEach { putAgent(it, index) }
         return AgentCatalog(
             projects = owners(bootstrap.projects),
             workspaces = owners(bootstrap.workspaces),
@@ -175,17 +183,43 @@ data class AgentCatalog(
     }
 
     /**
-     * A task left or archived, a bot archived or a subtask ([kind] `agent`)
-     * archived here and taken by the computer: out of home until a
-     * snapshot says otherwise, so it doesn't come back between the answer
-     * and the event that says so.
+     * A task left or archived, a bot archived or a conversation ([kind]
+     * `agent`: a project's chat or a subtask) archived here and taken by the
+     * computer: out of home until a snapshot says otherwise, so it doesn't
+     * come back between the answer and the event that says so. A
+     * conversation stays, archived since [at], so home's archive lists it
+     * at once.
      */
-    fun withoutListed(kind: String, id: String): AgentCatalog = when (kind) {
+    fun withoutListed(kind: String, id: String, at: Long = System.currentTimeMillis()): AgentCatalog = when (kind) {
         "task" -> if (id in memberships || id in tasks) copy(tasks = tasks - id, memberships = memberships - id) else this
         "bot" -> if (id in bots) copy(bots = bots - id) else this
-        "agent" -> if (id in agents) copy(agents = agents - id) else this
+        "agent" -> agents[id]?.takeIf { it["archivedAt"].isNullish() }
+            ?.let { copy(agents = agents + (id to JsonObject(it + ("archivedAt" to JsonPrimitive(at))))) } ?: this
         "surface" -> withoutSurface(id)
         else -> this
+    }
+
+    /**
+     * A conversation the computer brought back from the archive, as it
+     * answered ([agent], `archivedAt` null): kept, and in its owner's
+     * series at its own `orderKey` until the owner's own update, which
+     * lists it, comes (API.md: unarchiving keeps the owner and order).
+     */
+    fun withRestored(agent: JsonObject): AgentCatalog {
+        val id = agent.string("id") ?: return this
+        val index = HashMap(agents)
+        putAgent(agent, index)
+        val owner = agent.string("workspaceId") ?: return copy(agents = index)
+        fun listed(resource: JsonObject): JsonObject {
+            val series = (resource["agents"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>()
+            if (series.any { it.string("id") == id }) return resource
+            return JsonObject(resource + ("agents" to JsonArray(inOrder(series, agent))))
+        }
+        return copy(
+            projects = projects[owner]?.let { projects + (owner to listed(it)) } ?: projects,
+            workspaces = workspaces[owner]?.let { workspaces + (owner to listed(it)) } ?: workspaces,
+            agents = index,
+        )
     }
 
     /** A task or bot ([kind]) renamed here and taken: it wears [name] until the computer's event brings its own copy. */
@@ -334,6 +368,17 @@ data class AgentCatalog(
             val id = agent.string("id") ?: return
             (agent["subtasks"] as? JsonArray)?.forEach { (it as? JsonObject)?.let { child -> putAgent(child, index) } }
             if (force || newer(agent, index[id])) index[id] = agent
+        }
+
+        /**
+         * [agent] in an owner's ordered [series] before the first conversation
+         * whose `orderKey` sorts after its own, else last; fractional keys
+         * compare as text, as the agent orders them.
+         */
+        internal fun inOrder(series: List<JsonObject>, agent: JsonObject): List<JsonObject> {
+            val key = agent.string("orderKey") ?: return series + agent
+            val at = series.indexOfFirst { listed -> listed.string("orderKey")?.let { it > key } == true }
+            return if (at < 0) series + agent else series.subList(0, at) + agent + series.subList(at, series.size)
         }
 
         /** Whether [candidate] is at least as new as [current] (UUIDv7 versions compare as text). */

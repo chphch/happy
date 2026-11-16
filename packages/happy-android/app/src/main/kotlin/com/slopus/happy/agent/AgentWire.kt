@@ -153,6 +153,13 @@ data class WireDesktopBootstrap(
     val cursor: String? = null,
     /** The person's open Feed entries; null from a daemon, or for a person, without a Feed. */
     val feedUnread: Int? = null,
+    /**
+     * The archived conversations of the projects' and workspaces' series,
+     * which those owners never list, newest `archivedAt` first and at most
+     * the 200 most recently archived (API.md, `GET /v0/bootstrap/desktop`).
+     * Empty from a daemon that sends none.
+     */
+    val archivedAgents: List<JsonObject> = emptyList(),
 )
 
 /** `x` of [o] when it is a JSON string. */
