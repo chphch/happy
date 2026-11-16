@@ -5,11 +5,15 @@ import android.view.ViewGroup
 import android.webkit.WebView
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.slopus.happy.chat.markdown.parseMarkdown
@@ -35,9 +39,10 @@ import org.robolectric.shadows.ShadowLooper
 /**
  * MermaidRenderer.tsx on native: a WebView loading mermaid@11, full width
  * with 8 above and below, radius 8 on surfaceHighest, 200 high until the
- * page posts `{type: "dimensions", height}`, then the tallest height
- * reported, capped at 600. Where there is no WebView (Robolectric) the
- * diagram stays a "mermaid" code block.
+ * page posts `{type: "dimensions", height}`, then the height reported, down
+ * as well as up, capped at 600 and kept for the next row with the same
+ * diagram; an expand button opens it full screen. Where there is no
+ * WebView (Robolectric) the diagram stays a "mermaid" code block.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = PHONE)
@@ -79,14 +84,51 @@ class MermaidLayoutTest {
         settle()
         assertBox("reported", rule.node(MermaidTags.DIAGRAM).bounds, 0.dp, 8.dp, 411.dp, 320.dp)
 
-        // A later, smaller report doesn't shrink it.
+        // It follows the diagram down as well as up.
         bridge.postMessage("""{"type":"dimensions","height":250}""")
         settle()
-        assertBox("kept", rule.node(MermaidTags.DIAGRAM).bounds, 0.dp, 8.dp, 411.dp, 320.dp)
+        assertBox("shrunk", rule.node(MermaidTags.DIAGRAM).bounds, 0.dp, 8.dp, 411.dp, 250.dp)
 
         bridge.postMessage("""{"type":"dimensions","height":2000}""")
         settle()
         assertBox("capped", rule.node(MermaidTags.DIAGRAM).bounds, 0.dp, 8.dp, 411.dp, 600.dp)
+    }
+
+    @Test
+    fun aRowScrolledBackComesBackAtItsHeight() {
+        var root: View? = null
+        var shown by mutableStateOf(true)
+        val content = "graph LR\n  K${System.nanoTime()}-->L"
+        rule.setHappyContent {
+            root = LocalView.current
+            CompositionLocalProvider(LocalMermaidWebView provides true) {
+                if (shown) MarkdownView(parseMarkdown("```mermaid\n$content\n```"), Modifier.fillMaxWidth())
+            }
+        }
+        (shadowOf(findWebView(root!!.rootView)!!).getJavascriptInterface("ReactNativeWebView") as MermaidBridge)
+            .postMessage("""{"type":"dimensions","height":140}""")
+        settle()
+        shown = false
+        settle()
+        shown = true
+        settle()
+        assertBox("again", rule.node(MermaidTags.DIAGRAM).bounds, 0.dp, 8.dp, 411.dp, 140.dp)
+    }
+
+    @Test
+    fun expandOpensTheDiagramFullScreen() {
+        rule.setHappyContent {
+            CompositionLocalProvider(LocalMermaidWebView provides true) {
+                MarkdownView(parseMarkdown("```mermaid\ngraph TD\n  X-->Y\n```"), Modifier.fillMaxWidth())
+            }
+        }
+        assertBox("expand reach", rule.node(MermaidTags.EXPAND).bounds, 371.dp, 8.dp, 40.dp, 40.dp)
+        rule.node(MermaidTags.EXPAND).performClick()
+        rule.waitForIdle()
+        rule.node(MermaidTags.FULL).assertExists()
+        rule.node(WebViewScreenTags.CLOSE).performClick()
+        rule.waitForIdle()
+        rule.node(MermaidTags.FULL).assertDoesNotExist()
     }
 
     @Test
