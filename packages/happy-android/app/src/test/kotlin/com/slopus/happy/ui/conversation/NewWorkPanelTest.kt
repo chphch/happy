@@ -207,6 +207,15 @@ class NewWorkPanelTest {
         rule.onAllNodes(hasClickAction() and hasAnyAncestor(hasTestTag(NewWorkTags.FOLDER)), useUnmergedTree = true).assertCountEquals(0)
     }
 
+    @Test fun `a new workspace's session names its project and says the workspace is made at the first send`() {
+        state = state.copy(newWork = NewWork(WorkChoice(folder = WorkFolder("p1", "happy", newWorkspace = true))))
+        show()
+        rule.node(NewWorkTags.KIND).assertDoesNotExist()
+        assertDp("folder 44", 44, rule.node(NewWorkTags.FOLDER).bounds.height)
+        rule.onNodeWithText("happy").assertExists()
+        rule.node(NewWorkTags.NOTE).assertTextEquals("A new workspace, a Git branch of its own, is made from this project when you send. Its first chat names it.")
+    }
+
     @Test fun `once a first message is in nothing changes the work and Send still goes`() {
         state = state.copy(newWork = NewWork(WorkChoice(WorkKind.Bot, "B"), locked = true))
         show()
