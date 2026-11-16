@@ -12,6 +12,7 @@
     <string name="chat_voice">Veu</string>
     <string name="chat_send">Envia</string>
     <string name="chat_markdown_image">Imatge de Markdown</string>
+    <string name="chat_markdown_page">Pàgina HTML</string>
     <string name="chat_remove_image">Treu %1$s</string>
     <string name="chat_add_photo">Afegeix una foto</string>
     <string name="diff_badge_new">NOU</string>
