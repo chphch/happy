@@ -166,6 +166,8 @@ class Conversation(
     private val now: () -> Long = System::currentTimeMillis,
     private val draftDebounceMillis: Long = 300,
     private val retryDelayMillis: Long = 600,
+    /** How often a new workspace's checkout is asked after until it is ready ([WorkFolder.newWorkspace]). */
+    private val workspaceWaitMillis: Long = 1_000,
     /** Where the newest history is kept on this phone; null keeps nothing. */
     private val keeper: ConversationKeeper? = null,
     /** Where [keeper] is read and written: never the main thread. */
@@ -1315,7 +1317,12 @@ class Conversation(
         val work = creating ?: scope.async(lane) {
             val folder = choice.folder
             val made = try {
-                withRetries { if (folder != null) api.createAgent(task, folder) else api.createWork(task, choice) }
+                if (folder != null) {
+                    val place = if (folder.newWorkspace) newWorkspace(task, folder) else folder
+                    withRetries { api.createAgent(task, place) }
+                } else {
+                    withRetries { api.createWork(task, choice) }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1338,6 +1345,30 @@ class Conversation(
         } finally {
             if (creating === work && !work.isActive) creating = null
         }
+    }
+
+    /**
+     * [folder]'s new workspace, made under its project and waited for: the
+     * computer starts no agent in a workspace whose checkout is still being
+     * made (`409 not_initialized`), so [task]'s chat goes in only once
+     * `initialization.status` is `ready`, as desktop's
+     * `worktreeSessionStart` waits. `failed` is the computer's error. A
+     * retry asks for the same workspace again ([ConversationApi.createWorkspace]).
+     */
+    private suspend fun newWorkspace(task: NewTask, folder: WorkFolder): WorkFolder {
+        val made = withRetries { api.createWorkspace(task, folder.workspaceId, WorkspaceNames.pick()) }
+        var workspace = made
+        while (true) {
+            val initialization = workspace["initialization"].obj
+            when (initialization?.get("status").str) {
+                // An older computer that doesn't say has made it before it answers.
+                "ready", null -> break
+                "failed" -> throw ConversationApiException(409, "workspace_failed", initialization?.get("error").str)
+            }
+            delay(workspaceWaitMillis)
+            workspace = withRetries { api.workspace(task.workspaceId) }
+        }
+        return WorkFolder(task.workspaceId, workspace["name"].str ?: folder.name)
     }
 
     private suspend fun <T> withRetries(block: suspend () -> T): T {

@@ -102,10 +102,13 @@ import kotlinx.serialization.Serializable
     val attach: Boolean = false,
     /**
      * New work is a session of this project or worktree ([WorkFolder]),
-     * named [workspaceName] as home lists it, instead of a task or bot.
+     * named [workspaceName] as home lists it, instead of a task or bot;
+     * with [newWorkspace], of a new workspace made under that project
+     * ([WorkFolder.newWorkspace]).
      */
     val workspaceId: String? = null,
     val workspaceName: String? = null,
+    val newWorkspace: Boolean = false,
 )
 
 /** The connection's Chief of Staff chat, found when opened, with [prefix] waiting in its composer. */
@@ -178,10 +181,11 @@ fun NavHostController.openChiefOfStaff(connectionId: String, prefix: String) {
 /**
  * A new, empty chat: pushed from home; from a chat it replaces that chat
  * (animated by the NavHost's transition), so Back goes home. With a
- * [folder] it is a session of that project or worktree.
+ * [folder] it is a session of that project or worktree, or of a new
+ * workspace of that project.
  */
 fun NavHostController.composeConversation(connectionId: String, attach: Boolean = false, folder: WorkFolder? = null) {
-    val route = ConversationRoute(connectionId, attach = attach, workspaceId = folder?.workspaceId, workspaceName = folder?.name)
+    val route = ConversationRoute(connectionId, attach = attach, workspaceId = folder?.workspaceId, workspaceName = folder?.name, newWorkspace = folder?.newWorkspace == true)
     val current = currentBackStackEntry
     if (current?.destination?.hasRoute<ConversationRoute>() == true) {
         navigate(route) {
@@ -344,7 +348,7 @@ internal class ConversationHolder(
     init {
         // A new chat that is not this entry's own yet takes the work left unsent, if any. A project's session
         // neither takes it nor leaves its own there: that is the next New task's.
-        val folder = route.workspaceId?.let { WorkFolder(it, route.workspaceName.orEmpty()) }
+        val folder = route.workspaceId?.let { WorkFolder(it, route.workspaceName.orEmpty(), route.newWorkspace) }
         val unsent = if (route.agentId == null && folder == null && saved.get<String>(TASK) == null) session.unsentWork?.also { session.unsentWork = null } else null
         task = if (route.agentId != null) null else NewTask(
             saved.get<String>(TASK) ?: (unsent?.task?.taskId ?: ConversationApi.clientId()).also { saved[TASK] = it },
