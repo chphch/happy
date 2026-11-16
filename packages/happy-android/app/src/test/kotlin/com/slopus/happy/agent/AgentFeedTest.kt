@@ -104,6 +104,81 @@ class AgentFeedTest {
         assertEquals(listOf("section-places", "artifacts", "todos", "section-bots"), places(false))
     }
 
+    /** Projects with live and archived chats, a bot and a task, and archived ones home never lists. */
+    private val archive = Wire.bootstrap(
+        bots = listOf(Wire.bot("b1", "Happy", Wire.agent("ab1"))),
+        tasks = listOf(Wire.task("t1", "Fix login", Wire.agent("at1"))),
+        memberships = listOf(Wire.membership("t1", "1")),
+        projects = listOf(Wire.project("p1", "rig", listOf(Wire.agent("ap1", workspaceId = "p1", title = "Live", orderKey = "2")))),
+        workspaces = listOf(Wire.workspace("w1", "p1", "fix-login", emptyList())),
+        archivedAgents = listOf(
+            Wire.agent("sub", workspaceId = "p1", subtask = true, parent = "ap1", archivedAt = 60),
+            Wire.agent("elsewhere", workspaceId = "nowhere", archivedAt = 50),
+            Wire.agent("new", workspaceId = "w1", title = "Newer", archivedAt = 30),
+            Wire.agent("untitled", workspaceId = "p1", archivedAt = 20),
+            Wire.agent("old", workspaceId = "p1", title = "Old chat", archivedAt = 10, orderKey = "1"),
+        ),
+    )
+
+    @Test
+    fun theArchiveListsTheProjectsArchivedChatsNewestFirstWithWhereTheyWere() {
+        val feed = AgentFeed.derive(catalog(archive))
+        assertEquals(
+            listOf(
+                AgentFeedRow.Archived("new", "Newer", "rig / fix-login"),
+                AgentFeedRow.Archived("untitled", null, "rig"),
+                AgentFeedRow.Archived("old", "Old chat", "rig"),
+            ),
+            feed.archived,
+        )
+        // Apart from the rows, so search and the chime never count it; a subtask or a chat of no listed place is in neither.
+        val listed = feed.rows.map { it.key }
+        assertTrue(listOf("new", "untitled", "old", "sub", "elsewhere").none { "agent-$it" in listed })
+        // Left out with the projects.
+        val hidden = catalog(archive.with("userSettings", JsonArray(listOf(Wire.projectsHidden(true, "v2")))))
+        assertEquals(emptyList<AgentFeedRow.Archived>(), AgentFeed.derive(hidden).archived)
+    }
+
+    @Test
+    fun aChatArchivedHereIsTheArchivesNewestAndOneBroughtBackStandsInItsProjectAtOnce() {
+        val catalog = catalog(archive)
+        val archiving = AgentFeed.derive(catalog, intents = IntentOverlay(removed = setOf("ap1")))
+        assertEquals(listOf("ap1", "new", "untitled", "old"), archiving.archived.map { it.agentId })
+        assertTrue(archiving.conversations.none { it.agentId == "ap1" })
+
+        // On its way back: out of the archive, in its project at its own order key ("1" before the live chat's "2").
+        val back = AgentFeed.derive(catalog, intents = IntentOverlay(restored = setOf("old")))
+        assertTrue(back.archived.none { it.agentId == "old" })
+        assertEquals(listOf("folder-p1", "agent-old", "agent-ap1", "folder-w1"), back.rows.map { it.key }.dropWhile { it != "folder-p1" })
+    }
+
+    @Test
+    fun aChatArchivedHereStaysInTheArchiveAndOneBroughtBackGoesBackInItsOrder() {
+        // The computer took the phone's archive: still known, archived since then, so the archive lists it.
+        val taken = catalog(archive).withoutListed("agent", "ap1", at = 99)
+        assertEquals(99L, taken.agent("ap1")?.archivedAt)
+        assertEquals(listOf("ap1", "new", "untitled", "old"), AgentFeed.derive(taken).archived.map { it.agentId })
+
+        // The computer's answer to an unarchive: in its project's series at its order key until the project's own update.
+        val restored = taken.withRestored(Wire.agent("old", workspaceId = "p1", title = "Old chat", version = "02", orderKey = "1"))
+        assertEquals(listOf("old", "ap1"), (restored.projects.getValue("p1")["agents"] as JsonArray).map { (it as JsonObject).string("id") })
+        val feed = AgentFeed.derive(restored)
+        assertTrue(feed.conversations.any { it.agentId == "old" })
+        assertEquals(listOf("new", "untitled"), feed.archived.map { it.agentId }.filter { it != "ap1" })
+    }
+
+    @Test
+    fun theNextSnapshotSaysWhichArchivedChatsTheComputerStillHas() {
+        val kept = catalog(archive)
+        // Deleted on the computer: the next snapshot no longer sends "old" among the archived ones, so it leaves the archive.
+        val sent = (archive["archivedAgents"] as JsonArray).filter { (it as JsonObject).string("id") != "old" }
+        val next = kept.withBootstrap(AgentClient.json.decodeFromJsonElement(WireDesktopBootstrap.serializer(), archive.with("archivedAgents", JsonArray(sent))))
+        assertEquals(listOf("new", "untitled"), AgentFeed.derive(next).archived.map { it.agentId })
+        assertFalse("old" in next.agents)
+        // The live chat is still there, from its project.
+        assertTrue(AgentFeed.derive(next).conversations.any { it.agentId == "ap1" })
+    }
+
     @Test
     fun desktopsHideProjectsLeavesTheProjectsOutLiveAndTheNewerVersionWins() {
         val keys = { catalog: AgentCatalog -> AgentFeed.derive(catalog).rows.map { it.key } }

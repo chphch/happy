@@ -59,4 +59,5 @@
     <string name="agent_new_project_home_unknown">Ten Happy Agent nie udostępnił jeszcze swojego folderu domowego. Wpisz pełną ścieżkę folderu.</string>
     <string name="agent_new_project_refused">Happy Agent go nie dodał.</string>
     <string name="agent_new_project_unreachable">Nie udało się połączyć z Happy Agent. Spróbuj ponownie, gdy będzie połączony.</string>
+    <string name="agent_home_unarchive">Przywróć</string>
 </resources>

@@ -178,6 +178,12 @@ class AgentHomeActions(
      * comes back if the computer refuses. Null offers no Archive.
      */
     val onArchive: (suspend (AgentFeedRow.Conversation) -> Unit)? = null,
+    /**
+     * Brings an archived chat back to its project
+     * ([com.slopus.happy.agent.AgentSession.unarchive]): it leaves the
+     * archive at once and comes back if the computer refuses. Null offers no Unarchive.
+     */
+    val onUnarchive: (suspend (AgentFeedRow.Archived) -> Unit)? = null,
     /** Signs a team server in again, once its sign-in expired (edge SSO). */
     val onSignIn: () -> Unit = {},
     /** Opens new work with "+"'s sheet up, for its first message's picture. */
@@ -301,6 +307,9 @@ fun AgentHomeScreen(
     people: Map<String, TeamUser> = emptyMap(),
     /** Reads the members search found that [people] lacks. */
     wantPeople: (Collection<String>) -> Unit = {},
+    /** The projects' archive is open under its toggle; kept per connection by [AgentHome]. */
+    archiveShown: Boolean = false,
+    onArchiveShown: (Boolean) -> Unit = {},
 ) {
     val colors = HappyTheme.colors
     val reduceMotion = rememberReduceMotion()
@@ -334,7 +343,7 @@ fun AgentHomeScreen(
     }
 
     val addsProjects = actions.onAddProject != null
-    val items = remember(feed, addsProjects) { agentHomeItems(feed, newProject = addsProjects) }
+    val items = remember(feed, addsProjects, archiveShown) { agentHomeItems(feed, newProject = addsProjects, archiveShown = archiveShown) }
     // New work takes the screen, so the search gives it back first (iOS); everything else leaves it for coming back.
     val compose = {
         closeSearch()
@@ -381,8 +390,8 @@ fun AgentHomeScreen(
                 AgentFeedRow.Plugins -> plugins
                 is AgentFeedRow.Feed -> feedTitle
                 AgentFeedRow.Todos -> todos
-                // Home's own row, never in the feed search reads.
-                is AgentFeedRow.Section, AgentFeedRow.NewProject -> null
+                // Home's own row, never in the feed search reads; search leaves the archive out.
+                is AgentFeedRow.Section, AgentFeedRow.NewProject, is AgentFeedRow.Archived -> null
             }
         }
         // Only the answer to what is typed now joins in; an earlier query's would bring in what no longer answers.
@@ -402,14 +411,17 @@ fun AgentHomeScreen(
         // other than the network keeps it away (a pairing to redo, an update, a sign-in), which says so.
         !feed.loaded && !status.needsAction -> HomePhase.Loading
         !feed.loaded -> HomePhase.Unavailable
-        // Fixed places alone are no home yet: the first chat is.
-        feed.rows.all { it is AgentFeedRow.Section || it == AgentFeedRow.Artifacts || it == AgentFeedRow.Plugins || it is AgentFeedRow.Feed || it == AgentFeedRow.Todos } -> HomePhase.Empty
+        // Fixed places alone are no home yet: the first chat is, or an archive to open (as the Happy CLI home).
+        feed.archived.isEmpty() && feed.rows.all { it is AgentFeedRow.Section || it == AgentFeedRow.Artifacts || it == AgentFeedRow.Plugins || it is AgentFeedRow.Feed || it == AgentFeedRow.Todos } -> HomePhase.Empty
         else -> HomePhase.List
     }
     val chatPreview = remember { ChatPreview() }
     // A row's swipe and its preview's menu archive alike, without waiting on the computer.
     val archive: ((AgentFeedRow.Conversation) -> Unit)? = remember(actions.onArchive, scope) {
         actions.onArchive?.let { run -> { row: AgentFeedRow.Conversation -> scope.launch { run(row) }; Unit } }
+    }
+    val unarchive: ((AgentFeedRow.Archived) -> Unit)? = remember(actions.onUnarchive, scope) {
+        actions.onUnarchive?.let { run -> { row: AgentFeedRow.Archived -> scope.launch { run(row) }; Unit } }
     }
     val previewBlur = with(LocalDensity.current) { MessageLiftSpec.blur.toPx() }
     Box(Modifier.fillMaxSize()) {
@@ -493,6 +505,8 @@ fun AgentHomeScreen(
                             onComposeIn = actions.onComposeIn,
                             onNewProject = { newProject = "" },
                             onArchive = archive,
+                            onArchiveShown = onArchiveShown,
+                            onUnarchive = unarchive,
                             // The list starts under the glass bar and scrolls on beneath it.
                             contentPadding = PaddingValues(top = top),
                             // The notice is the list's first row (iOS ba0d7da0e): it comes and goes as a row does, the rows it
@@ -1082,6 +1096,8 @@ private fun SignedInAgentHome(
             onLeaveSurface = { session.leaveSurface(it.id) },
             // Whoever may start work may archive it, as on desktop; a viewer's home has no Archive.
             onArchive = if (canCompose) { row -> row.archive?.let { session.archive(it.kind, it.id) } } else null,
+            // And bring it back, as desktop's Chats menu does.
+            onUnarchive = if (canCompose) { row -> session.unarchive(row.agentId) } else null,
             onSignIn = { graph.agentConnections.accounts.value.firstOrNull { it.id == id }?.server?.let(onSignIn) },
             onVoice = voice.takeIf { canCompose },
             onOpenVaultItem = onOpenVaultItem,
@@ -1092,6 +1108,8 @@ private fun SignedInAgentHome(
             onOpenPerson = onOpenPerson.takeIf { session.client.cloud },
         )
     }
+    // Whether the archive is open stays with the connection, so it neither comes nor goes on its own.
+    var archiveShown by rememberSaveable(id) { mutableStateOf(false) }
     CompositionLocalProvider(LocalAgentPictures provides session.pictures) {
         AgentHomeScreen(
             name = agents.firstOrNull { it.id == id }?.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.account_kind_agent),
@@ -1113,6 +1131,8 @@ private fun SignedInAgentHome(
             search = remember(session) { { query -> session.search(query) } },
             people = people,
             wantPeople = remember(session) { { ids -> session.team.want(ids) } },
+            archiveShown = archiveShown,
+            onArchiveShown = { archiveShown = it },
         )
     }
 }
