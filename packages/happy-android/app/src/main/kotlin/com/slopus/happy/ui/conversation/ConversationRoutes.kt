@@ -297,6 +297,7 @@ internal fun AgentSession.makeConversation(
     preferences = modelPreferences,
     onStarted = ::recordStart,
     address = { ChatAddress.of(catalog.value, agentId) },
+    restore = ::restore,
 )
 
 /** Which settings pages this connection has ([com.slopus.happy.ui.connection.SettingsLinks]): a link to any other reads as its words. */
@@ -499,15 +500,10 @@ private fun ConversationEntry(graph: AppGraph, nav: NavHostController, route: Co
         session.catalog.map { ChatAddress.of(it, conversation.agentId).chiefOfStaff }.distinctUntilChanged()
     }.collectAsStateWithLifecycle(false)
     val roleCanSend = permissions.allows(if (chief) Permission.BOTS_MANAGE else Permission.CONTENT_WRITE)
-    // A project's archived chat comes back with Resume, as home's archive lists it ([com.slopus.happy.agent.AgentFeed.archived]);
-    // pressed, it waits until the computer has answered the unarchive.
+    // A project's archived chat, as home's archive lists it ([com.slopus.happy.agent.AgentFeed.archived]), takes a
+    // message like any other: the message brings it back first ([Conversation]'s `restore`, [AgentSession.restore]).
     val resumable by remember(session, conversation.agentId) {
         session.feed.map { feed -> feed.archived.any { it.agentId == conversation.agentId } }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(false)
-    val resuming by remember(session, conversation.agentId) {
-        session.intents.pending.map { pending ->
-            pending.any { it.kind == com.slopus.happy.agent.Intent.UNARCHIVE && it.target == conversation.agentId }
-        }.distinctUntilChanged()
     }.collectAsStateWithLifecycle(false)
     // A command's artwork is read and kept as the agent's other pictures are.
     ProvideLinks(links) { androidx.compose.runtime.CompositionLocalProvider(com.slopus.happy.ui.connection.LocalAgentPictures provides session.pictures) { com.slopus.happy.ui.references.ProvideBusyLinks(references, session.references) {
@@ -517,7 +513,6 @@ private fun ConversationEntry(graph: AppGraph, nav: NavHostController, route: Co
             roleCanSend = roleCanSend,
             roleCanCompose = permissions.canWrite,
             resumable = resumable,
-            resuming = resuming,
             link = link,
             usage = usage,
             onRefreshUsage = session.usage::refresh,
@@ -539,7 +534,6 @@ private fun ConversationEntry(graph: AppGraph, nav: NavHostController, route: Co
                     onRetryFailure = conversation::retryFailure,
                     onFailureShown = { row -> failureShown(row, ChatAddress.of(session.catalog.value, conversation.agentId)) },
                     onAnswer = conversation::answer,
-                    onResume = { session.unarchive(conversation.agentId) },
                     onLoadOlder = { retry -> conversation.loadOlder(retry) },
                     onOpenArtifact = { row -> nav.openArtifact(route.connectionId, row.ref) },
                     // A Happy URL a page followed opens in the app; any other its own browser.

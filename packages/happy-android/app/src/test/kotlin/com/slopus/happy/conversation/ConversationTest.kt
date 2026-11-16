@@ -201,6 +201,7 @@ class ConversationTest {
         route: AttachmentRoute = AttachmentRoute().apply { markMissing() },
         kept: MutableMap<String, java.io.File> = HashMap(),
         created: (JsonObject) -> Unit = {},
+        restore: (suspend (String) -> String?)? = null,
     ) = Conversation(
         api = ConversationApi(null, agent.request, fileRequest = agent.fileRequest),
         signals = signals,
@@ -224,6 +225,7 @@ class ConversationTest {
         cloudFiles = cloudFiles,
         attachmentRoute = route,
         keepAttachment = { id, file -> kept[id] = file },
+        restore = restore,
     ).also { it.start() }
 
     private fun event(type: String, payload: String) = ConversationSignal.Event(type, Json.parseToJsonElement(payload).jsonObject)
@@ -1099,6 +1101,47 @@ class ConversationTest {
         signals.emit(event("agent.updated", """{"agentId":"a1","changes":{"archivedAt":null,"canSendMessages":true,"updatedAt":8}}"""))
         advanceUntilIdle()
         assertTrue(chat.state.value.canSend)
+    }
+
+    @Test fun `a message to an archived chat brings it back first, then goes`() = runTest {
+        val agent = FakeAgent()
+        agent.bootstrap = """{"agent":{"id":"a1","workspaceId":"w1","status":"idle","archivedAt":7,"canSendMessages":false},"mode":${FakeAgent.MODE},"draft":{"value":null,"updatedAt":null},"pending":[]}"""
+        // How many messages had gone each time the chat was asked back.
+        val goneWhenAsked = ArrayList<Int>()
+        val chat = conversation(agent, restore = { id ->
+            assertEquals("a1", id)
+            goneWhenAsked += agent.requests.count { it.second.endsWith("/send") }
+            null
+        })
+        advanceUntilIdle()
+        assertFalse(chat.state.value.canSend)
+        assertTrue(chat.send("Pick this up again"))
+        advanceUntilIdle()
+        assertEquals(listOf(0), goneWhenAsked)
+        assertEquals(1, agent.requests.count { it.second.endsWith("/send") })
+    }
+
+    @Test fun `an archived chat the agent won't bring back fails the message in its words, unsent`() = runTest {
+        val agent = FakeAgent()
+        agent.bootstrap = """{"agent":{"id":"a1","workspaceId":"w1","status":"idle","archivedAt":7,"canSendMessages":false},"mode":${FakeAgent.MODE},"draft":{"value":null,"updatedAt":null},"pending":[]}"""
+        val chat = conversation(agent, restore = { "Archive or unarchive this agent through its task." })
+        advanceUntilIdle()
+        chat.send("Pick this up again")
+        advanceUntilIdle()
+        assertEquals(0, agent.requests.count { it.second.endsWith("/send") })
+        val row = chat.state.value.rows.filterIsInstance<ConversationRow.User>().single()
+        assertEquals(Delivery.Failed(Problem.Said("Archive or unarchive this agent through its task.")), row.delivery)
+    }
+
+    @Test fun `a chat that isn't archived is never asked back`() = runTest {
+        val agent = FakeAgent()
+        var asked = 0
+        val chat = conversation(agent, restore = { asked++; null })
+        advanceUntilIdle()
+        chat.send("Hello")
+        advanceUntilIdle()
+        assertEquals(0, asked)
+        assertEquals(1, agent.requests.count { it.second.endsWith("/send") })
     }
 
     @Test fun `without canSendMessages, the daemon's rule decides`() {

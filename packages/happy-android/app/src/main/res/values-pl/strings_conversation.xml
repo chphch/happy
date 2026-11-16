@@ -10,6 +10,7 @@
     <string name="conversation_empty">Brak wiadomości.</string>
     <string name="conversation_read_only">Tą rozmową steruje inny agent i nie przyjmuje ona wiadomości.</string>
     <string name="conversation_archived">Ta rozmowa jest zarchiwizowana.</string>
+    <string name="conversation_archived_send">Ta rozmowa jest zarchiwizowana. Wysłanie wiadomości ją przywróci.</string>
     <string name="conversation_activity_awaiting_answer">Czeka na Twoją odpowiedź</string>
     <string name="conversation_activity_waiting_for_model">Oczekiwanie na model…</string>
     <string name="conversation_activity_thinking">Myśli…</string>

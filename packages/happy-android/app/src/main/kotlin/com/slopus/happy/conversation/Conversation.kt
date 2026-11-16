@@ -202,6 +202,13 @@ class Conversation(
     /** Where its analytics go: [Analytics], or a test's list. */
     private val record: (AnalyticsEvent) -> Unit = Analytics::record,
     private val errorShown: (ErrorArea, ErrorCode) -> Unit = Analytics::errorShown,
+    /**
+     * Brings this chat back while it is archived ([AgentSession.restore][com.slopus.happy.agent.AgentSession.restore]):
+     * null once it is back, else the agent's words for the refusal. A
+     * message waits on it ([ensureBack]); null leaves an archived chat's
+     * messages to go as they are.
+     */
+    private val restore: (suspend (String) -> String?)? = null,
 ) {
     /**
      * A send on its way: the person's [text], its pictures and its [files].
@@ -1111,6 +1118,7 @@ class Conversation(
                 try {
                     next.images.indices.forEach { uploads.set(UploadBoard.pictureKey(next.id, it), UploadPhase.Preparing) }
                     ensureCreated()
+                    ensureBack()
                     made = true
                     val mode = sendingMode() ?: throw IllegalStateException("No model is set up on this computer.")
                     // Pictures inline and files in the workspace only where the computer takes no attachments.
@@ -1305,6 +1313,19 @@ class Conversation(
         val offered = withRetries { api.bootstrap(agentId) }.slashCommands.orEmpty().any { it.name == name && it.isSkill }
         if (offered) send.toolRequest = skillRequest(name)
         send.skill = null
+    }
+
+    /**
+     * An archived chat comes back before a message goes into it ([restore]):
+     * Happy Agent takes no message into an archived chat. The message waits
+     * meanwhile; a refusal fails it in the agent's words.
+     */
+    private suspend fun ensureBack() {
+        val restore = restore ?: return
+        if (snapshot.agent?.archivedAt == null) return
+        val refusal = restore(agentId) ?: return
+        // The agent's own words, or none, which the screen says in its own ([Problem.Unknown]).
+        throw IllegalStateException(refusal.ifEmpty { null })
     }
 
     /**
