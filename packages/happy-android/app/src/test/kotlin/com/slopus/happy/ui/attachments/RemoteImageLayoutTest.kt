@@ -9,6 +9,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -25,7 +26,14 @@ import com.slopus.happy.ui.components.Avatar
 import com.slopus.happy.ui.components.LocalImageLoader
 import com.slopus.happy.ui.components.MarkdownImage
 import com.slopus.happy.ui.components.MarkdownImageTags
+import com.slopus.happy.ui.components.MarkdownPicture
 import com.slopus.happy.ui.components.RemoteImage
+import com.slopus.happy.ui.components.dataUrlBytes
+import com.slopus.happy.ui.components.markdownImageBox
+import com.slopus.happy.ui.components.markdownImageRadius
+import com.slopus.happy.ui.components.markdownPictureOpens
+import com.slopus.happy.ui.components.svgSize
+import com.slopus.happy.ui.conversation.PictureViewerTags
 import com.slopus.happy.ui.components.RemoteImageState
 import com.slopus.happy.ui.components.RemoteImageTags
 import com.slopus.happy.ui.components.isRemoteImageUrl
@@ -51,6 +59,7 @@ class RemoteImageLayoutTest {
 
     private val requested = CopyOnWriteArrayList<Any>()
     private val broken = "https://example.com/broken.png"
+    private val large = "https://example.com/large.png"
 
     private val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext())
         .components {
@@ -60,6 +69,7 @@ class RemoteImageLayoutTest {
                         override suspend fun intercept(chain: Interceptor.Chain): ImageResult = ErrorResult(null, chain.request, IOException("404"))
                     })
                     .intercept({ requested += it; false }, FakeImage())
+                    .intercept({ it == large }, FakeImage(width = 4000, height = 2000))
                     .default(FakeImage(width = 64, height = 64))
                     .build(),
             )
@@ -122,31 +132,118 @@ class RemoteImageLayoutTest {
     }
 
     @Test
-    fun markdownImagesFillUpTo520() {
+    fun aMarkdownPictureHolds4To3OfTheColumnUntilItsPixelsAreKnown() {
         rule.setHappyContent {
             CompositionLocalProvider(LocalImageLoader provides loader) {
-                Box(Modifier.fillMaxWidth()) { MarkdownImage("A diagram", "https://example.com/d.png") }
+                Box(Modifier.fillMaxWidth()) { MarkdownImage("Never arrives", broken) }
             }
         }
-        rule.waitUntil(5_000) { "https://example.com/d.png" in requested }
+        rule.waitForIdle()
         val block = rule.node(MarkdownImageTags.BLOCK).getUnclippedBoundsInRoot()
-        val image = rule.node(RemoteImageTags.IMAGE).getUnclippedBoundsInRoot()
+        val image = rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot()
         val caption = rule.node(MarkdownImageTags.CAPTION).getUnclippedBoundsInRoot()
-        // 411 wide phone: the whole width; 8 above, 240 high, 8 to the caption.
-        assertBox("image", image, 0.dp, 8.dp, 411.dp, 240.dp)
+        // 411 wide phone: the whole width at 4:3, 8 above, 8 to the caption.
+        assertBox("placeholder", image, 0.dp, 8.dp, 411.dp, 308.25.dp)
         assertEquals(image.bottom + 8.dp, caption.top)
         assertEquals(caption.bottom, block.bottom)
+        // Nothing loaded, nothing to open.
+        rule.node(MarkdownImageTags.PICTURE).performClick()
+        rule.waitForIdle()
+        rule.node(PictureViewerTags.VIEWER).assertDoesNotExist()
     }
 
     @Test
-    fun markdownImagesStopAt520AndHaveNoCaptionWithoutAlt() {
+    fun aSmallPictureIsNeverEnlarged() {
         rule.setHappyContent {
             CompositionLocalProvider(LocalImageLoader provides loader) {
-                Box(Modifier.wrapContentWidth(unbounded = true).requiredWidth(700.dp)) { MarkdownImage("", "https://example.com/e.png") }
+                Box(Modifier.fillMaxWidth()) { MarkdownImage("A badge", "https://example.com/badge.png") }
             }
         }
-        rule.waitUntil(5_000) { "https://example.com/e.png" in requested }
-        assertEquals(520.dp, rule.node(RemoteImageTags.IMAGE).getUnclippedBoundsInRoot().let { it.right - it.left })
+        rule.waitUntil(5_000) { pictureWidth() < 100.dp }
+        // 64 × 64 pixels, one to one.
+        assertBox("whole", rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot(), 0.dp, 8.dp, 64.dp, 64.dp)
+    }
+
+    @Test
+    fun aLargePictureTakesTheColumnInItsOwnShape() {
+        rule.setHappyContent {
+            CompositionLocalProvider(LocalImageLoader provides loader) {
+                Box(Modifier.fillMaxWidth()) { MarkdownImage("Wide", large) }
+            }
+        }
+        rule.waitUntil(5_000) { rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot().let { it.bottom - it.top } < 300.dp }
+        // 4000 × 2000: all 411 of the column at 2:1.
+        assertBox("wide", rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot(), 0.dp, 8.dp, 411.dp, 205.5.dp)
+    }
+
+    @Test
+    fun markdownPicturesStopAt520AndHaveNoCaptionWithoutAlt() {
+        rule.setHappyContent {
+            CompositionLocalProvider(LocalImageLoader provides loader) {
+                Box(Modifier.wrapContentWidth(unbounded = true).requiredWidth(700.dp)) { MarkdownImage("", large) }
+            }
+        }
+        rule.waitUntil(5_000) { rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot().let { it.bottom - it.top } < 300.dp }
+        // The 700 wide box sits centred on the phone, so only its size is the picture's own.
+        val capped = rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot()
+        assertEquals(520f, (capped.right - capped.left).value, 0.34f)
+        assertEquals(260f, (capped.bottom - capped.top).value, 0.34f)
         rule.node(MarkdownImageTags.CAPTION).assertDoesNotExist()
     }
+
+    @Test
+    fun aLoadedPictureOpensInTheViewer() {
+        rule.setHappyContent {
+            CompositionLocalProvider(LocalImageLoader provides loader) {
+                Box(Modifier.fillMaxWidth()) { MarkdownImage("A plot", "https://example.com/plot.png") }
+            }
+        }
+        rule.waitUntil(5_000) { pictureWidth() < 100.dp }
+        rule.node(PictureViewerTags.VIEWER).assertDoesNotExist()
+        rule.node(MarkdownImageTags.PICTURE).performClick()
+        rule.waitForIdle()
+        rule.node(PictureViewerTags.VIEWER).assertExists()
+    }
+
+    @Test
+    fun aDataUrlsBytesAreItsOwn() {
+        assertEquals("abc", dataUrlBytes("data:text/plain;base64,YWJj")!!.decodeToString())
+        assertEquals("<svg/>", dataUrlBytes("data:image/svg+xml,%3Csvg%2F%3E")!!.decodeToString())
+        assertEquals(null, dataUrlBytes("https://example.com/a.png"))
+        assertTrue(markdownPictureOpens("https://example.com/a.png"))
+        assertTrue(markdownPictureOpens("data:image/png;base64,AAAA"))
+        listOf("file:///x.png", "/relative.png", "content://x/y").forEach { assertFalse(it, markdownPictureOpens(it)) }
+    }
+
+    @Test
+    fun aPicturesBox() {
+        fun box(expected: Pair<Float, Float>, actual: Pair<Float, Float>) {
+            assertEquals(expected.first, actual.first, 0.01f)
+            assertEquals(expected.second, actual.second, 0.01f)
+        }
+        box(411f to 308.25f, markdownImageBox(411f, null))
+        box(520f to 390f, markdownImageBox(700f, null))
+        // Whole: its pixels one to one, at most the column; scaled down when decoded: all the column.
+        box(64f to 32f, markdownImageBox(411f, MarkdownPicture(64, 32, whole = true)))
+        box(411f to 822f, markdownImageBox(411f, MarkdownPicture(500, 1000, whole = true)))
+        box(411f to 411f * 270 / 1079, markdownImageBox(411f, MarkdownPicture(1079, 270, whole = false)))
+    }
+
+    @Test
+    fun anSvgsOwnSize() {
+        assertEquals(90f to 20f, svgSize("""<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="90" height="20" role="img">"""))
+        assertEquals(120f to 40.5f, svgSize("<svg viewBox='0 0 10 10' height=\"40.5px\" width='120'>"))
+        // A percentage, another unit, a missing side, a stroke width and anything not SVG give nothing.
+        listOf("<svg width=\"100%\" height=\"20\">", "<svg width=\"2em\" height=\"1em\">", "<svg width=\"90\">", "<svg stroke-width=\"3\" height=\"9\">", "\u0089PNG\r\n")
+            .forEach { assertEquals(it, null, svgSize(it)) }
+    }
+
+    @Test
+    fun aPicturesCornersFollowItsSize() {
+        assertEquals(12f, markdownImageRadius(411f, 300f).value, 0.01f)
+        assertEquals(6f, markdownImageRadius(24f, 24f).value, 0.01f)
+        assertEquals(5f, markdownImageRadius(90f, 20f).value, 0.01f)
+    }
+
+    private fun pictureWidth() = rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot().let { it.right - it.left }
 }
