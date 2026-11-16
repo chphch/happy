@@ -21,6 +21,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -66,6 +68,12 @@ private fun mathWebViewAvailable(): Boolean =
  * shows its error in red mono inside the page; with KaTeX unreachable the
  * TeX itself shows there. Nothing in it navigates (KaTeX's `trust` stays
  * off). Where there is no WebView, [fallback] shows instead.
+ *
+ * The WebView draws into an offscreen layer of its own size. Drawn straight
+ * into a reply row that is still fading in, its GL functor crashed the
+ * render thread on the emulator (`GLFunctorDrawable` found no surface for
+ * the row's layer); the page and Mermaid views get a layer of their own
+ * from their rounded clip, and theirs never crashed.
  */
 @Composable
 fun MathView(tex: String, modifier: Modifier = Modifier, fallback: @Composable () -> Unit) {
@@ -87,7 +95,8 @@ fun MathView(tex: String, modifier: Modifier = Modifier, fallback: @Composable (
             .testTag(MathTags.BLOCK)
             .fillMaxWidth()
             .height(height.dp)
-            .semantics { contentDescription = tex },
+            .semantics { contentDescription = tex }
+            .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen),
     ) {
         AndroidView(
             factory = { context -> mathWebView(context, colors.dark) { onHeight(it) } },
