@@ -124,6 +124,19 @@ class MarkdownParserTest {
         assertEquals(listOf(MarkdownBlock.CodeBlock(null, "unterminated")), parseMarkdown("```\nunterminated"))
     }
 
+    @Test fun `a closed artifact fence is a page, an open one its source`() {
+        val html = "<table>\n<tr><td>1</td></tr>\n</table>"
+        assertEquals(
+            listOf(MarkdownBlock.Text(spans("Before")), MarkdownBlock.HtmlPage(html), MarkdownBlock.Text(spans("After"))),
+            parseMarkdown("Before\n```artifact\n$html\n```\nAfter"),
+        )
+        // Still streaming in: its source until the fence closes, so the page loads once, whole.
+        assertEquals(listOf(MarkdownBlock.CodeBlock("artifact", "<div>half")), parseMarkdown("```artifact\n<div>half"))
+        // Only the bare word makes a page; html and anything after the word stay code.
+        assertEquals(listOf(MarkdownBlock.CodeBlock("html", "<p>x</p>")), parseMarkdown("```html\n<p>x</p>\n```"))
+        assertEquals(listOf(MarkdownBlock.CodeBlock("artifact html", "<p>x</p>")), parseMarkdown("```artifact html\n<p>x</p>\n```"))
+    }
+
     private fun button(text: String, url: String) = MarkdownSpan(emptySet(), text, url, button = true)
 
     @Test fun `a link's title is not its address`() {

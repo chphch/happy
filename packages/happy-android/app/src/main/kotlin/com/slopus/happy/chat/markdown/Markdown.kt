@@ -25,6 +25,12 @@ sealed interface MarkdownBlock {
     data class NumberedList(val items: List<NumberedItem>) : MarkdownBlock
     data class CodeBlock(val language: String?, val content: String) : MarkdownBlock
     data class Mermaid(val content: String) : MarkdownBlock
+    /**
+     * A closed ```` ```artifact ```` fence: a self-contained HTML page the chat
+     * draws in place, static (no script runs, nothing comes from the network).
+     * While its closing fence hasn't arrived it is a [CodeBlock].
+     */
+    data class HtmlPage(val html: String) : MarkdownBlock
     data object HorizontalRule : MarkdownBlock
     /** `<options>` the agent offers; tapping one sends it as the next message. */
     data class Options(val items: List<String>) : MarkdownBlock
@@ -268,14 +274,25 @@ fun parseMarkdownBlocks(markdown: String): List<MarkdownBlock> {
         if (trimmed.startsWith("```")) {
             val language = trimmed.substring(3).trim().ifEmpty { null }
             val content = ArrayList<String>()
+            var closed = false
             while (index < lines.size) {
                 val next = lines[index]
                 index++
-                if (next.trim() == "```") break
+                if (next.trim() == "```") {
+                    closed = true
+                    break
+                }
                 content.add(next)
             }
             val text = content.joinToString("\n")
-            blocks.add(if (language == "mermaid") MarkdownBlock.Mermaid(text) else MarkdownBlock.CodeBlock(language, text))
+            blocks.add(
+                when {
+                    language == "mermaid" -> MarkdownBlock.Mermaid(text)
+                    // Half a page is its source until the fence closes: a page loads once, whole.
+                    language == "artifact" && closed -> MarkdownBlock.HtmlPage(text)
+                    else -> MarkdownBlock.CodeBlock(language, text)
+                },
+            )
             continue
         }
 
