@@ -234,7 +234,8 @@ class AgentHomeLayoutTest {
         val box = button.bounds
         // It ends the row, after the new-chat glyph and its gap, and takes presses over the row's height.
         assertDp("the button ends the card's row, its padding in", row.bounds.right - AgentHomeSpec.cardInset - AgentHomeSpec.paddingEnd, box.right)
-        assertDp("the gap after the new-chat glyph", glyph.right + AgentHomeSpec.workspaceGap, box.left)
+        // Its press starts where the glyph ends; the capsule stands the gap further in.
+        assertDp("the press starts at the new-chat glyph", glyph.right, box.left)
         assertDp("the row's height", 48, box.height)
         rule.onNodeWithText("Workspace", useUnmergedTree = true).assertExists()
         button.assert(androidx.compose.ui.test.hasContentDescription("New workspace in happy"))
