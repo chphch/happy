@@ -47,6 +47,8 @@
     <string name="agent_settings_update">需要更新</string>
     <string name="agent_settings_remove_message">Happy 会在此手机上忘记此智能体。在你也从 Happy Agent 中移除之前，它会继续列出此手机。</string>
     <string name="agent_home_new_session_in">在 %1$s 中新建会话</string>
+    <string name="agent_home_new_workspace">工作区</string>
+    <string name="agent_home_new_workspace_in">在 %1$s 中新建工作区</string>
     <string name="agent_home_new_project">新建项目</string>
     <string name="agent_new_project_message">此 Happy Agent 运行处已有的文件夹（如 ~/Projects/app），或要克隆的 GitHub 仓库（如 owner/app）。</string>
     <string name="agent_new_project_add">添加</string>

@@ -182,8 +182,8 @@ fun HappyApp(graph: AppGraph, onNavigationReady: (NavHostController) -> Unit = {
                                 account.id,
                                 onOpenConversation = { agentId -> go.open(MainPanelKey.conversation(agentId)) { nav.openConversation(account.id, agentId) } },
                                 onCompose = { go.open(null) { nav.composeConversation(account.id) } },
-                                onComposeIn = { folder ->
-                                    go.open(null) { nav.composeConversation(account.id, folder = com.slopus.happy.conversation.WorkFolder(folder.id, folder.name)) }
+                                onComposeIn = { folder, newWorkspace ->
+                                    go.open(null) { nav.composeConversation(account.id, folder = com.slopus.happy.conversation.WorkFolder(folder.id, folder.name, newWorkspace)) }
                                 },
                                 onComposeWithPicture = { go.open(null) { nav.composeConversation(account.id, attach = true) } },
                                 onSettings = { go.open(MainPanelKey.SETTINGS) { nav.navigate(SettingsRoute()) } },

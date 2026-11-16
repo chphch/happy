@@ -112,4 +112,5 @@
     <string name="conversation_message_undisplayable">Ehi, non è stato possibile mostrare questo messaggio.</string>
     <string name="conversation_report_bug">Segnala un bug</string>
     <string name="conversation_new_work_folder_note">La sessione inizia in questa cartella.</string>
+    <string name="conversation_new_work_workspace_note">All\'invio viene creato un nuovo spazio di lavoro da questo progetto, con un suo ramo Git. La prima chat gli dà il nome.</string>
 </resources>

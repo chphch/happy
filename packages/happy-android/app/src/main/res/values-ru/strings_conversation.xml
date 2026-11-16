@@ -112,4 +112,5 @@
     <string name="conversation_message_undisplayable">Ой, это сообщение не удалось показать.</string>
     <string name="conversation_report_bug">Сообщить об ошибке</string>
     <string name="conversation_new_work_folder_note">Сессия начнётся в этой папке.</string>
+    <string name="conversation_new_work_workspace_note">При отправке из этого проекта создаётся новое рабочее пространство — отдельная ветка Git. Первый чат даст ему имя.</string>
 </resources>
