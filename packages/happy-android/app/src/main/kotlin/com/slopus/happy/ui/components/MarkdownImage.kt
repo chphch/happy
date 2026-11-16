@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.request.CachePolicy
@@ -41,6 +43,8 @@ import com.slopus.happy.ui.theme.HappyTheme
 import com.slopus.happy.ui.theme.happyTextStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okio.Buffer
+import kotlin.math.ceil
 
 object MarkdownImageSpec {
     val maxWidth = 520.dp
@@ -66,7 +70,9 @@ object MarkdownImageTags {
  * fitted inside (contain), holds 4:3 of the column until its pixels are
  * known, then takes its own shape ([markdownImageBox]): as wide as the
  * column at most, never wider than its pixels one to one. An SVG draws too
- * (the loader's SVG decoder). Described by the alt text or "Markdown
+ * (the loader's SVG decoder), at its root element's width and height when it
+ * states them ([svgSize]). The corners are 12, at most a quarter of the
+ * shorter side. Described by the alt text or "Markdown
  * image". Once it has loaded, a tap on a picture from the web or a `data:`
  * URL opens it in the viewer. The caption is the alt text, 14/20
  * textSecondary, only when there is one.
@@ -75,11 +81,21 @@ object MarkdownImageTags {
 fun MarkdownImage(alt: String, url: String, modifier: Modifier = Modifier) {
     val colors = HappyTheme.colors
     val density = LocalDensity.current
+    val loader = rememberImageLoader()
     val key = "markdown:$url"
     var picture by remember(url) { mutableStateOf(MarkdownPictures[url]) }
     var loaded by remember(url) { mutableStateOf(false) }
     var viewing by remember { mutableStateOf(false) }
     val opens = loaded && markdownPictureOpens(url)
+    // A picture that filled the box it was asked to fill may be an SVG drawn to fit it: its own size is in its source.
+    LaunchedEffect(url, picture) {
+        val known = picture ?: return@LaunchedEffect
+        if (known.whole || known.checked) return@LaunchedEffect
+        val own = markdownPictureHead(loader, url)?.let(::svgSize)
+        val checked = own?.let { (width, height) -> MarkdownPicture(ceil(width).toInt(), ceil(height).toInt(), whole = true, checked = true) } ?: known.copy(checked = true)
+        MarkdownPictures[url] = checked
+        picture = checked
+    }
     Column(
         modifier = modifier
             .padding(vertical = MarkdownImageSpec.marginVertical)
@@ -91,6 +107,7 @@ fun MarkdownImage(alt: String, url: String, modifier: Modifier = Modifier) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val (width, height) = markdownImageBox(maxWidth.value, picture)
             val asked = with(density) { width.dp.toPx() to height.dp.toPx() }
+            val radius = markdownImageRadius(width, height)
             RemoteImage(
                 model = url,
                 contentDescription = alt.ifEmpty { stringResource(R.string.chat_markdown_image) },
@@ -100,8 +117,8 @@ fun MarkdownImage(alt: String, url: String, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .testTag(MarkdownImageTags.PICTURE)
                     .size(width.dp, height.dp)
-                    .viewerOrigin(key, MarkdownImageSpec.radius)
-                    .clip(RoundedCornerShape(MarkdownImageSpec.radius))
+                    .viewerOrigin(key, radius)
+                    .clip(RoundedCornerShape(radius))
                     .then(if (opens) Modifier.clickable(role = Role.Image) { viewing = true } else Modifier),
                 onState = { loaded = it == RemoteImageState.Success },
                 onImage = { image ->
@@ -137,9 +154,13 @@ private fun MarkdownPictureViewer(url: String, key: String, alt: String, picture
     PictureViewer(listOf(ViewerItem(key, alt.ifEmpty { null }, width = whole?.width?.toFloat(), height = whole?.height?.toFloat())), 0, source, onClose = onClose)
 }
 
-/** A markdown picture's pixels as decoded, and whether that is all of them (not scaled down to the box it was asked to fill). */
+/**
+ * A markdown picture's pixels as decoded, and whether that is all of them
+ * (not scaled to the box it was asked to fill); [checked] once its source
+ * has been read for an SVG's own size.
+ */
 @Immutable
-internal data class MarkdownPicture(val width: Int, val height: Int, val whole: Boolean)
+internal data class MarkdownPicture(val width: Int, val height: Int, val whole: Boolean, val checked: Boolean = false)
 
 /** What markdown pictures turned out to be while the app runs: a row scrolled back keeps its picture's shape. */
 internal object MarkdownPictures {
@@ -164,6 +185,49 @@ internal fun markdownImageBox(available: Float, picture: MarkdownPicture?): Pair
     val shown = if (picture.whole) minOf(width, picture.width.toFloat()) else width
     return shown to shown * picture.height / picture.width
 }
+
+/** A picture's corners: [MarkdownImageSpec.radius], at most a quarter of its shorter side, so a small one stays its shape. */
+internal fun markdownImageRadius(width: Float, height: Float): Dp = minOf(MarkdownImageSpec.radius.value, minOf(width, height) / 4).coerceAtLeast(0f).dp
+
+private val SVG_ROOT = Regex("<svg\\b[^>]*>", RegexOption.IGNORE_CASE)
+
+private fun svgLength(tag: String, name: String): Float? =
+    Regex("(?:^|\\s)$name\\s*=\\s*[\"']\\s*([0-9]*\\.?[0-9]+)\\s*(?:px)?\\s*[\"']", RegexOption.IGNORE_CASE)
+        .find(tag)?.groupValues?.get(1)?.toFloatOrNull()?.takeIf { it > 0 }
+
+/**
+ * An SVG's own size: its root element's width and height in px, as
+ * happy-app's svgIntrinsicSize read them; null without both, with other
+ * units, or for anything that isn't an SVG.
+ */
+internal fun svgSize(head: String): Pair<Float, Float>? {
+    val tag = SVG_ROOT.find(head)?.value ?: return null
+    val width = svgLength(tag, "width") ?: return null
+    val height = svgLength(tag, "height") ?: return null
+    return width to height
+}
+
+/** The first bytes of a markdown picture's source as text, enough for an SVG's root element: a `data:` URL's own, a web picture's from the loader's disk cache. */
+internal suspend fun markdownPictureHead(loader: ImageLoader, url: String): String? = withContext(Dispatchers.IO) {
+    val head: ByteArray? = when {
+        url.startsWith("data:", ignoreCase = true) -> dataUrlBytes(url)?.let { it.copyOf(minOf(it.size, HEAD_BYTES.toInt())) }
+        isRemoteImageUrl(url) -> loader.diskCache?.let { disk ->
+            runCatching {
+                disk.openSnapshot(url)?.use { snapshot ->
+                    disk.fileSystem.read(snapshot.data) {
+                        val buffer = Buffer()
+                        while (buffer.size < HEAD_BYTES && read(buffer, HEAD_BYTES - buffer.size) != -1L) Unit
+                        buffer.readByteArray()
+                    }
+                }
+            }.getOrNull()
+        }
+        else -> null
+    }
+    head?.decodeToString()
+}
+
+private const val HEAD_BYTES = 4096L
 
 /** Whether a tap opens the picture: one from the web or carried in a `data:` URL, whose bytes the viewer can have. */
 internal fun markdownPictureOpens(url: String): Boolean = isRemoteImageUrl(url) || url.startsWith("data:image/", ignoreCase = true)

@@ -30,7 +30,9 @@ import com.slopus.happy.ui.components.MarkdownPicture
 import com.slopus.happy.ui.components.RemoteImage
 import com.slopus.happy.ui.components.dataUrlBytes
 import com.slopus.happy.ui.components.markdownImageBox
+import com.slopus.happy.ui.components.markdownImageRadius
 import com.slopus.happy.ui.components.markdownPictureOpens
+import com.slopus.happy.ui.components.svgSize
 import com.slopus.happy.ui.conversation.PictureViewerTags
 import com.slopus.happy.ui.components.RemoteImageState
 import com.slopus.happy.ui.components.RemoteImageTags
@@ -225,6 +227,22 @@ class RemoteImageLayoutTest {
         box(64f to 32f, markdownImageBox(411f, MarkdownPicture(64, 32, whole = true)))
         box(411f to 822f, markdownImageBox(411f, MarkdownPicture(500, 1000, whole = true)))
         box(411f to 411f * 270 / 1079, markdownImageBox(411f, MarkdownPicture(1079, 270, whole = false)))
+    }
+
+    @Test
+    fun anSvgsOwnSize() {
+        assertEquals(90f to 20f, svgSize("""<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="90" height="20" role="img">"""))
+        assertEquals(120f to 40.5f, svgSize("<svg viewBox='0 0 10 10' height=\"40.5px\" width='120'>"))
+        // A percentage, another unit, a missing side, a stroke width and anything not SVG give nothing.
+        listOf("<svg width=\"100%\" height=\"20\">", "<svg width=\"2em\" height=\"1em\">", "<svg width=\"90\">", "<svg stroke-width=\"3\" height=\"9\">", "\u0089PNG\r\n")
+            .forEach { assertEquals(it, null, svgSize(it)) }
+    }
+
+    @Test
+    fun aPicturesCornersFollowItsSize() {
+        assertEquals(12f, markdownImageRadius(411f, 300f).value, 0.01f)
+        assertEquals(6f, markdownImageRadius(24f, 24f).value, 0.01f)
+        assertEquals(5f, markdownImageRadius(90f, 20f).value, 0.01f)
     }
 
     private fun pictureWidth() = rule.node(MarkdownImageTags.PICTURE).getUnclippedBoundsInRoot().let { it.right - it.left }
