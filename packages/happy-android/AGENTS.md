@@ -2401,6 +2401,19 @@ the diagram full screen and zoomable (`WebViewScreen`). Where there is no WebVie
 MarkdownView's code block shows instead; layout tests see the code block
 unless they provide `true`.
 
+### Math
+
+Display math (`$$…$$` or `\[…\]` on lines of its own) is a `MarkdownBlock.Math`
+that `ui/components/MathView.kt` draws with KaTeX 0.16 from jsdelivr in a
+see-through WebView, its height posted the way a diagram's is and kept in
+`PageHeights`; without a WebView it is a "latex" code block
+(`LocalMathWebView`). Math inside a sentence (`$…$`, `\(…\)`; prices such as
+"$5 and $10" stay text) is not typeset: `chat/markdown/TexText.kt` turns
+simple TeX into Unicode symbols (Greek letters, relations, super- and
+subscripts, `\frac`, `\sqrt`), drawn as a `SpanStyle.Math` span in the italic
+serif, and math with anything it can't write (an environment, a superscript
+Unicode lacks, an unknown command) shows as written.
+
 ## Happy Protocol V2
 
 A Happy Agent connected straight to the phone (an agent connection;
