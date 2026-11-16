@@ -10,6 +10,7 @@
     <string name="conversation_empty">まだメッセージはありません。</string>
     <string name="conversation_read_only">この会話は別のエージェントが進めているため、メッセージを送れません。</string>
     <string name="conversation_archived">この会話はアーカイブされています。</string>
+    <string name="conversation_archived_send">この会話はアーカイブされています。メッセージを送ると元に戻ります。</string>
     <string name="conversation_activity_awaiting_answer">回答を待っています</string>
     <string name="conversation_activity_waiting_for_model">モデルを待っています…</string>
     <string name="conversation_activity_thinking">思考中…</string>

@@ -581,6 +581,22 @@ class AgentSession internal constructor(
      */
     suspend fun unarchive(agentId: String): Intent = intents.enqueue(Intent.UNARCHIVE, agentId, of("agent"))
 
+    /**
+     * [unarchive] while a message waits on it ([com.slopus.happy.conversation.Conversation]):
+     * Happy Agent takes no message into an archived chat. Tried at once, and
+     * one that can't go yet goes when the link is back; this answers when the
+     * computer has. Null once the chat is back; otherwise the agent's own
+     * words for the refusal, empty where it gave none.
+     */
+    suspend fun restore(agentId: String): String? {
+        // An unarchive already on its way is the one waited on, not a second.
+        val pending = intents.pending.value.firstOrNull { it.kind == Intent.UNARCHIVE && it.target == agentId }
+        val (id, first) = pending?.let { it.id to intents.attempt(it.id) }
+            ?: intents.enqueueAndAttempt(Intent.UNARCHIVE, agentId, of("agent")).let { it.intent.id to it.verdict }
+        val verdict = if (first == IntentOutbox.Verdict.Waiting) intents.verdict(id) else first
+        return (verdict as? IntentOutbox.Verdict.Refused)?.reason
+    }
+
     /** Leaves a task or Surface (`kind`): out of this person's list at once. */
     suspend fun leave(kind: String, id: String): Intent = intents.enqueue(Intent.LEAVE, id, of(kind))
 

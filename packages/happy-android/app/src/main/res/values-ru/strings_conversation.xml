@@ -10,6 +10,7 @@
     <string name="conversation_empty">Пока нет сообщений.</string>
     <string name="conversation_read_only">Этим разговором управляет другой агент, и он не принимает сообщения.</string>
     <string name="conversation_archived">Этот разговор в архиве.</string>
+    <string name="conversation_archived_send">Этот разговор в архиве. Отправка сообщения вернёт его.</string>
     <string name="conversation_activity_awaiting_answer">Ожидает вашего ответа</string>
     <string name="conversation_activity_waiting_for_model">Ожидание модели…</string>
     <string name="conversation_activity_thinking">Думает…</string>
