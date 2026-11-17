@@ -372,7 +372,7 @@ internal class ConversationHolder(
         val unsent = if (route.agentId == null && folder == null && saved.get<String>(TASK) == null) session.unsentWork?.also { session.unsentWork = null } else null
         task = if (route.agentId != null) null else NewTask(
             saved.get<String>(TASK) ?: (unsent?.task?.taskId ?: ConversationApi.clientId()).also { saved[TASK] = it },
-            saved.get<String>(WORKSPACE) ?: (unsent?.task?.workspaceId ?: ConversationApi.clientId()).also { saved[WORKSPACE] = it },
+            saved.createdWorkspaceId(route.workspaceId, unsent?.task?.workspaceId),
             saved.get<String>(AGENT) ?: (unsent?.task?.agentId ?: ConversationApi.clientId()).also { saved[AGENT] = it },
             saved.get<String>(MUTATION) ?: (unsent?.task?.mutationId ?: ConversationApi.clientId()).also { saved[MUTATION] = it },
         )
@@ -427,7 +427,6 @@ internal class ConversationHolder(
 
     private companion object {
         const val TASK = "taskId"
-        const val WORKSPACE = "workspaceId"
         const val AGENT = "agentId"
         const val MUTATION = "mutationId"
         const val CREATED = "created"
@@ -435,6 +434,15 @@ internal class ConversationHolder(
         const val NAME = "name"
     }
 }
+
+/**
+ * New work's workspace id, kept separately from the route's parent `workspaceId`.
+ * Older entries kept it under that key too: retain a generated id, never the
+ * parent's id that Navigation put there before the holder was made.
+ */
+internal fun SavedStateHandle.createdWorkspaceId(parentId: String?, unsentId: String?): String =
+    (get<String>("createdWorkspaceId") ?: get<String>("workspaceId")?.takeUnless { it == parentId }
+        ?: unsentId ?: ConversationApi.clientId()).also { this["createdWorkspaceId"] = it }
 
 /**
  * A route's prefill the first time this back stack entry asks for it, and
