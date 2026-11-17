@@ -12,6 +12,7 @@ import androidx.navigation.toRoute
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.slopus.happy.agent.AgentEvent
 import com.slopus.happy.conversation.ConversationSignal
+import com.slopus.happy.conversation.WorkFolder
 import com.slopus.happy.ui.PHONE
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
@@ -20,6 +21,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -126,6 +128,33 @@ class ConversationNavigationTest {
         assertNull(SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) }).takePrefill(prefix))
         // A route with no prefill never asks for one.
         assertNull(SavedStateHandle().takePrefill(null))
+    }
+
+    @Test fun `a new workspace has its own id beside the parent's route argument, kept after recreation`() {
+        host()
+        rule.runOnIdle { nav.composeConversation("c1", folder = WorkFolder("p1", "demo", newWorkspace = true)) }
+        rule.runOnIdle {
+            val saved = nav.currentBackStackEntry!!.savedStateHandle
+            assertEquals("p1", saved.get<String>("workspaceId"))
+            val id = saved.createdWorkspaceId("p1", null)
+            assertNotEquals("p1", id)
+            val restored = SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) })
+            assertEquals(id, restored.createdWorkspaceId("p1", "another-unsent-id"))
+            assertEquals("p1", restored.get<String>("workspaceId"))
+        }
+    }
+
+    @Test fun `a legacy generated workspace id survives recreation for new tasks`() {
+        val saved = SavedStateHandle(mapOf("workspaceId" to "legacy-workspace"))
+        assertEquals("legacy-workspace", saved.createdWorkspaceId(null, "unsent-workspace"))
+        val restored = SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) })
+        assertEquals("legacy-workspace", restored.createdWorkspaceId(null, null))
+    }
+
+    @Test fun `new workspace ids take precedence while unsent work keeps its own id`() {
+        val saved = SavedStateHandle(mapOf("createdWorkspaceId" to "created", "workspaceId" to "legacy"))
+        assertEquals("created", saved.createdWorkspaceId("p1", "unsent"))
+        assertEquals("unsent", SavedStateHandle().createdWorkspaceId(null, "unsent"))
     }
 
     @Test fun `a chat hears its own events and a resync on every connect`() = runBlocking {
