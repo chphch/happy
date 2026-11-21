@@ -47,17 +47,19 @@ class SideQuestionCommandTest {
 
     private val compact = SlashCommand("compact", false, "Summarize older messages to free context space.", SlashCommand.COMPACTION)
 
-    private fun show(state: ConversationState = SideQuestionFixtures.conversation(commands = listOf(compact)), served: Boolean = true) {
+    private fun show(state: ConversationState = SideQuestionFixtures.conversation(commands = listOf(compact)), served: Boolean = true, resumable: Boolean = false) {
         rule.setHappyContent {
             ProvideWindowLayout {
                 ConversationScreen(
                     state,
                     ConversationScreenActions(
                         onDraftChange = { drafts += it },
+                        // In the app, a message's way: Conversation.send, which brings an archived chat back first.
                         onSend = { words, _ -> sent += words; true },
                         onCommand = { name, _ -> ran += name; true },
                         sideQuestions = SideQuestionActions(served = { served }, onAsk = { asked += it }),
                     ),
+                    resumable = resumable,
                 )
             }
         }
@@ -115,6 +117,21 @@ class SideQuestionCommandTest {
         send("/btw which file?")
         assertEquals(listOf("/btw which file?"), sent)
         assertTrue(asked.isEmpty())
+    }
+
+    @Test fun `in an archived chat btw asks and leaves it archived, while a message still brings it back`() {
+        val chat = SideQuestionFixtures.conversation(commands = listOf(compact))
+        show(chat.copy(agent = chat.agent!!.copy(archivedAt = 1_755_500_000_000)), resumable = true)
+        rule.node(ConversationScreenTags.ARCHIVED).assertExists()
+        send("/btw which file handles the retries?")
+        assertEquals(listOf("which file handles the retries?"), asked)
+        assertTrue("never the message's way, which restores the chat", sent.isEmpty())
+        send("/btw")
+        rule.node(SideQuestionTags.USAGE).assertExists()
+        assertTrue(sent.isEmpty())
+        send("Keep going")
+        assertEquals(listOf("Keep going"), sent)
+        assertEquals(1, asked.size)
     }
 
     @Test fun `a new chat has nothing to ask about, and its btw is its first message`() {

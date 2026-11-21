@@ -250,8 +250,11 @@ class ConversationScreenActions(
  * a submitted `/btw <question>` is never a message: it asks [sideThread]
  * in [SideQuestionPanel], over the top of the transcript under the bar. A
  * bare `/btw` only says how to use it, in [SideQuestionUsage] over the
- * composer, until the composer is edited again. Elsewhere `/btw` is what
- * it would be without them.
+ * composer, until the composer is edited again. Either is taken before
+ * [ConversationScreenActions.onSend], so in an archived chat a message
+ * brings back ([resumable]) a side question leaves it archived, as the
+ * agent answers it there. Elsewhere `/btw` is what it would be without
+ * them.
  */
 @Composable
 fun ConversationScreen(
@@ -655,7 +658,8 @@ fun ConversationScreen(
                                 text = text,
                                 onTextChange = onComposerText,
                                 onSend = { words, attachments ->
-                                    // "/btw <question>" asks the side panel, and a bare "/btw" only says how: neither is ever a message.
+                                    // "/btw <question>" asks the side panel, and a bare "/btw" only says how: neither is ever a message,
+                                    // so neither takes the send's way that brings an archived chat back first.
                                     val side = actions.sideQuestions?.takeIf { attachments.isEmpty() && asksSideQuestions() }
                                     val asked = side?.let { SideQuestion.question(words) }
                                     if (side != null && asked != null) {

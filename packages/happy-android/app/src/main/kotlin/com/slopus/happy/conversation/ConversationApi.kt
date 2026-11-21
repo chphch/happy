@@ -366,9 +366,9 @@ open class ConversationApi(
      * Asks [agentId]'s harness a side question (API.md `POST
      * …/side-questions`, Claude Code's `/btw`), with the earlier exchanges of
      * the same thread as [history] when there are any. It waits up to 20 s:
-     * the answer, or that it is still answering. `409 harness_not_running`:
-     * nothing to answer from yet; `501 unsupported`: the agent's model
-     * answers none.
+     * the answer, or that it is still answering. An archived agent is asked
+     * too and stays archived. `409 harness_not_running`: nothing to answer
+     * from yet; `501 unsupported`: the agent's model answers none.
      */
     open suspend fun askSideQuestion(agentId: String, question: String, history: List<SideTurn> = emptyList()): SideReply {
         val body = buildJsonObject {
