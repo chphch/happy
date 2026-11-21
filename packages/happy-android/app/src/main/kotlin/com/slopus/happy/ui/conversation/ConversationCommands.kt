@@ -15,8 +15,9 @@ import com.slopus.happy.conversation.SlashCommands
  * them ([SlashCommands]): only while the whole draft is `/` and a word some
  * command begins, commands before skills. A picked command runs at once
  * ([run]); a skill instead becomes `/name ` in the draft, for what it is
- * asked to do, as desktop's palette has it (4078fd44). A new chat has no
- * [agentId] yet and offers the computer's skills.
+ * asked to do, as desktop's palette has it (4078fd44), and so does `/btw`
+ * where the chat offers it ([SlashCommand.isSideQuestion]), for its
+ * question. A new chat has no [agentId] yet and offers the computer's skills.
  *
  * Anywhere else, an `@` word at the cursor offers the team's [people]
  * ([searchPeople], [self] left out), as desktop's mention list does; a
@@ -40,7 +41,7 @@ class ConversationCommands(
     }
 
     override fun pick(suggestion: Suggestion): Boolean =
-        suggestion is Suggestion.AgentCommand && !suggestion.command.isSkill && run(suggestion.command)
+        suggestion is Suggestion.AgentCommand && !suggestion.command.isSkill && !suggestion.command.isSideQuestion && run(suggestion.command)
 
     override fun draft(suggestion: Suggestion): String? = (suggestion as? Suggestion.AgentCommand)?.let { "/${it.command.name} " }
 
