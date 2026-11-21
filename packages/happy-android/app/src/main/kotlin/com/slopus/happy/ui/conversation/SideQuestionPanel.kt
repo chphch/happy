@@ -38,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -144,7 +143,8 @@ object SideQuestionSpec {
     val askGlyph = 18.dp
     /** Ask's glyph sits on the field's one line: its 40 less the button's 36, halved. */
     val askBottom = 2.dp
-    const val ASK_DISABLED_ALPHA = 0.4f
+    /** Ask with nothing typed: textSecondary at this alpha, as the composer's send. */
+    const val ASK_DISABLED_ALPHA = 0.45f
     const val FADE_MILLIS = 200
 }
 
@@ -192,10 +192,11 @@ class SideQuestionActions(
  * 14 spinner, 8 before it), while it waits for the answer above, for no
  * answer, for a canned reply (which has no copy button) and for why there
  * is none; a failure reads "Couldn't get an answer: …" in textDestructive.
- * Under a hairline the follow-up field: 12 padding, a pill at least 40
- * high (radius 20, 14/10 in, 15/20, up to four lines, then it scrolls),
- * and 8 after it Ask, a 36 primary circle with an 18 arrow, 2 above the
- * row's foot, at 0.4 while nothing is typed.
+ * Under a hairline the follow-up field: 12 padding, a surfaceHighest pill
+ * at least 40 high (radius 20, 14/10 in, 15/20, up to four lines, then it
+ * scrolls), and 8 after it Ask, a 36 circle with an 18 arrow, 2 above the
+ * row's foot, in the composer send's colours: the text colour with the
+ * surface's arrow, textSecondary at 0.45 while nothing is typed.
  */
 @Composable
 internal fun SideQuestionPanel(
@@ -416,21 +417,22 @@ private fun FollowUp(draft: String, actions: SideQuestionActions) {
                 .testTag(SideQuestionTags.FIELD)
                 .heightIn(min = SideQuestionSpec.fieldMin)
                 .clip(RoundedCornerShape(SideQuestionSpec.fieldRadius))
-                .background(colors.input.background),
+                // The card's code blocks' ground: on surfaceHigh in both themes, where input's dark ground is the card's own.
+                .background(colors.surfaceHighest),
         )
+        // The composer's send, in its colours.
         Box(
             Modifier
                 .padding(bottom = SideQuestionSpec.askBottom)
                 .testTag(SideQuestionTags.ASK)
                 .size(SideQuestionSpec.ask)
-                .alpha(if (canAsk) 1f else SideQuestionSpec.ASK_DISABLED_ALPHA)
                 .clip(CircleShape)
-                .background(colors.button.primaryBackground)
+                .background(if (canAsk) colors.text else colors.textSecondary.copy(alpha = SideQuestionSpec.ASK_DISABLED_ALPHA))
                 .clickable(enabled = canAsk, role = Role.Button, onClickLabel = ask, onClick = actions.onAskDraft)
                 .semantics { contentDescription = ask },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Ionicon.ArrowUp, SideQuestionSpec.askGlyph, colors.button.primaryTint)
+            Icon(Ionicon.ArrowUp, SideQuestionSpec.askGlyph, colors.surface)
         }
     }
 }
