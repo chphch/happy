@@ -1590,6 +1590,63 @@ class AgentSessionTest {
     }
 
     @Test
+    fun anArchivedTaskComesBackThroughItsTaskAtItsVersionJoinedWhereThePersonIsNotIn(): Unit = runBlocking {
+        fun task(id: String, name: String, version: String, archived: Boolean) = Wire.task(id, name, Wire.agent("a$id"), version = version, archived = archived)
+        agent.bootstrap = Wire.bootstrap(
+            tasks = listOf(task("t1", "Fix login", "v3", true), task("t2", "Ship the launch", "v4", true), task("t3", "Audit the ledger", "v5", true)),
+            memberships = listOf(Wire.membership("t1", "1")),
+        )
+        // What the computer was asked, with the version each unarchive names.
+        val asked = java.util.concurrent.CopyOnWriteArrayList<Pair<String, String?>>()
+        fun answer(task: kotlinx.serialization.json.JsonObject, membership: kotlinx.serialization.json.JsonObject?) =
+            TransportResponse(200, body = buildJsonObject { put("task", task); membership?.let { put("membership", it) } }.toString().toByteArray())
+        val transport = { _: AgentConnectionCredentials ->
+            object : Transport by agent {
+                override suspend fun request(method: String, path: String, credential: String, body: ByteArray?, headers: Map<String, String>, category: RequestCategory): TransportResponse {
+                    agent.calls += "$method $path"
+                    return when {
+                        method == "GET" && path == "/v0/tasks/t1" -> answer(task("t1", "Fix login", "v3", true), Wire.membership("t1", "1"))
+                        method == "GET" && path == "/v0/tasks/t2" -> answer(task("t2", "Ship the launch", "v4", true), null)
+                        method == "GET" && path == "/v0/tasks/t3" -> answer(task("t3", "Audit the ledger", "v5", true), null)
+                        path.endsWith("/unarchive") || path.endsWith("/join") -> {
+                            asked += path to headers["If-Match"]
+                            when (path) {
+                                "/v0/tasks/t1/unarchive" -> answer(task("t1", "Fix login", "v6", false), Wire.membership("t1", "1"))
+                                "/v0/tasks/t2/unarchive" -> answer(task("t2", "Ship the launch", "v7", false), null)
+                                "/v0/tasks/t2/join" -> answer(task("t2", "Ship the launch", "v7", false), Wire.membership("t2", "0"))
+                                else -> TransportResponse(403, body = "{\"error\":\"Only the owner can unarchive this task.\",\"code\":\"forbidden\"}".toByteArray())
+                            }
+                        }
+                        else -> agent.request(method, path, credential, body, headers)
+                    }
+                }
+            }
+        }
+        val session = sessions(transport = transport).session(id)!!
+        agent.frames.send(Wire.hello("c0"))
+        eventually({ session.feed.value.archived.mapNotNull { it.taskId }.toSet() }) { it == setOf("t1", "t2", "t3") }
+
+        // Out of the archive and in the person's list at once, and still there once the computer has it back.
+        session.unarchiveTask("t1")
+        eventually({ session.feed.value }) { feed -> feed.archived.none { it.taskId == "t1" } && feed.conversations.map { it.agentId } == listOf("at1") }
+        eventually({ session.intents.pending.value }) { it.isEmpty() }
+        assertEquals(listOf("/v0/tasks/t1/unarchive" to "v3"), asked.toList())
+        assertEquals(listOf("at1"), session.feed.value.conversations.map { it.agentId })
+
+        // One the person is not in is joined as well, and comes to their list.
+        session.unarchiveTask("t2")
+        eventually({ session.intents.pending.value }) { it.isEmpty() }
+        assertEquals(listOf("/v0/tasks/t2/unarchive" to "v4", "/v0/tasks/t2/join" to null), asked.drop(1))
+        eventually({ session.feed.value.conversations.map { it.agentId } }) { it == listOf("at2", "at1") }
+
+        // Refused: back in the archive, with the computer's words on home's notice.
+        session.unarchiveTask("t3")
+        eventually({ session.notice.value }) { it == "Only the owner can unarchive this task." }
+        eventually({ session.feed.value.archived.map { it.taskId } }) { it == listOf("t3") }
+        assertEquals(listOf("at2", "at1"), session.feed.value.conversations.map { it.agentId })
+    }
+
+    @Test
     fun aNewProjectRegistersItsFolderWithHomeSpelledOutClonesARepositoryAndSaysWhyNot(): Unit = runBlocking {
         val home = Wire.project("ph", "Home", emptyList(), avatar = "home").with("compute", buildJsonObject { put("type", "host"); put("path", "/Users/me/") })
         agent.bootstrap = Wire.bootstrap(projects = listOf(home))

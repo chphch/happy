@@ -59,6 +59,7 @@
     <string name="agent_new_project_refused">Happy Agent 沒有新增它。</string>
     <string name="agent_new_project_unreachable">無法連線到 Happy Agent。請在它連線後再試一次。</string>
     <string name="agent_home_unarchive">取消封存</string>
+    <string name="agent_home_archived_task_place">任務</string>
     <string name="agent_home_archive_workspace">封存工作區</string>
     <string name="agent_home_archive_workspace_title">封存「%1$s」？</string>
     <string name="agent_home_archive_workspace_message">其中的聊天會一起封存，正在執行的工作會停止。它的資料夾會被刪除，封存後的工作區無法復原。</string>
