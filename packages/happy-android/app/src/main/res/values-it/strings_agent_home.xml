@@ -61,6 +61,7 @@
     <string name="agent_new_project_refused">Happy Agent non l\'ha aggiunto.</string>
     <string name="agent_new_project_unreachable">Impossibile raggiungere Happy Agent. Riprova quando è connesso.</string>
     <string name="agent_home_unarchive">Ripristina</string>
+    <string name="agent_home_archived_task_place">Attività</string>
     <string name="agent_home_archive_workspace">Archivia spazio</string>
     <string name="agent_home_archive_workspace_title">Archiviare «%1$s»?</string>
     <string name="agent_home_archive_workspace_message">Anche le sue chat vengono archiviate e ciò che è in esecuzione si ferma. La sua cartella viene eliminata e uno spazio archiviato non si può ripristinare.</string>

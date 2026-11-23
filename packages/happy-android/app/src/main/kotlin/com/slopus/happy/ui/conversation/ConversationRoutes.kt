@@ -541,8 +541,9 @@ private fun ConversationEntry(graph: AppGraph, nav: NavHostController, route: Co
     val self by remember(session) { session.catalog.map { it.userId }.distinctUntilChanged() }.collectAsStateWithLifecycle(session.catalog.value.userId)
     // A project's archived chat, as home's archive lists it ([com.slopus.happy.agent.AgentFeed.archived]), takes a
     // message like any other: the message brings it back first ([Conversation]'s `restore`, [AgentSession.restore]).
+    // An archived task in that archive stays read-only: it comes back through its task, from home's archive.
     val resumable by remember(session, conversation.agentId) {
-        session.feed.map { feed -> feed.archived.any { it.agentId == conversation.agentId } }.distinctUntilChanged()
+        session.feed.map { feed -> feed.archived.any { it.agentId == conversation.agentId && it.taskId == null } }.distinctUntilChanged()
     }.collectAsStateWithLifecycle(false)
     // The chat's /btw thread, which the connection keeps: shown again, answered meanwhile, on the way back.
     val sideThread by remember(session, conversation.agentId) { session.sideQuestions.thread(conversation.agentId) }

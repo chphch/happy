@@ -185,7 +185,9 @@ class AgentHomeActions(
     val onArchiveWorkspace: (suspend (AgentFeedRow.Folder) -> Unit)? = null,
     /**
      * Brings an archived chat back to its project
-     * ([com.slopus.happy.agent.AgentSession.unarchive]): it leaves the
+     * ([com.slopus.happy.agent.AgentSession.unarchive]), or an archived
+     * task back to the person's list
+     * ([com.slopus.happy.agent.AgentSession.unarchiveTask]): it leaves the
      * archive at once and comes back if the computer refuses. Null offers no Unarchive.
      */
     val onUnarchive: (suspend (AgentFeedRow.Archived) -> Unit)? = null,
@@ -1137,8 +1139,8 @@ private fun SignedInAgentHome(
             onArchive = if (canCompose) { row -> row.archive?.let { session.archive(it.kind, it.id) } } else null,
             // A workspace too, after its confirm (desktop archives one from its sidebar row).
             onArchiveWorkspace = if (canCompose) { row -> row.archive?.let { session.archive(it.kind, it.id) } } else null,
-            // And bring it back, as desktop's Chats menu does.
-            onUnarchive = if (canCompose) { row -> session.unarchive(row.agentId) } else null,
+            // And bring it back, as desktop's Chats menu does, or a task as desktop's Tasks heading does.
+            onUnarchive = if (canCompose) { row -> row.taskId?.let { session.unarchiveTask(it) } ?: session.unarchive(row.agentId) } else null,
             onSignIn = { graph.agentConnections.accounts.value.firstOrNull { it.id == id }?.server?.let(onSignIn) },
             onVoice = voice.takeIf { canCompose },
             onOpenVaultItem = onOpenVaultItem,
