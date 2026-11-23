@@ -193,6 +193,42 @@ class AgentFeedTest {
         assertTrue(AgentFeed.derive(next).conversations.any { it.agentId == "ap1" })
     }
 
+    /** The [archive], with a live task the person is in and archived ones, one only its owner may bring back. */
+    private val archivedTasks = archive.with(
+        "tasks",
+        JsonArray(listOf(
+            Wire.task("t1", "Fix login", Wire.agent("at1")),
+            Wire.task("t2", "Ship the launch", Wire.agent("at2"), archived = true).with("archivedAt", 40L),
+            Wire.task("t3", "Audit the ledger", Wire.agent("at3"), archived = true).with("canArchive", false),
+            Wire.task("t4", "Write the post", Wire.agent("at4"), archived = true).with("archivedAt", 15L),
+        )),
+    )
+
+    private fun taskRows(feed: AgentFeed) = feed.conversations.filter { it.kind == ConversationKind.Task }.map { it.agentId }
+
+    @Test
+    fun theArchiveListsTheArchivedTasksThePersonMayBringBackAmongTheChatsNewestFirst() {
+        val feed = AgentFeed.derive(catalog(archivedTasks))
+        assertEquals(listOf("at2", "new", "untitled", "at4", "old"), feed.archived.map { it.agentId })
+        // Under its name, with its task, and no place: the row says Tasks.
+        assertEquals(AgentFeedRow.Archived("at2", "Ship the launch", "", taskId = "t2"), feed.archived.first())
+        assertEquals(listOf("at1"), taskRows(feed))
+        // Kept when the projects are hidden, which takes their chats away.
+        val hidden = catalog(archivedTasks.with("userSettings", JsonArray(listOf(Wire.projectsHidden(true, "v2")))))
+        assertEquals(listOf("at2", "at4"), AgentFeed.derive(hidden).archived.map { it.agentId })
+    }
+
+    @Test
+    fun aTaskBroughtBackLeavesTheArchiveAndStandsInThePersonsListAtOnce() {
+        val joined = archivedTasks.with("taskMemberships", JsonArray(listOf(Wire.membership("t2", "0"), Wire.membership("t1", "1"))))
+        val catalog = catalog(joined)
+        assertEquals(listOf("at1"), taskRows(AgentFeed.derive(catalog)))
+
+        val back = AgentFeed.derive(catalog, intents = IntentOverlay(restored = setOf("t2")))
+        assertTrue(back.archived.none { it.taskId == "t2" })
+        assertEquals(listOf("at2", "at1"), taskRows(back))
+    }
+
     @Test
     fun aServerWithPipelinesListsThemUnderPlugins() {
         val places = { plugins: Boolean, pipelines: Boolean -> AgentFeed.derive(catalog(sample), plugins = plugins, pipelines = pipelines).rows.map { it.key }.take(5) }

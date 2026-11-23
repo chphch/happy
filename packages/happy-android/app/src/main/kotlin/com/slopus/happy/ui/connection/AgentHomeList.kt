@@ -144,9 +144,9 @@ object AgentHomeTags {
     const val ROW_NEW_SESSION = "agentHome.rowNewSession"
     /** A project's Workspace button: a new workspace of the project, and a new session in it. */
     const val ROW_NEW_WORKSPACE = "agentHome.rowNewWorkspace"
-    /** An archived chat's second line: where it was. */
+    /** An archived chat's second line: where it was, Tasks for a task. */
     const val ROW_PLACE = "agentHome.rowPlace"
-    /** Show archived / Hide archived, under the last card where the projects have an archive. */
+    /** Show archived / Hide archived, under the last card where home has an archive. */
     const val ARCHIVE_TOGGLE = HomeTags.ARCHIVE_TOGGLE
     /** A Surface row's held menu: Leave. */
     const val LEAVE = "agentHome.leave"
@@ -388,9 +388,10 @@ sealed interface AgentHomeItem {
  * The feed's rows, each knowing where it stands in its section's card. With
  * [newProject] the projects card ends with New project
  * ([AgentFeedRow.NewProject]); a home whose projects are hidden has no such
- * card, and so no New project either. Where the projects have an archive
- * ([AgentFeed.archived]), its toggle follows the last card, and while
- * [archiveShown] the archive is one card under it, as the Happy CLI home's.
+ * card, and so no New project either. Where home has an archive
+ * ([AgentFeed.archived]: the projects' archived chats and the archived
+ * tasks), its toggle follows the last card, and while [archiveShown] the
+ * archive is one card under it, as the Happy CLI home's.
  */
 fun agentHomeItems(feed: AgentFeed, newProject: Boolean = false, archiveShown: Boolean = false): List<AgentHomeItem> {
     val out = ArrayList<AgentHomeItem>(feed.rows.size + 1)
@@ -704,7 +705,8 @@ private fun ConversationRow(row: AgentFeedRow.Conversation, onOpen: (String) -> 
  * over where it was, 13/18 secondary ([AgentFeedRow.Archived.place]), both
  * at [AgentHomeSpec.ARCHIVED_ALPHA] as the Happy CLI home's archived rows,
  * from the card's 16 with no mark. No dot, no time. The whole row opens
- * it, read-only.
+ * it, read-only. An archived task's second line is Tasks, the list it
+ * comes back to.
  */
 @Composable
 private fun ArchivedRow(row: AgentFeedRow.Archived, onOpen: (String) -> Unit) {
@@ -729,7 +731,7 @@ private fun ArchivedRow(row: AgentFeedRow.Archived, onOpen: (String) -> Unit) {
             modifier = Modifier.testTag(AgentHomeTags.ROW_TITLE),
         )
         Text(
-            row.place,
+            if (row.taskId != null) stringResource(R.string.agent_home_archived_task_place) else row.place,
             style = AgentHomeSpec.detail,
             color = colors.textSecondary,
             maxLines = 1,

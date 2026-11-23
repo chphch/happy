@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.longOrNull
 
 /** One row of an agent connection's home. [key] is stable for the row's whole life. */
 @Immutable
@@ -137,8 +138,11 @@ sealed interface AgentFeedRow {
      * its title, or null before it had one, and where it was, as desktop's
      * `groupMeta` says it ([place]: the project, and the worktree after a
      * slash). It opens read-only, as an archived chat takes no messages.
+     * An archived task is one too, its conversation ([agentId]) under the
+     * task's name, with its [taskId]: it comes back through its task, and
+     * its [place] is empty, the row saying Tasks in its stead.
      */
-    data class Archived(val agentId: String, val title: String?, val place: String) : AgentFeedRow {
+    data class Archived(val agentId: String, val title: String?, val place: String, val taskId: String? = null) : AgentFeedRow {
         override val key get() = "archived-$agentId"
     }
 }
@@ -192,8 +196,9 @@ enum class AgentFeedSection(val key: String) { Places("places"), Bots("bots"), T
 
 /**
  * What home shows for an agent connection. [loaded] is false until a
- * snapshot (cached or read) is in. [archived] is the projects' archive,
- * apart from [rows], so search and the chime never count it.
+ * snapshot (cached or read) is in. [archived] is home's archive, the
+ * projects' archived chats and the archived tasks, apart from [rows], so
+ * search and the chime never count it.
  */
 @Immutable
 data class AgentFeed(
@@ -228,12 +233,15 @@ data class AgentFeed(
          * phone has on its way ([intents]) shows already: a chat read has
          * no dot, a task, bot, subtask or Surface archived or left is gone,
          * a task or bot renamed wears its new name, a chat brought back from
-         * the archive stands in its project at its own order key.
+         * the archive stands in its project at its own order key, and a task
+         * brought back stands in the person's list again.
          *
-         * Apart from the rows, the projects' archive ([AgentFeed.archived]):
-         * their top-level chats archived on the computer or here, newest
-         * first and at most [ARCHIVED_LIMIT], one archived here before the
-         * computer dated it the newest of all. Left out with the projects.
+         * Apart from the rows, home's archive ([AgentFeed.archived]): the
+         * projects' top-level chats archived on the computer or here, at
+         * most [ARCHIVED_LIMIT] of them and left out with the projects, and
+         * the archived tasks the person may bring back (desktop's Tasks
+         * heading), all newest first, one archived here before the computer
+         * dated it the newest of all.
          */
         fun derive(
             catalog: AgentCatalog,
@@ -319,8 +327,10 @@ data class AgentFeed(
             }
 
             val bots = catalog.bots.values.filter(::active).sortedWith(byOrderKey)
+            // One brought back from the archive here is in the list again before the computer says so.
+            fun listed(task: JsonObject) = active(task) || task.string("id") in intents.restored
             val tasks = catalog.memberships.values.sortedWith(byOrderKey)
-                .mapNotNull { membership -> membership.string("taskId")?.let(catalog.tasks::get)?.takeIf(::active) }
+                .mapNotNull { membership -> membership.string("taskId")?.let(catalog.tasks::get)?.takeIf(::listed) }
             // The worktrees bots' and tasks' subtasks work in: listed under those subtasks, not again under their project.
             val owned = HashSet<String>()
             fun collect(agentId: String) {
@@ -433,7 +443,8 @@ data class AgentFeed(
                     folderActivity(projectAt)
                 }
             }
-            val archived = if (catalog.projectsHidden) emptyList() else {
+            // Each with when it was archived, so the chats and the tasks sort as one archive.
+            val archivedChats: List<Pair<Long, AgentFeedRow.Archived>> = if (catalog.projectsHidden) emptyList() else {
                 // Where each place's chats were: a project's name, a worktree's after its project's and a slash.
                 val places = HashMap<String, String>()
                 catalog.projects.values.filter(::active).forEach { project ->
@@ -456,9 +467,21 @@ data class AgentFeed(
                     .filter { it.parentAgentId == null && !it.subtask && it.visible }
                     .sortedWith(compareByDescending<WireAgent> { it.archivedAt ?: Long.MAX_VALUE }.thenBy { it.id })
                     .take(ARCHIVED_LIMIT)
-                    .map { AgentFeedRow.Archived(it.id, it.title?.takeIf(String::isNotBlank), places.getValue(it.workspaceId)) }
+                    .map { (it.archivedAt ?: Long.MAX_VALUE) to AgentFeedRow.Archived(it.id, it.title?.takeIf(String::isNotBlank), places.getValue(it.workspaceId)) }
                     .toList()
             }
+            // The archived tasks the person may bring back, as desktop's Tasks heading lists them: in their list or not,
+            // and whether the projects are hidden or not.
+            val archivedTasks = catalog.tasks.values.mapNotNull { task ->
+                val id = task.string("id")?.takeUnless { listed(task) } ?: return@mapNotNull null
+                if ((task["canArchive"] as? JsonPrimitive)?.booleanOrNull == false) return@mapNotNull null
+                val agentId = (task["agent"] as? JsonObject)?.string("id") ?: return@mapNotNull null
+                val name = (intents.titles[id] ?: task.string("name"))?.takeIf(String::isNotBlank)
+                ((task["archivedAt"] as? JsonPrimitive)?.longOrNull ?: Long.MAX_VALUE) to AgentFeedRow.Archived(agentId, name, "", taskId = id)
+            }
+            val archived = (archivedChats + archivedTasks)
+                .sortedWith(compareByDescending<Pair<Long, AgentFeedRow.Archived>> { it.first }.thenBy { it.second.agentId })
+                .map { it.second }
             return AgentFeed(loaded = true, rows = rows, archived = archived)
         }
 

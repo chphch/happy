@@ -379,6 +379,33 @@ class AgentHomeLayoutTest {
     }
 
     @Test
+    fun anArchivedTaskStandsInTheArchiveSayingTasksAndComesBackAsATask() {
+        val unarchived = mutableListOf<AgentFeedRow.Archived>()
+        val acting = AgentHomeActions(
+            onOpenConversation = { opened += it }, onCompose = {}, onSettings = {}, onSettingsRow = {}, onSwitchAccount = {}, onAdd = {},
+            onUnarchive = { unarchived += it },
+        )
+        val archivedTask = Wire.task("t9", "Ship the launch", Wire.agent("at9"), archived = true).with("archivedAt", NOW - 3_600_000)
+        val home = feed(sample.with("tasks", JsonArray((sample["tasks"] as JsonArray) + archivedTask)))
+        rule.setHappyContent { AgentHomeScreen("Studio", home, AgentLinkStatus.Connected, accounts, acting, archiveShown = true, onArchiveShown = {}) }
+        val rowTag = AgentHomeTags.row("archived-at9")
+        rule.onNode(hasTestTag(AgentHomeTags.LIST)).performScrollToNode(hasTestTag(rowTag))
+        val row = rule.node(rowTag)
+        val inRow = hasAnyAncestor(hasTestTag(rowTag))
+        // A chat's two lines, the second the list it comes back to.
+        assertDp("a title and its place: 13 + 22 + 18 + 13", 66, row.bounds.height)
+        rule.onNode(hasTestTag(AgentHomeTags.ROW_TITLE) and inRow and hasText("Ship the launch"), useUnmergedTree = true).assertExists()
+        rule.onNode(hasTestTag(AgentHomeTags.ROW_PLACE) and inRow and hasText("Tasks"), useUnmergedTree = true).assertExists()
+
+        // Swiped left it uncovers Unarchive, which asks for the task back.
+        row.performTouchInput { swipeLeft(startX = right - (AgentHomeSpec.cardInset * 2).toPx(), endX = left + AgentHomeSpec.cardInset.toPx()) }
+        rule.waitForIdle()
+        rule.onNode(hasTestTag(FlatRowTags.ARCHIVE_ACTION) and inRow, useUnmergedTree = true).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("t9"), unarchived.map { it.taskId })
+    }
+
+    @Test
     fun aWorkspaceRowSwipesToArchiveWorkspaceWhichAsksFirstAndAProjectRowHasNoSwipe() {
         val archived = mutableListOf<String>()
         val acting = AgentHomeActions(
