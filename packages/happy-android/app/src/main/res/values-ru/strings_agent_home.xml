@@ -62,6 +62,7 @@
     <string name="agent_new_project_refused">Happy Agent не добавил его.</string>
     <string name="agent_new_project_unreachable">Не удалось связаться с Happy Agent. Попробуйте снова, когда он подключится.</string>
     <string name="agent_home_unarchive">Разархивировать</string>
+    <string name="agent_home_archived_task_place">Задачи</string>
     <string name="agent_home_archive_workspace">Архивировать пространство</string>
     <string name="agent_home_archive_workspace_title">Архивировать «%1$s»?</string>
     <string name="agent_home_archive_workspace_message">Его чаты тоже архивируются, а всё, что в нём выполняется, останавливается. Его папка удаляется, и архивированное пространство нельзя вернуть.</string>

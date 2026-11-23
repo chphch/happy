@@ -615,6 +615,14 @@ class AgentSession internal constructor(
     suspend fun unarchive(agentId: String): Intent = intents.enqueue(Intent.UNARCHIVE, agentId, of("agent"))
 
     /**
+     * Brings an archived task back for everyone (desktop's Tasks heading):
+     * it leaves home's archive and stands in the person's list again at
+     * once, and goes back only if the computer refuses. One the person is
+     * not in is joined as well, so it comes back to their list.
+     */
+    suspend fun unarchiveTask(taskId: String): Intent = intents.enqueue(Intent.UNARCHIVE, taskId, of("task"))
+
+    /**
      * [unarchive] while a message waits on it ([com.slopus.happy.conversation.Conversation]):
      * Happy Agent takes no message into an archived chat. Tried at once, and
      * one that can't go yet goes when the link is back; this answers when the
@@ -712,10 +720,14 @@ class AgentSession internal constructor(
                     "workspace" -> archiveAt("/v0/workspaces/$id", "workspace")
                     else -> archiveAt("/v0/tasks/$id", "task")
                 }
-                // Back in its project as the computer answered, before the owner's event lists it.
-                Intent.UNARCHIVE -> {
-                    val body = client.decode<JsonObject>("POST", "/v0/agents/$id/unarchive", mutation)
-                    (body["agent"] as? JsonObject)?.let { agent -> catalogLock.withLock { catalogState.update { it.withRestored(agent) } } }
+                Intent.UNARCHIVE -> when (intent.of) {
+                    // Through the task: its conversation's own unarchive is refused (API.md, "Tasks").
+                    "task" -> unarchiveTaskAt("/v0/tasks/$id", intent.id)
+                    // Back in its project as the computer answered, before the owner's event lists it.
+                    else -> {
+                        val body = client.decode<JsonObject>("POST", "/v0/agents/$id/unarchive", mutation)
+                        (body["agent"] as? JsonObject)?.let { agent -> catalogLock.withLock { catalogState.update { it.withRestored(agent) } } }
+                    }
                 }
                 Intent.RENAME -> {
                     val title = (intent.value["title"] as? JsonPrimitive)?.contentOrNull ?: return
@@ -744,6 +756,29 @@ class AgentSession internal constructor(
     private suspend fun archiveAt(path: String, key: String) {
         val version = versionOf(path, key)
         client.send("POST", "$path/archive", JsonObject(emptyMap()), headers = mapOf("If-Match" to version))
+    }
+
+    /**
+     * Unarchival names the version it unarchives (`If-Match`); one that lost
+     * a race reads the newer version and unarchives that. Its answer is the
+     * task with the person's membership, and a task they are not in is
+     * joined, so it is in their list again. Home lists it as answered,
+     * before the task's own events.
+     */
+    private suspend fun unarchiveTaskAt(path: String, mutationId: String) {
+        val mutation = buildJsonObject { put("mutationId", mutationId) }
+        val unarchived = (0..1).firstNotNullOf { attempt ->
+            try {
+                client.decode<JsonObject>("POST", "$path/unarchive", mutation, headers = mapOf("If-Match" to versionOf(path, "task")))
+            } catch (e: AgentApiException) {
+                if (e.status != 409 || attempt == 1) throw e
+                null
+            }
+        }
+        val answer = if (!unarchived["membership"].isNullish()) unarchived
+            else client.decode<JsonObject>("POST", "$path/join", buildJsonObject { put("mutationId", AgentClient.newId()) })
+        val task = answer["task"] as? JsonObject ?: return
+        catalogLock.withLock { catalogState.update { it.withTask(task, answer["membership"] as? JsonObject) } }
     }
 
     /** A rename names the version it renames (`If-Match`); one that lost a race reads the newer version and renames that. */
