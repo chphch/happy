@@ -1061,8 +1061,8 @@ fun AgentHomeList(
         modifier = modifier.fillMaxSize().background(HappyTheme.colors.surface).testTag(AgentHomeTags.LIST)
             .then(if (onReorder != null) drag.input() else Modifier),
         contentPadding = contentPadding,
-        // A carried row moves the list at its edges itself.
-        userScrollEnabled = !drag.dragging,
+        // A held row keeps the list still; carried, it moves the list at its edges itself.
+        userScrollEnabled = !drag.holding,
     ) {
         header?.invoke(this)
         agentHomeRows(

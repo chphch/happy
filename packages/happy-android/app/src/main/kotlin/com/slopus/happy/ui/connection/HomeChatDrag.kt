@@ -116,7 +116,7 @@ internal fun arrangedHomeItems(items: List<AgentHomeItem>, owner: String?, order
  * Geometry, swaps and the set-down follow [com.slopus.happy.ui.todos.TodoDrag].
  */
 @Stable
-internal class HomeChatDrag(
+class HomeChatDrag internal constructor(
     private val list: LazyListState,
     private val scope: CoroutineScope,
     private val view: View,
@@ -126,7 +126,7 @@ internal class HomeChatDrag(
     private data class Held(val key: String, val agentId: String, val owner: String, val top: Float, val height: Int, val offset: Float = 0f)
 
     /** Held, but not yet carried: the finger has not moved [LIFT] since the hold. */
-    private var armed: Held? = null
+    private var armed by mutableStateOf<Held?>(null)
     private var moved = Offset.Zero
     private var held by mutableStateOf<Held?>(null)
     private var dropping by mutableStateOf<String?>(null)
@@ -150,6 +150,13 @@ internal class HomeChatDrag(
         private set
     var scrolling by mutableStateOf(false)
         private set
+
+    /**
+     * A chat is held, carried or not yet: the list must not scroll under the
+     * finger, whose first few dp would otherwise start a scroll before the
+     * row lifts ([LIFT] is past the touch slop) and take the gesture.
+     */
+    val holding: Boolean get() = armed != null || dragging
 
     /** [items] as the list shows them now ([arrangedHomeItems]). */
     fun arrange(items: List<AgentHomeItem>): List<AgentHomeItem> = arrangedHomeItems(items, owner, order, held?.agentId)
