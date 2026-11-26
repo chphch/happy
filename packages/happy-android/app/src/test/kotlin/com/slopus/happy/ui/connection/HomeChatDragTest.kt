@@ -1,7 +1,11 @@
 package com.slopus.happy.ui.connection
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -115,6 +119,57 @@ class HomeChatDragTest {
         rule.waitForIdle()
         assertEquals(0, lifts)
         assertEquals(emptyList<Pair<String, String?>>(), moves)
+    }
+
+    @Test fun `at the bar the list scrolls only toward a place in the chat's own list`() {
+        val moves = mutableListOf<Pair<String, String?>>()
+        // Other projects above, so the list could scroll on up past this one.
+        val above = (1..8).flatMap { n -> card(folder("q$n"), chat("x$n", owner = "q$n")) }
+        lateinit var state: LazyListState
+        rule.setHappyContent {
+            state = rememberLazyListState(initialFirstVisibleItemIndex = above.size)
+            AgentHomeList(
+                above + card(folder("p1"), chat("a"), chat("b"), chat("c")), state, onOpen = {}, contentPadding = PaddingValues(top = 56.dp),
+                onHold = { _, _ -> }, onReorder = { row, afterId -> moves += row.agentId to afterId },
+            )
+        }
+        val c = rule.node(AgentHomeTags.row("agent-c"))
+        val list = rule.node(AgentHomeTags.LIST).fetchSemanticsNode().boundsInRoot
+        val row = c.fetchSemanticsNode().boundsInRoot
+        c.performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(700)
+        // Up under the bar and held there: every place in its list is in sight, so nothing scrolls.
+        c.performTouchInput { moveBy(Offset(0f, list.top + 20f - row.center.y)) }
+        rule.mainClock.advanceTimeBy(1_000)
+        rule.runOnIdle {
+            assertEquals(above.size, state.firstVisibleItemIndex)
+            assertEquals(0, state.firstVisibleItemScrollOffset)
+        }
+        c.performTouchInput { up() }
+        rule.waitUntil(5_000) { moves.isNotEmpty() }
+        assertEquals(listOf("c" to null), moves)
+    }
+
+    @Test fun `a chat that leaves the list while another is carried is no place to go after`() {
+        val moves = mutableListOf<Pair<String, String?>>()
+        var items by mutableStateOf(card(folder("p1"), chat("a"), chat("b"), chat("c"), chat("d")))
+        rule.setHappyContent {
+            AgentHomeList(
+                items, rememberLazyListState(), onOpen = {}, contentPadding = PaddingValues(),
+                onHold = { _, _ -> }, onReorder = { row, afterId -> moves += row.agentId to afterId },
+            )
+        }
+        val d = rule.node(AgentHomeTags.row("agent-d"))
+        d.performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(700)
+        // Carried up past c, after b ...
+        d.performTouchInput { moveBy(Offset(0f, -height * 1.2f)) }
+        // ... as b is archived on another device: it goes after a, the chat now before it.
+        rule.runOnIdle { items = card(folder("p1"), chat("a"), chat("c"), chat("d")) }
+        rule.waitForIdle()
+        d.performTouchInput { up() }
+        rule.waitUntil(5_000) { moves.isNotEmpty() }
+        assertEquals(listOf("d" to "a"), moves)
     }
 
     @Test fun `a screen reader moves a chat a place at a time`() {
