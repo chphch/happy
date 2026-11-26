@@ -44,6 +44,26 @@ class IntentOutboxTest {
         withTimeout(5_000) { while (!check(read())) delay(10) }
     }
 
+    /**
+     * A move is a step taken from the list the moves before it made, and a
+     * later move may be placed against an earlier one: none replaces
+     * another, a later move of the same chat included, and home replays
+     * them in the order they were made.
+     */
+    @Test
+    fun movesNeverReplaceOneAnotherAndHomeReplaysThemInOrder(): Unit = runBlocking {
+        val box = outbox()
+        fun move(after: String?) = buildJsonObject { put("kind", "agent"); put("owner", "p1"); put("afterId", after) }
+        box.enqueue(Intent.REORDER, "c", move(null))
+        box.enqueue(Intent.REORDER, "d", move("c"))
+        box.enqueue(Intent.REORDER, "c", move("b"))
+        assertEquals(listOf("c", "d", "c"), box.pending.value.map { it.target })
+        assertEquals(
+            listOf(IntentOverlay.Move("c", null, "p1"), IntentOverlay.Move("d", "c", "p1"), IntentOverlay.Move("c", "b", "p1")),
+            IntentOverlay.of(box.pending.value).moves,
+        )
+    }
+
     @Test
     fun aLaterIntentReplacesOneWaitingInItsSlotAndUnarchiveSharesArchives(): Unit = runBlocking {
         val box = outbox()
@@ -167,6 +187,38 @@ class IntentOutboxTest {
         box.kick()
         eventually({ box.pending.value }) { it.isEmpty() }
         assertEquals(listOf("b", "a"), sent.toList())
+    }
+
+    /**
+     * A move goes after the moves made before it in its list and after its
+     * chat's unarchive: while one of those waits out a failure the move waits
+     * with it, no failure counted, and goes right after it. A move in another
+     * list goes meanwhile.
+     */
+    @Test
+    fun aMoveWaitsUncountedForTheEarlierMovesOfItsListAndItsChatsUnarchive(): Unit = runBlocking {
+        val box = outbox()
+        val failing = java.util.concurrent.atomic.AtomicBoolean(true)
+        box.handle(setOf(Intent.REORDER, Intent.UNARCHIVE)) {
+            if (failing.get() && it.kind == Intent.UNARCHIVE) error("unreachable")
+            sent += "${it.kind} ${it.target}"
+        }
+        fun move(owner: String, after: String?) = buildJsonObject { put("kind", "agent"); put("owner", owner); put("afterId", after) }
+        box.setOnline(true)
+        val back = box.enqueue(Intent.UNARCHIVE, "r")
+        eventually({ box.pending.value.firstOrNull { it.id == back.id }?.attempts }) { it == 1 }
+        box.enqueue(Intent.REORDER, "r", move("p1", null))
+        box.enqueue(Intent.REORDER, "c", move("p1", "r"))
+        box.enqueue(Intent.REORDER, "x", move("p2", null))
+        eventually({ sent.toList() }) { it == listOf("reorder x") }
+        delay(100)
+        assertEquals(listOf("reorder x"), sent.toList())
+        assertEquals(listOf(0, 0), box.pending.value.filter { it.kind == Intent.REORDER }.map { it.attempts })
+        failing.set(false)
+        clock.addAndGet(1_000)
+        box.kick()
+        eventually({ box.pending.value }) { it.isEmpty() }
+        assertEquals(listOf("reorder x", "unarchive r", "reorder r", "reorder c"), sent.toList())
     }
 
     @Test
