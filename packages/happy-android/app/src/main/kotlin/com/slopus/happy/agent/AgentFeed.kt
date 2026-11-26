@@ -418,7 +418,10 @@ data class AgentFeed(
                         val back = intents.restored.mapNotNull { restored ->
                             catalog.agents[restored]?.takeIf { it.string("workspaceId") == ownerId && listed.none { l -> l.string("id") == restored } }
                         }
-                        back.fold(listed) { series, agent -> AgentCatalog.inOrder(series, agent) }.forEach { embedded ->
+                        val restoredHere = back.fold(listed) { series, agent -> AgentCatalog.inOrder(series, agent) }
+                        // A chat moved here stands where it was put until the computer has moved it.
+                        val ordered = intents.moves.filter { it.owner == ownerId }.fold(restoredHere, ::moved)
+                        ordered.forEach { embedded ->
                             val agentId = embedded.string("id") ?: return@forEach
                             // A workspace-bound subtask shows under the work that made it.
                             if (catalog.agents[agentId]?.get("subtask")?.toString() == "true") return@forEach
@@ -489,6 +492,19 @@ data class AgentFeed(
         const val ARCHIVED_LIMIT = 200
 
         private val byOrderKey = compareBy<JsonObject>({ it.string("orderKey") ?: "\uFFFF" }, { it.string("id") ?: it.string("taskId") })
+
+        /**
+         * An owner's [series] with [move]'s chat after its anchor, or first, as
+         * the computer will put it (`POST /v0/agents/:agentId/reorder`). The
+         * same move made twice changes nothing more; a move whose chat or
+         * anchor the list no longer holds leaves it as it is.
+         */
+        internal fun moved(series: List<JsonObject>, move: IntentOverlay.Move): List<JsonObject> {
+            val agent = series.firstOrNull { it.string("id") == move.agentId } ?: return series
+            val rest = series.filter { it !== agent }
+            val at = if (move.afterId == null) 0 else rest.indexOfFirst { it.string("id") == move.afterId }.takeIf { it >= 0 }?.plus(1) ?: return series
+            return rest.subList(0, at) + agent + rest.subList(at, rest.size)
+        }
 
         /** [next] with every row equal to one in [previous] kept as that instance, so Compose skips it. */
         fun reuse(previous: AgentFeed?, next: AgentFeed): AgentFeed {
