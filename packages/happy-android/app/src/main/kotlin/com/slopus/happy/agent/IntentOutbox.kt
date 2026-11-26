@@ -56,6 +56,18 @@ data class Intent(
      */
     val slot: String get() = if (kind == REORDER) "$kind|$target|$id" else "${slotOf(kind)}|$target"
 
+    /**
+     * Whether this goes only after [older], still kept: a move after the
+     * moves made before it in its list, each placed against the ones before
+     * it, and after its chat's unarchive, as the computer moves no archived
+     * chat. [IntentOutbox] holds it back meanwhile, no failure counted.
+     */
+    fun waitsFor(older: Intent): Boolean = kind == REORDER && older.createdAt < createdAt && when (older.kind) {
+        REORDER -> older.value["owner"] == value["owner"]
+        UNARCHIVE -> older.target == target
+        else -> false
+    }
+
     /** What [value] says it is about: `task`, `bot`, `agent` (a subtask) or `surface`. */
     val of: String? get() = (value["kind"] as? JsonPrimitive)?.contentOrNull
 
@@ -134,7 +146,8 @@ class FileIntentStorage(private val file: File) : IntentStorage {
  * they show ([IntentOverlay]), and sent oldest first while the connection
  * is up ([setOnline]), each by the deliverer [handle]d for its kind. A
  * transient failure waits 1, 2, 4 … 30 s ([backoff]) and lets the rest go
- * meanwhile; an [IntentRefusal] drops the intent and says so on
+ * meanwhile, save those that go only after it ([Intent.waitsFor]), which wait
+ * with it; an [IntentRefusal] drops the intent and says so on
  * [rejections]. An intent whose kind nothing handles yet waits.
  */
 class IntentOutbox(
@@ -293,7 +306,12 @@ class IntentOutbox(
                 // Going offline must stop new claims before that callback runs.
                 if (!online.value) return@withLock null
                 val handled = deliverers.value
-                val due = loaded().filter { it.kind in handled && synchronized(inFlight) { it.id !in inFlight } }
+                val kept = loaded()
+                // One that goes only after an older one still kept waits for it ([Intent.waitsFor]):
+                // that one's end wakes this runner, so it sets no time of its own.
+                val due = kept.filter { candidate ->
+                    candidate.kind in handled && synchronized(inFlight) { candidate.id !in inFlight } && kept.none(candidate::waitsFor)
+                }
                 val intent = due.firstOrNull { it.nextAttemptAt <= now() }
                 if (intent == null) {
                     at = due.minOfOrNull { it.nextAttemptAt }

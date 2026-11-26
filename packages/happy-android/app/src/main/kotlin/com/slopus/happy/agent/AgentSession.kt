@@ -748,15 +748,7 @@ class AgentSession internal constructor(
                 }
                 Intent.REORDER -> {
                     // Each move names the chat it goes after and takes the moves made before it as
-                    // done, so one never overtakes an older one in the same list that is waiting out
-                    // a failure: it waits its turn and goes again.
-                    val owner = (intent.value["owner"] as? JsonPrimitive)?.contentOrNull
-                    if (intents.pending.value.any { earlier ->
-                            earlier.kind == Intent.REORDER && earlier.id != intent.id &&
-                                earlier.createdAt < intent.createdAt &&
-                                (earlier.value["owner"] as? JsonPrimitive)?.contentOrNull == owner
-                        }
-                    ) throw IllegalStateException("An earlier move in this list is still on its way.")
+                    // done: the outbox sends none before them ([Intent.waitsFor]).
                     val afterId = (intent.value["afterId"] as? JsonPrimitive)?.contentOrNull
                     val body = client.decode<JsonObject>("POST", "/v0/agents/$id/reorder", buildJsonObject { put("afterId", afterId); put("mutationId", intent.id) })
                     // Where the computer put it, before the owner's event lists it again.

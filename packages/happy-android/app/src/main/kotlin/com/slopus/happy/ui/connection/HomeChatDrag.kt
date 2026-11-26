@@ -137,6 +137,13 @@ class HomeChatDrag internal constructor(
     private var armed by mutableStateOf<Held?>(null)
     private var moved = Offset.Zero
     private var held by mutableStateOf<Held?>(null)
+
+    /**
+     * The chat carried, its subtasks folded away ([arrange]): it changes as a
+     * row lifts and drops, where [held] changes with every move of the finger,
+     * which home's list must not compose again for.
+     */
+    private var carried by mutableStateOf<String?>(null)
     private var dropping by mutableStateOf<String?>(null)
     private var elevated by mutableStateOf<String?>(null)
     private val drop = Animatable(0f)
@@ -167,7 +174,7 @@ class HomeChatDrag internal constructor(
     val holding: Boolean get() = armed != null || dragging
 
     /** [items] as the list shows them now ([arrangedHomeItems]). */
-    fun arrange(items: List<AgentHomeItem>): List<AgentHomeItem> = arrangedHomeItems(items, owner, order, held?.agentId)
+    fun arrange(items: List<AgentHomeItem>): List<AgentHomeItem> = arrangedHomeItems(items, owner, order, carried)
 
     /** Whether [key]'s row is in hand or being set down, and so drawn apart from its place ([row]). */
     fun holds(key: String): Boolean = elevated == key
@@ -213,6 +220,7 @@ class HomeChatDrag internal constructor(
         owner = start.owner
         order = before
         held = start
+        carried = start.agentId
         dragging = true
         elevated = start.key
         dropping = null
@@ -237,20 +245,28 @@ class HomeChatDrag internal constructor(
 
     private fun scrollSpeed(): Float {
         val held = held ?: return 0f
+        val order = order ?: return 0f
         val edge = 56 * density
         val center = held.top + held.offset + held.height / 2f
         val viewport = list.layoutInfo
         // Under the glass bar the list is still drawn, but nothing there is a place to put a row.
         val top = maxOf(viewport.viewportStartOffset, 0)
+        val end = viewport.viewportEndOffset
+        // Only toward a place in the chat's own list not yet shown whole: past its list the
+        // list would scroll the chat's slot away, and the row in hand would go with it.
+        fun shown(agentId: String?) = viewport.visibleItemsInfo.firstOrNull { it.key == "agent-$agentId" }
+            ?.let { it.offset >= top && it.offset + it.size <= end } == true
         return when {
-            center < top + edge -> -((top + edge - center) / edge).coerceIn(0f, 1f)
-            center > viewport.viewportEndOffset - edge -> ((center - viewport.viewportEndOffset + edge) / edge).coerceIn(0f, 1f)
+            center < top + edge && !shown(order.firstOrNull()) -> -((top + edge - center) / edge).coerceIn(0f, 1f)
+            center > end - edge && !shown(order.lastOrNull()) -> ((center - end + edge) / edge).coerceIn(0f, 1f)
             else -> 0f
         }
     }
 
     suspend fun scroll() {
         val speed = scrollSpeed()
+        // Once the chat's list is shown whole the scrolling stops, till the finger moves again.
+        scrolling = speed != 0f
         if (speed != 0f) { list.scrollBy(speed * 12 * density); place() }
     }
 
@@ -258,15 +274,22 @@ class HomeChatDrag internal constructor(
         armed = null
         val held = held ?: return
         val offset = held.top + held.offset - (list.layoutInfo.visibleItemsInfo.firstOrNull { it.key == held.key }?.offset ?: held.top.toInt())
-        val final = order.takeIf { !cancelled && it != before }
+        // A chat that left the list while this one was carried (archived on another
+        // device) is no place to go after, and the feed will never list it again.
+        val listed = peers(held.owner).toSet()
+        val placed = order?.filter { it in listed }
+        val final = placed.takeIf { !cancelled && it != before.filter { id -> id in listed } }
         val chat = items.firstNotNullOfOrNull { movableChat(it)?.takeIf { chat -> chat.agentId == held.agentId } }
         this.held = null
+        carried = null
         dragging = false
         scrolling = false
         dropping = held.key
         if (final == null) {
             order = null
             owner = null
+        } else {
+            order = final
         }
         view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         dropJob = scope.launch {
