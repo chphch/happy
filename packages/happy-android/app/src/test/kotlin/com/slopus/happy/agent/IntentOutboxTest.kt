@@ -44,6 +44,26 @@ class IntentOutboxTest {
         withTimeout(5_000) { while (!check(read())) delay(10) }
     }
 
+    /**
+     * A move is a step taken from the list the moves before it made, and a
+     * later move may be placed against an earlier one: none replaces
+     * another, a later move of the same chat included, and home replays
+     * them in the order they were made.
+     */
+    @Test
+    fun movesNeverReplaceOneAnotherAndHomeReplaysThemInOrder(): Unit = runBlocking {
+        val box = outbox()
+        fun move(after: String?) = buildJsonObject { put("kind", "agent"); put("owner", "p1"); put("afterId", after) }
+        box.enqueue(Intent.REORDER, "c", move(null))
+        box.enqueue(Intent.REORDER, "d", move("c"))
+        box.enqueue(Intent.REORDER, "c", move("b"))
+        assertEquals(listOf("c", "d", "c"), box.pending.value.map { it.target })
+        assertEquals(
+            listOf(IntentOverlay.Move("c", null, "p1"), IntentOverlay.Move("d", "c", "p1"), IntentOverlay.Move("c", "b", "p1")),
+            IntentOverlay.of(box.pending.value).moves,
+        )
+    }
+
     @Test
     fun aLaterIntentReplacesOneWaitingInItsSlotAndUnarchiveSharesArchives(): Unit = runBlocking {
         val box = outbox()

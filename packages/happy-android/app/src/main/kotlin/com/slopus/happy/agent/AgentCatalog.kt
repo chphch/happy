@@ -223,6 +223,29 @@ data class AgentCatalog(
         )
     }
 
+    /**
+     * A conversation the computer moved in its owner's list, as it answered
+     * ([agent], with its new `orderKey`): kept, and in its owner's series at
+     * that key until the owner's own update, which lists the series again,
+     * comes (API.md: a reorder advances the owner).
+     */
+    fun withMoved(agent: JsonObject): AgentCatalog {
+        val id = agent.string("id") ?: return this
+        val index = HashMap(agents)
+        putAgent(agent, index)
+        val owner = agent.string("workspaceId") ?: return copy(agents = index)
+        fun placed(resource: JsonObject): JsonObject {
+            val series = (resource["agents"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>()
+            if (series.none { it.string("id") == id }) return resource
+            return JsonObject(resource + ("agents" to JsonArray(inOrder(series.filter { it.string("id") != id }, agent))))
+        }
+        return copy(
+            projects = projects[owner]?.let { projects + (owner to placed(it)) } ?: projects,
+            workspaces = workspaces[owner]?.let { workspaces + (owner to placed(it)) } ?: workspaces,
+            agents = index,
+        )
+    }
+
     /** A task or bot ([kind]) renamed here and taken: it wears [name] until the computer's event brings its own copy. */
     fun withName(kind: String, id: String, name: String): AgentCatalog {
         fun renamed(map: Map<String, JsonObject>) = map[id]?.let { map + (id to JsonObject(it + ("name" to JsonPrimitive(name)))) }

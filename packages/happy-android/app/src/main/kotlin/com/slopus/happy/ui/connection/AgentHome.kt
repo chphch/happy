@@ -191,6 +191,14 @@ class AgentHomeActions(
      * archive at once and comes back if the computer refuses. Null offers no Unarchive.
      */
     val onUnarchive: (suspend (AgentFeedRow.Archived) -> Unit)? = null,
+    /**
+     * Moves a project's chat after another chat of its list, or first when
+     * that is null ([com.slopus.happy.agent.AgentSession.reorder]), as the
+     * desktop's tab strip does: it stands there at once, on every device once
+     * the computer has it, and goes back if the computer refuses. Null
+     * offers no drag.
+     */
+    val onReorder: (suspend (AgentFeedRow.Conversation, afterId: String?) -> Unit)? = null,
     /** Signs a team server in again, once its sign-in expired (edge SSO). */
     val onSignIn: () -> Unit = {},
     /** Opens new work with "+"'s sheet up, for its first message's picture. */
@@ -417,6 +425,10 @@ fun AgentHomeScreen(
     val unarchive: ((AgentFeedRow.Archived) -> Unit)? = remember(actions.onUnarchive, scope) {
         actions.onUnarchive?.let { run -> { row: AgentFeedRow.Archived -> scope.launch { run(row) }; Unit } }
     }
+    // A chat carried in its list, or moved by a screen reader, stands there without waiting on the computer.
+    val reorder: ((AgentFeedRow.Conversation, String?) -> Unit)? = remember(actions.onReorder, scope) {
+        actions.onReorder?.let { run -> { row: AgentFeedRow.Conversation, afterId: String? -> scope.launch { run(row, afterId) }; Unit } }
+    }
     val previewBlur = with(LocalDensity.current) { MessageLiftSpec.blur.toPx() }
     Box(Modifier.fillMaxSize()) {
         GlassBarLayout(
@@ -503,6 +515,9 @@ fun AgentHomeScreen(
                             onArchiveShown = onArchiveShown,
                             onUnarchive = unarchive,
                             onArchiveWorkspace = actions.onArchiveWorkspace?.let { { folder: AgentFeedRow.Folder -> confirmingArchive = folder } },
+                            onReorder = reorder,
+                            // The hold opened the chat's preview; carrying the row puts it away (iOS's sidebar).
+                            onLift = chatPreview::close,
                             // The list starts under the glass bar and scrolls on beneath it.
                             contentPadding = PaddingValues(top = top),
                             // The notice is the list's first row (iOS ba0d7da0e): it comes and goes as a row does, the rows it
@@ -1141,6 +1156,8 @@ private fun SignedInAgentHome(
             onArchiveWorkspace = if (canCompose) { row -> row.archive?.let { session.archive(it.kind, it.id) } } else null,
             // And bring it back, as desktop's Chats menu does, or a task as desktop's Tasks heading does.
             onUnarchive = if (canCompose) { row -> row.taskId?.let { session.unarchiveTask(it) } ?: session.unarchive(row.agentId) } else null,
+            // A chat moved in its project's list moves in every device's, as the desktop's tab strip does.
+            onReorder = if (canCompose) { row, afterId -> row.workspaceId?.let { owner -> session.reorder(row.agentId, afterId, owner) } } else null,
             onSignIn = { graph.agentConnections.accounts.value.firstOrNull { it.id == id }?.server?.let(onSignIn) },
             onVoice = voice.takeIf { canCompose },
             onOpenVaultItem = onOpenVaultItem,
