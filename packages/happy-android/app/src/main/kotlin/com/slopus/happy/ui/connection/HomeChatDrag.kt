@@ -6,7 +6,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
@@ -22,13 +23,16 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.slopus.happy.agent.AgentFeedRow
 import com.slopus.happy.agent.ConversationKind
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -105,7 +109,8 @@ internal fun arrangedHomeItems(items: List<AgentHomeItem>, owner: String?, order
 /**
  * A project's chat carried to another place in its list on home, as the
  * desktop's tab strip carries its tabs and iOS's sidebar its bots and tasks
- * (8386b4dd5c). A hold opens the chat's preview as before; the finger
+ * (8386b4dd5c). A hold opens the chat's preview as before, and the same
+ * long press holds the row ([hold]); the finger
  * moving [LIFT] from there closes the preview ([onLift]) and lifts the row
  * (1.03, a shadow), which then follows the finger past its peers, the
  * chats of the same project or worktree, the list scrolling at its edges.
@@ -124,6 +129,9 @@ class HomeChatDrag internal constructor(
 ) {
     /** The chat in hand: its row's key, its list, where its slot was, how far the finger has carried it. */
     private data class Held(val key: String, val agentId: String, val owner: String, val top: Float, val height: Int, val offset: Float = 0f)
+
+    /** A finger is on the list, so a row's long press can hold it ([hold]). */
+    private var pressed = false
 
     /** Held, but not yet carried: the finger has not moved [LIFT] since the hold. */
     private var armed by mutableStateOf<Held?>(null)
@@ -166,12 +174,19 @@ class HomeChatDrag internal constructor(
 
     private fun peers(owner: String): List<String> = homePeers(items, owner).map { it.agentId }
 
-    private fun start(point: Offset) {
-        if (onReorder == null) return
-        val item = list.layoutInfo.visibleItemsInfo.firstOrNull { point.y >= it.offset && point.y < it.offset + it.size } ?: return
-        val chat = items.firstNotNullOfOrNull { candidate -> movableChat(candidate)?.takeIf { candidate.key == item.key } } ?: return
-        if (peers(chat.workspaceId!!).size < 2) return
-        armed = Held(item.key as String, chat.agentId, chat.workspaceId, item.offset.toFloat(), item.size)
+    /**
+     * [chat]'s row is held: its own long press, the one that opens its preview
+     * ([AgentHomeList]'s onHold), readies it to be carried. One hold for both, so
+     * a preview never opens on a row the finger then cannot carry. A long press
+     * with no finger on the list (a screen reader's) holds nothing; a reader
+     * moves a chat with its Move up and Move down.
+     */
+    fun hold(chat: AgentFeedRow.Conversation) {
+        if (!pressed || onReorder == null || !chat.movable()) return
+        val owner = chat.workspaceId ?: return
+        if (peers(owner).size < 2) return
+        val item = list.layoutInfo.visibleItemsInfo.firstOrNull { it.key == chat.key } ?: return
+        armed = Held(chat.key, chat.agentId, owner, item.offset.toFloat(), item.size)
         moved = Offset.Zero
     }
 
@@ -278,14 +293,45 @@ class HomeChatDrag internal constructor(
         }
     }
 
+    /**
+     * The finger on the list, read before its rows see it (the Initial pass).
+     * Until a row is held ([hold]) nothing is taken, so the list scrolls and a
+     * row swipes as before. From the hold on the finger is the drag's: the held
+     * row takes every event once its long press fires, so a drag reading the
+     * finger after the row would only ever find it taken.
+     */
     fun input(): Modifier = Modifier.pointerInput(this) {
-        detectDragGesturesAfterLongPress(
-            onDragStart = ::start,
-            onDragEnd = { stop(false) },
-            onDragCancel = { stop(true) },
-            // Held, the list neither scrolls nor swipes a row under the finger.
-            onDrag = { change, amount -> if (armed != null || held != null) { change.consume(); drag(amount) } },
-        )
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            pressed = true
+            try {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id }
+                    val ours = armed != null || held != null
+                    if (change == null || !change.pressed) {
+                        // A gesture the window cancels comes as an up already taken.
+                        val cancelled = change == null || change.isConsumed
+                        if (ours) {
+                            if (!cancelled) event.changes.forEach { it.consume() }
+                            stop(cancelled)
+                        }
+                        break
+                    }
+                    if (ours) {
+                        // Held, the list neither scrolls nor swipes a row under the finger.
+                        val amount = change.positionChangeIgnoreConsumed()
+                        event.changes.forEach { it.consume() }
+                        if (amount != Offset.Zero) drag(amount)
+                    }
+                }
+            } catch (c: CancellationException) {
+                if (armed != null || held != null) stop(true)
+                throw c
+            } finally {
+                pressed = false
+            }
+        }
     }
 
     /** The carried row drawn over the others, where the finger has it, lifted; set down after. */

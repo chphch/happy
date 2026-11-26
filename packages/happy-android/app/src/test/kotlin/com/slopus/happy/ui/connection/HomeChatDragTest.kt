@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.slopus.happy.agent.AgentFeedRow
 import com.slopus.happy.agent.ConversationKind
@@ -72,7 +73,8 @@ class HomeChatDragTest {
         var lifts = 0
         rule.setHappyContent {
             AgentHomeList(
-                card(folder("p1"), chat("a"), chat("b"), chat("c")), rememberLazyListState(), onOpen = {}, contentPadding = PaddingValues(),
+                // Under a bar, as home's list starts under its glass bar.
+                card(folder("p1"), chat("a"), chat("b"), chat("c")), rememberLazyListState(), onOpen = {}, contentPadding = PaddingValues(top = 56.dp),
                 onHold = { row, _ -> holds += row.agentId },
                 onReorder = { row, afterId -> moves += row.agentId to afterId },
                 onLift = { lifts++ },
