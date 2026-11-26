@@ -20,6 +20,7 @@ import com.slopus.happy.ui.node
 import com.slopus.happy.ui.setHappyContent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -133,6 +134,11 @@ class HomeChatDragTest {
                 onHold = { _, _ -> }, onReorder = { row, afterId -> moves += row.agentId to afterId },
             )
         }
+        // Scrolled to its end, the projects above off screen.
+        val start = rule.runOnIdle {
+            assertTrue("the list could scroll on up", state.canScrollBackward)
+            state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset
+        }
         val c = rule.node(AgentHomeTags.row("agent-c"))
         val list = rule.node(AgentHomeTags.LIST).fetchSemanticsNode().boundsInRoot
         val row = c.fetchSemanticsNode().boundsInRoot
@@ -141,10 +147,7 @@ class HomeChatDragTest {
         // Up under the bar and held there: every place in its list is in sight, so nothing scrolls.
         c.performTouchInput { moveBy(Offset(0f, list.top + 20f - row.center.y)) }
         rule.mainClock.advanceTimeBy(1_000)
-        rule.runOnIdle {
-            assertEquals(above.size, state.firstVisibleItemIndex)
-            assertEquals(0, state.firstVisibleItemScrollOffset)
-        }
+        rule.runOnIdle { assertEquals(start, state.firstVisibleItemIndex to state.firstVisibleItemScrollOffset) }
         c.performTouchInput { up() }
         rule.waitUntil(5_000) { moves.isNotEmpty() }
         assertEquals(listOf("c" to null), moves)
