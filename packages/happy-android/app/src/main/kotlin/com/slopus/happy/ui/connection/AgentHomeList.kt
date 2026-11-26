@@ -1048,7 +1048,7 @@ fun AgentHomeList(
     // A chat's long press opens its preview and holds its row to be carried ([HomeChatDrag.hold]).
     val preview by rememberUpdatedState(onHold)
     val hold: ((AgentFeedRow.Conversation, Rect) -> Unit)? = if (onHold == null || onReorder == null) onHold else remember(drag) {
-        { row: AgentFeedRow.Conversation, source: Rect -> drag.hold(row); preview?.invoke(row, source) }
+        { row: AgentFeedRow.Conversation, source: Rect -> drag.hold(row.agentId); preview?.invoke(row, source) }
     }
     // The list as it stands while a chat is carried, and until the feed lists the move.
     val shown = drag.arrange(items)

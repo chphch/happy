@@ -175,14 +175,16 @@ class HomeChatDrag internal constructor(
     private fun peers(owner: String): List<String> = homePeers(items, owner).map { it.agentId }
 
     /**
-     * [chat]'s row is held: its own long press, the one that opens its preview
+     * [agentId]'s row is held: its own long press, the one that opens its preview
      * ([AgentHomeList]'s onHold), readies it to be carried. One hold for both, so
      * a preview never opens on a row the finger then cannot carry. A long press
      * with no finger on the list (a screen reader's) holds nothing; a reader
-     * moves a chat with its Move up and Move down.
+     * moves a chat with its Move up and Move down. The chat is looked up in
+     * [items]: a row draws a copy without its list ([AgentFeedRow.Conversation.drawn]).
      */
-    fun hold(chat: AgentFeedRow.Conversation) {
-        if (!pressed || onReorder == null || !chat.movable()) return
+    fun hold(agentId: String) {
+        if (!pressed || onReorder == null) return
+        val chat = items.firstNotNullOfOrNull { item -> movableChat(item)?.takeIf { it.agentId == agentId } } ?: return
         val owner = chat.workspaceId ?: return
         if (peers(owner).size < 2) return
         val item = list.layoutInfo.visibleItemsInfo.firstOrNull { it.key == chat.key } ?: return
