@@ -516,8 +516,6 @@ fun AgentHomeScreen(
                             onUnarchive = unarchive,
                             onArchiveWorkspace = actions.onArchiveWorkspace?.let { { folder: AgentFeedRow.Folder -> confirmingArchive = folder } },
                             onReorder = reorder,
-                            // The hold opened the chat's preview; carrying the row puts it away (iOS's sidebar).
-                            onLift = chatPreview::close,
                             // The list starts under the glass bar and scrolls on beneath it.
                             contentPadding = PaddingValues(top = top),
                             // The notice is the list's first row (iOS ba0d7da0e): it comes and goes as a row does, the rows it
